@@ -1,9 +1,11 @@
+from debugpy import connect
 from mne_lsl.lsl import resolve_streams
 from mne_lsl.lsl.stream_info import StreamInfo
 from mne_lsl.stream import StreamLSL as Stream
 
 class AuraLslStreamHandler:
     # Public functions
+
     def __init__(self, buffer_size_multiplier):
         """
         Creates an LSL signal handler for AURA.
@@ -13,6 +15,28 @@ class AuraLslStreamHandler:
         """
         self.__connected_streams = {}
         self.__buffer_size_multiplier = buffer_size_multiplier
+
+    # Getters
+    def get_stream_new_samples(self, stream_id):
+        """
+        Return the number of new samples available in the stream.
+        :param stream_id: The connected stream to check the parameters
+        :return: None if the stream is not found, and Int containing the number of new samples available.
+        """
+        if self.__connected_streams.get(stream_id) is None:
+            return None
+        return self.__connected_streams[stream_id].n_new_samples
+
+    def get_stream_frequency(self, stream_id):
+        """
+        Return the sampling frequency of the stream.
+        :param stream_id: The stream to check the parameters
+        :return: None if the stream is not found, and Int containing the sampling frequency of the stream.
+        """
+        if self.__connected_streams.get(stream_id) is None:
+            return None
+        return self.__connected_streams[stream_id].info["sfreq"]
+
 
     @staticmethod
     def available_streams() -> list[StreamInfo]:
@@ -38,9 +62,30 @@ class AuraLslStreamHandler:
         Connects a stream given the stream identifier.
         :param stream_id: The unique ID of the stream to be connected.
         """
-        self.__connected_streams[stream_id] = (Stream(bufsize=self.__buffer_size_multiplier, source_id=stream_id))
-        self.__connected_streams[stream_id].connect()
+        was_able_to_connect = True
+        try:
+            self.__connected_streams[stream_id] = (Stream(bufsize=self.__buffer_size_multiplier, source_id=stream_id))
+            self.__connected_streams[stream_id].connect()
+        except RuntimeError:
+            self.__connected_streams.pop(stream_id)
+            was_able_to_connect = False
+        return was_able_to_connect
 
+    def is_stream_ready(self, stream_id) -> bool:
+        """
+        Check if the streams has enough data to process.
+        :param stream_id: The stream to check.
+        :return: A boolean indicating whether the stream has enough data to process.
+        """
+        is_ready = False
+        if self.__connected_streams.get(stream_id) is None:
+            raise ValueError("Stream does not exist.")
+
+        if (self.__connected_streams[stream_id].connected and
+                self.__connected_streams[stream_id].n_new_samples >= self.__connected_streams[stream_id].n_buffer):
+            is_ready = True
+
+        return is_ready
 
     def get_data_from_stream(self, stream_id=''):
         """
@@ -49,13 +94,12 @@ class AuraLslStreamHandler:
         :return: None if the stream is closed or does not exist or has not being filled with fresh data, returns a tuple when
                  a pack of fresh data is available.
         """
-        data_to_return = None
+        data_to_return = (None, None)
 
         if self.__connected_streams.get(stream_id) is None:
             data_to_return = -1
         else:
-            if (self.__connected_streams[stream_id].connected and
-                    self.__connected_streams[stream_id].n_buffer >= self.__connected_streams[stream_id].n_new_samples):
+            if self.is_stream_ready(stream_id):
                 data = self.__connected_streams[stream_id].get_data()
                 data_to_return = data
         return data_to_return
