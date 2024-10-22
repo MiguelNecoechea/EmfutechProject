@@ -9,7 +9,7 @@ import threading
 class WindowsScreenRecorder(ScreenRecorder):
     """
     Specific implementation of a basic ScreenRecorder using the dxcam module.
-    Since this module requires directX components implementation is intended to only windows systems.
+    Since this module requires directX components implementation is intended to only Windows systems.
     """
     def __init__(self, output_path: str, filename, fps: int = 30):
         """
