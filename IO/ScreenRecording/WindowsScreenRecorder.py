@@ -13,7 +13,7 @@ class WindowsScreenRecorder(ScreenRecorder):
     """
     def __init__(self, output_path: str, filename, fps: int = 30):
         """
-        Constructor of the screen recorder. The format of the file is mp4.
+        Constructor of the screen recorder.
         :param output_path: The path where the video will be saved.
         :param filename: The name of the video file.
         :param fps: The target fps of the recording.
@@ -84,6 +84,8 @@ class WindowsScreenRecorder(ScreenRecorder):
         try:
             while True:
                 self.writer.write(self.camera.get_latest_frame())
+                if not self.is_recording:
+                    break
         except Exception as e:
             print(f"Error during recording: {e}")
         finally:
