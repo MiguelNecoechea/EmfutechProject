@@ -1,4 +1,3 @@
-from debugpy import connect
 from mne_lsl.lsl import resolve_streams
 from mne_lsl.lsl.stream_info import StreamInfo
 from mne_lsl.stream import StreamLSL as Stream
@@ -92,12 +91,12 @@ class AuraLslStreamHandler:
         Gets the data from a stream object, this function only gets data when the stream has full new data.
         :param stream_id: The unique ID of the stream to collect data from.
         :return: None if the stream is closed or does not exist or has not being filled with fresh data, returns a tuple when
-                 a pack of fresh data is available.
+                 a pack of fresh data is available. When the stream is not valid returns a tuple of negative ones
         """
         data_to_return = (None, None)
 
         if self.__connected_streams.get(stream_id) is None:
-            data_to_return = -1
+            data_to_return = (-1, -1)
         else:
             if self.is_stream_ready(stream_id):
                 data = self.__connected_streams[stream_id].get_data()
