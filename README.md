@@ -15,3 +15,6 @@
 ## Languages
 * Python 3.11.5
 * C++ 17
+
+# Acknowledgments
+Sergey Kuldin for the development of LaserGaze
