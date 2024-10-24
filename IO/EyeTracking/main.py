@@ -1,19 +1,15 @@
-from LaserGaze.GazeProcessor import GazeProcessor
-from LaserGaze.VisualizationOptions import VisualizationOptions
-from  LaserGaze import landmarks
-import asyncio
+from LaserGaze.LaserGaze import LaserGaze
+import cv2
+laser_gaze = LaserGaze()
+laser_gaze.start_camera_and_processor()
 
-async def gaze_vectors_collected(left, right):
-    print(f"left: {left}, right: {right}")
+while True:
+    data = laser_gaze.get_gaze_vector_and_frame()
+    if data is not None:
+        frame = data[-1]
+        cv2.imshow('LaserGaze', frame)
 
-async def main():
-    vo = VisualizationOptions()
-    gp = GazeProcessor(visualization_options=vo, callback=gaze_vectors_collected)
-    await gp.start()
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(main())
-    finally:
-        loop.close()
+laser_gaze.stop()
