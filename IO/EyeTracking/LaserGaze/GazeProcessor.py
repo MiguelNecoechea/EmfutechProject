@@ -13,10 +13,10 @@
 import mediapipe as mp
 import cv2
 import time
-from landmarks import *
-from face_model import *
-from AffineTransformer import AffineTransformer
-from EyeballDetector import EyeballDetector
+from .landmarks import *
+from .face_model import *
+from .AffineTransformer import AffineTransformer
+from .EyeballDetector import EyeballDetector
 
 # Can be downloaded from https://developers.google.com/mediapipe/solutions/vision/face_landmarker
 model_path = "./face_landmarker.task"

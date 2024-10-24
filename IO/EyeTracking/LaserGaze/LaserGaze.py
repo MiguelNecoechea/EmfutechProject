@@ -13,12 +13,20 @@
 # Author: Sergey Kuldin
 # -----------------------------------------------------------------------------------
 import cv2
-# Aqui debe de estar toda la logica del backend
-from GazeProcessor import GazeProcessor
-from VisualizationOptions import VisualizationOptions
 import asyncio
 
+# Aqui debe de estar toda la logica del backend
+from .GazeProcessor import GazeProcessor
+from .VisualizationOptions import VisualizationOptions
+import asyncio 
+from flask_socketio import SocketIO
+
+# Aquí se configura socketio para la transmisión de datos
+socketio = SocketIO()
+
 async def gaze_vectors_collected(left, right, frame):
+     # Transmitir coordenadas del ojo izquierdo al backend
+    socketio.emit('gaze_data', {'x': left[0], 'y': left[1]})
     cv2.imshow('Lazer Gaze', frame)
     print(f"left: {left}, right: {right}")
 

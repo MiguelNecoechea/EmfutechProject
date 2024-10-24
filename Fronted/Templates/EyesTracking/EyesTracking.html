@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Tracking</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        canvas {
+            width: 100%;
+            height: 80%;
+            display: block;
+            border: none; /* Eliminando el borde del canvas */
+        }
+    </style>
+</head>
+<body>
+    <h1 style="display: none;">Eye Tracking System</h1>
+    <canvas id="trackingCanvas"></canvas>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const canvas = document.getElementById('trackingCanvas');
+        const ctx = canvas.getContext('2d');
+        const socket = io();
+        let collectedCoordinates = []; // Array para almacenar las coordenadas
+        const totalPoints = 9;  // El número de puntos que queremos recolectar
+        let currentPoint = 0;
+        let intervalId;
+
+        // Hacer que el tamaño del canvas se ajuste automáticamente a la pantalla
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Llamar a la función de ajuste de tamaño cuando se cargue la página y cuando se cambie el tamaño de la ventana
+        window.addEventListener('load', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas);
+
+        const points = [
+            { x: 0.15, y: 0.15 }, { x: 0.5, y: 0.15 }, { x: 0.85, y: 0.15 },
+            { x: 0.15, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.85, y: 0.5 },
+            { x: 0.15, y: 0.85 }, { x: 0.5, y: 0.85 }, { x: 0.85, y: 0.85 }
+        ];
+
+        // Conexión al servidor SocketIO
+        socket.on('connect', function () {
+            console.log('Conectado al servidor');
+            socket.emit('start_eye_tracking');  // Solicitar inicio de seguimiento ocular
+        });
+
+        // Recibir las coordenadas de los ojos y dibujar en el canvas
+        socket.on('gaze_data', function (data) {
+            console.log('Datos de seguimiento recibidos:', data);
+
+            // Limpiar el canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar las coordenadas de la mirada en el canvas
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(data.x * canvas.width, data.y * canvas.height, 10, 0, Math.PI * 2);  // Dibuja el punto reescalado
+            ctx.fill();
+
+            // Guardar las coordenadas
+            collectedCoordinates.push({ x: data.x, y: data.y });
+
+            // Si ya hemos alcanzado 9 puntos, detener el mapeo
+            if (collectedCoordinates.length >= totalPoints) {
+                stopMapping();
+            }
+        });
+
+        // Función para simular la actualización de puntos cada 3 segundos
+        function startMapping() {
+            intervalId = setInterval(() => {
+                const point = points[currentPoint];
+                currentPoint = (currentPoint + 1) % points.length; // Ciclar entre los puntos
+
+                // Emitir coordenadas de simulación al backend en formato porcentual
+                socket.emit('gaze_data', { x: point.x, y: point.y });
+                console.log('Punto enviado:', point);
+
+                // Verificar si se han recibido 9 puntos
+                if (collectedCoordinates.length >= totalPoints) {
+                    stopMapping();
+                }
+            }, 3000);
+        }
+
+        // Función para detener el mapeo
+        function stopMapping() {
+            clearInterval(intervalId);  // Detener la simulación de puntos
+
+            // Imprimir las coordenadas recolectadas
+            console.log('Coordenadas guardadas:', collectedCoordinates);
+            alert('Mapeo detenido. Coordenadas guardadas en la consola.');
+
+            // Aquí podrías enviar las coordenadas al servidor para almacenarlas, si fuera necesario
+            // socket.emit('save_coordinates', collectedCoordinates);
+        }
+
+        // Comenzar el mapeo
+        startMapping();
+    </script>
+</body>
+</html>
