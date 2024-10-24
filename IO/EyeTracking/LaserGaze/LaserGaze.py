@@ -12,35 +12,40 @@
 #              GazeProcessor in their own applications.
 # Author: Sergey Kuldin
 # -----------------------------------------------------------------------------------
-import cv2
-import asyncio
-
-# Aqui debe de estar toda la logica del backend
 from .GazeProcessor import GazeProcessor
 from .VisualizationOptions import VisualizationOptions
-import asyncio 
-from flask_socketio import SocketIO
 
-# Aquí se configura socketio para la transmisión de datos
-socketio = SocketIO()
+class LaserGaze:
+    """
+    This class is just a wrapper around the GazeProcessor. For some reason if the GazeProcessor is called from another
+    folder is not working and I don't want to fix that inconvenience. :p
+    """
+    def __init__(self, automatic_start=False):
+        """
+        Makes a visual configuration for the visualization of the frame with the gaze vector
+        :param automatic_start: Whether to initialize the recording when instantiated.
+        """
+        vo = VisualizationOptions()
+        self.gaze_processor = GazeProcessor(visualization_options=vo)
+        if automatic_start:
+            self.start_camera_and_processor()
 
-async def gaze_vectors_collected(left, right, frame):
-     # Transmitir coordenadas del ojo izquierdo al backend
-    socketio.emit('gaze_data', {'x': left[0], 'y': left[1]})
-    cv2.imshow('Lazer Gaze', frame)
-    print(f"left: {left}, right: {right}")
+    def start_camera_and_processor(self):
+        """
+        Wraps the GazeProcessor starting routine.
+        """
+        self.gaze_processor.start()
 
-async def stop_recording():
-    pass
+    def get_gaze_vector_and_frame(self):
+        """
+        Wraps the main function of the GazeProcessor class.
+        :return: A tuple of the gaze vector and the gaze frame.
+        """
+        return self.gaze_processor.get_gaze_vector()
 
-async def main():
-    vo = VisualizationOptions()
-    gp = GazeProcessor(visualization_options=vo, callback=gaze_vectors_collected)
-    await gp.start()
+    def stop(self):
+        """
+        Wraps the GazeProcessor.stop() method to stop the GazeProcessor.
+        """
+        self.gaze_processor.stop_processing()
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(main())
-    finally:
-        loop.close()
