@@ -15,4 +15,4 @@ def handle_gaze_data(data):
     emit('gaze_data', data)  # Enviar de vuelta al cliente para actualizar la visualización
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
