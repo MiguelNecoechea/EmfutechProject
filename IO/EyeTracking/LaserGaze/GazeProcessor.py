@@ -18,14 +18,6 @@ from .face_model import *
 from .AffineTransformer import AffineTransformer
 from .EyeballDetector import EyeballDetector
 
-# Can be downloaded from https://developers.google.com/mediapipe/solutions/vision/face_landmarker
-model_path = "./face_landmarker.task"
-
-BaseOptions = mp.tasks.BaseOptions
-FaceLandmarker = mp.tasks.vision.FaceLandmarker
-FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
-VisionRunningMode = mp.tasks.vision.RunningMode
-
 class GazeProcessor:
     """
     Processes video input to detect facial landmarks and estimate gaze vectors using the MediaPipe library.
@@ -47,6 +39,13 @@ class GazeProcessor:
         self.running = False
         self.cap = None
         self.landmarker = None
+        # Can be downloaded from https://developers.google.com/mediapipe/solutions/vision/face_landmarker
+        model_path = "./face_landmarker.task"
+
+        BaseOptions = mp.tasks.BaseOptions
+        self.FaceLandmarker = mp.tasks.vision.FaceLandmarker
+        FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
         self.options = FaceLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=model_path),
             running_mode=VisionRunningMode.VIDEO
@@ -58,7 +57,7 @@ class GazeProcessor:
         Continuously updates the video display and invokes callback with gaze data.
         """
         self.cap = cv2.VideoCapture(self.camera_idx)
-        self.landmarker = FaceLandmarker.create_from_options(self.options)
+        self.landmarker = self.FaceLandmarker.create_from_options(self.options)
         self.running = True
 
     def get_gaze_vector(self):
@@ -135,6 +134,7 @@ class GazeProcessor:
                                 self.vis_options.color, 2)
 
             return left_gaze_vector, right_gaze_vector, frame
+        return None, None, frame
 
     def stop_processing(self):
         """
