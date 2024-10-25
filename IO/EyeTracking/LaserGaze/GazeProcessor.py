@@ -14,9 +14,10 @@ import mediapipe as mp
 import cv2
 import time
 from .landmarks import *
-from .face_model import *
-from .AffineTransformer import AffineTransformer
-from .EyeballDetector import EyeballDetector
+from face_model import *
+from AffineTransformer import AffineTransformer
+from EyeballDetector import EyeballDetector
+
 
 class GazeProcessor:
     """
@@ -142,4 +143,5 @@ class GazeProcessor:
         :return:
         """
         self.cap.release()
-        self.running = False
+        self.running = False4
+

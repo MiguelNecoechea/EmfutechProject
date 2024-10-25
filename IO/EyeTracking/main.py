@@ -11,7 +11,7 @@ while True:
         frame = data[-1]
         print("left: ", data[0], " right: ",data[1])
         cv2.imshow('LaserGaze', frame)
-
+    
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

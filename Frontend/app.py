@@ -1,18 +1,15 @@
-from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
+import sys
+import os
+import sys
+import os
 
-app = Flask(__name__)
-socketio = SocketIO(app)
+sys.path.append(os.path.join(os.path.dirname(__file__), 'Templates/EyesTracking'))
+from EyesTrackinig import run_eye_tracking
 
-@app.route('/')
-def index():
-    return render_template('EyesTracking/EyesTracking.html')
 
-# Manejo de evento para recibir coordenadas de simulación
-@socketio.on('gaze_data')
-def handle_gaze_data(data):
-    print(f"Coordenadas recibidas: {data}")  # Imprimir las coordenadas en la consola del servidor
-    emit('gaze_data', data)  # Enviar de vuelta al cliente para actualizar la visualización
+# Importar la función que ejecutará la interfaz de Eye Tracking
+from Templates.EyesTracking.EyesTrackinig import run_eye_tracking
 
-if __name__ == '__main__':
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+if __name__ == "__main__":
+    run_eye_tracking()  # Ejecutar la 
+    
