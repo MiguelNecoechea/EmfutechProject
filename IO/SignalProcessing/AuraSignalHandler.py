@@ -129,6 +129,20 @@ class AuraLslStreamHandler:
 
         self.__stream.filter(low_pass, high_pass, picks)
 
+    def drop_channels(self, channels_to_drop:list[str]):
+        """
+        Tries to remove channels that will not be needed.
+        :param channels_to_drop: The names of the channels to be removed.
+        :return: A boolean indicating whether the channels were removed or not.
+        """
+        try:
+            self.__stream.drop_channels(channels_to_drop)
+            dropped = True
+        except ValueError:
+            dropped = False
+
+        return dropped
+
     def rename_aura_channels(self) -> bool:
         """
         Rename the aura channels to the standard name of the electrodes that are being used
