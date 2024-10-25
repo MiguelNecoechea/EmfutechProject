@@ -106,17 +106,30 @@ class AuraLslStreamHandler:
         :return: None if the stream is closed or does not exist or has not being filled with fresh data, returns a tuple when
                  a pack of fresh data is available. When the stream is not valid returns a tuple of negative ones
         """
-        data_to_return = (None, None)
-
         if self.__stream is None:
-            data_to_return = (-1, -1)
-        else:
-            if self.is_stream_ready():
-                data = self.__stream.get_data()
-                data_to_return = data
-        return data_to_return
+            raise RuntimeError("The stream is not created or connected yet.")
 
-    def add_filter(self, low_pass=1.0, high_pass=1.0, picks='eeg'):
+        return self.__stream.get_data()
+
+    def clear_buffer(self):
+        """
+        Clears the buffer of the stream. This can be used if some anomalies occur with the data, given that it takes
+        to build the object.
+        :return:
+        """
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        self.__stream.get_data()
+
+    def add_notch_filter(self, freq_hz=50):
+        """
+        Adds a notch filter to the stream.
+        :param freq_hz: Specifies the frequency to filter out
+        """
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        self.__stream.notch_filter(freqs=freq_hz)
+    def add_filter(self, low_pass=1.0, high_pass=1.0, picks=None):
         """
         Adds a filter to the stream.
         :param low_pass: A float representing the low pass filter.
@@ -127,7 +140,7 @@ class AuraLslStreamHandler:
         if self.__stream is None:
             raise RuntimeError("Stream does not exist.")
 
-        self.__stream.filter(low_pass, high_pass, picks)
+        self.__stream.filter(low_pass, high_pass, picks=picks)
 
     def drop_channels(self, channels_to_drop:list[str]):
         """
