@@ -5,36 +5,44 @@ from mne_lsl.stream import StreamLSL as Stream
 class AuraLslStreamHandler:
     # Public functions
 
-    def __init__(self, buffer_size_multiplier):
+    def __init__(self, buffer_size_multiplier, stream_id=''):
         """
         Creates an LSL signal handler for AURA.
         :param buffer_size_multiplier: The multiplier for the buffer size.
-        it is important to consider that the buffer size is determined by the frequency,
         The formula is sampling_frequency_(Hz) * buffer_size_multiplier.
+        it is important to consider that the buffer size is determined by the frequency,
+        :param stream_id: The stream ID that will be handled.
         """
-        self.__connected_streams = {}
         self.__buffer_size_multiplier = buffer_size_multiplier
+        self.__stream = None
+        if stream_id != '':
+            self.connect_stream(stream_id)
 
     # Getters
-    def get_stream_new_samples(self, stream_id):
+
+    def get_stream_info(self):
+        if self.__stream is None:
+            raise RuntimeError("Stream handler has not been initialized.")
+
+        return self.__stream.info
+
+    def get_stream_new_samples(self):
         """
         Return the number of new samples available in the stream.
-        :param stream_id: The connected stream to check the parameters
         :return: None if the stream is not found, and Int containing the number of new samples available.
         """
-        if self.__connected_streams.get(stream_id) is None:
-            return None
-        return self.__connected_streams[stream_id].n_new_samples
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        return self.__stream.n_new_samples
 
-    def get_stream_frequency(self, stream_id):
+    def get_stream_frequency(self):
         """
         Return the sampling frequency of the stream.
-        :param stream_id: The stream to check the parameters
         :return: None if the stream is not found, and Int containing the sampling frequency of the stream.
         """
-        if self.__connected_streams.get(stream_id) is None:
-            return None
-        return self.__connected_streams[stream_id].info["sfreq"]
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        return self.__stream.info["sfreq"]
 
 
     @staticmethod
@@ -45,16 +53,12 @@ class AuraLslStreamHandler:
         """
         return resolve_streams()
 
-    def disconnect_stream(self, stream_name=''):
+    def disconnect_stream(self):
         """
         Disconnects a specific stream and deletes the object from memory.
-        :param stream_name: The name of the stream to be disconnected.
         """
-        for _, stream in self.__connected_streams.items():
-            if stream.name == stream_name and stream.connected:
-                stream.disconnect()
-                del stream
-                break
+        self.__stream.disconnect()
+        del self.__stream
 
     def connect_stream(self, stream_id=''):
         """
@@ -62,67 +66,123 @@ class AuraLslStreamHandler:
         :param stream_id: The unique ID of the stream to be connected.
         """
         was_able_to_connect = True
-        try:
-            self.__connected_streams[stream_id] = (Stream(bufsize=self.__buffer_size_multiplier, source_id=stream_id))
-            self.__connected_streams[stream_id].connect()
-        except RuntimeError:
-            self.__connected_streams.pop(stream_id)
-            was_able_to_connect = False
+        if self.__stream is None:
+            try:
+                self.__stream = Stream(bufsize=self.__buffer_size_multiplier, source_id=stream_id)
+                self.__stream.connect(processing_flags='all')
+                self.rename_aura_channels()
+            except RuntimeError:
+                was_able_to_connect = False
         return was_able_to_connect
 
-    def is_stream_ready(self, stream_id) -> bool:
+    def is_stream_ready(self) -> bool:
         """
         Check if the streams has enough data to process.
-        :param stream_id: The stream to check.
         :return: A boolean indicating whether the stream has enough data to process.
         """
         is_ready = False
-        if self.__connected_streams.get(stream_id) is None:
-            raise ValueError("Stream does not exist.")
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
 
-        if (self.__connected_streams[stream_id].connected and
-                self.__connected_streams[stream_id].n_new_samples >= self.__connected_streams[stream_id].n_buffer):
+        if (self.__stream.connected and
+                self.__stream.n_new_samples >= self.__stream.n_buffer):
             is_ready = True
 
         return is_ready
 
-    def get_data_from_stream(self, stream_id=''):
+    def remove_stream_filters(self):
+        """
+        Removes all previous applied filters to the stream.
+        :return:
+        """
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        if len(self.__stream.filters) != 0:
+            self.__stream.del_filter()
+
+    def get_data_from_stream(self):
         """
         Gets the data from a stream object, this function only gets data when the stream has full new data.
-        :param stream_id: The unique ID of the stream to collect data from.
         :return: None if the stream is closed or does not exist or has not being filled with fresh data, returns a tuple when
                  a pack of fresh data is available. When the stream is not valid returns a tuple of negative ones
         """
-        data_to_return = (None, None)
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created or connected yet.")
 
-        if self.__connected_streams.get(stream_id) is None:
-            data_to_return = (-1, -1)
-        else:
-            if self.is_stream_ready(stream_id):
-                data = self.__connected_streams[stream_id].get_data()
-                data_to_return = data
-        return data_to_return
+        return self.__stream.get_data()
 
-    def rename_aura_channels(self, stream_id='') -> bool:
+    def clear_buffer(self):
+        """
+        Clears the buffer of the stream. This can be used if some anomalies occur with the data, given that it takes
+        to build the object.
+        :return:
+        """
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        self.__stream.get_data()
+
+    def add_notch_filter(self, freq_hz=50):
+        """
+        Adds a notch filter to the stream.
+        :param freq_hz: Specifies the frequency to filter out
+        """
+        if self.__stream is None:
+            raise RuntimeError("The stream is not created yet.")
+        self.__stream.notch_filter(freqs=freq_hz)
+    def add_filter(self, low_pass=1.0, high_pass=1.0, picks=None):
+        """
+        Adds a filter to the stream.
+        :param low_pass: A float representing the low pass filter.
+        :param high_pass: A float representing the high pass filter.
+        :param picks: The channel where the filter will be applied.
+        :return:
+        """
+        if self.__stream is None:
+            raise RuntimeError("Stream does not exist.")
+
+        self.__stream.filter(low_pass, high_pass, picks=picks)
+
+    def drop_channels(self, channels_to_drop:list[str]):
+        """
+        Tries to remove channels that will not be needed.
+        :param channels_to_drop: The names of the channels to be removed.
+        :return: A boolean indicating whether the channels were removed or not.
+        """
+        try:
+            self.__stream.drop_channels(channels_to_drop)
+            dropped = True
+        except ValueError:
+            dropped = False
+
+        return dropped
+
+    def rename_aura_channels(self) -> bool:
         """
         Rename the aura channels to the standard name of the electrodes that are being used
-        This is supposed to take the stream with 8 channels.
-        :param stream_id: The name of the stream with 8 Channels of aura.
+        This is supposed to take the stream with 8 channels. However it is also capable of renaming the other channels.
         :return: True if the operation is successful. False otherwise.
         """
         named_changed = False
-        if self.__connected_streams.get(stream_id) is not None:
-            aura_channels = {
-                '0': 'F3',
-                '1': 'F4',
-                '2': 'Cz',
-                '3': 'C3',
-                '4': 'Pz',
-                '5': 'C4',
-                '6': 'P3',
-                '7': 'P4'
-               }
-            self.__connected_streams[stream_id].rename_channels(aura_channels)
+        if self.__stream is not None:
+            if self.__stream.info['nchan'] == 8:
+                aura_channels = {
+                    '0': 'F3',
+                    '1': 'F4',
+                    '2': 'Cz',
+                    '3': 'C3',
+                    '4': 'Pz',
+                    '5': 'C4',
+                    '6': 'P3',
+                    '7': 'P4'
+                   }
+            elif self.__stream.info['nchan'] == 40:
+                aura_channels = self.__rename_40_channels()
+            else:
+                self.disconnect_stream()
+                del self.__stream
+                raise RuntimeError("The stream is not supported")
+
+            self.__stream.rename_channels(aura_channels)
             named_changed = True
 
         return named_changed
@@ -138,14 +198,17 @@ class AuraLslStreamHandler:
         """
         Deletes all connected streams in order to free memory resources.
         """
-        self.__disconnect_all_streams()
-        for _, stream in self.__connected_streams.items():
-            del stream
+        if self.__stream is not None:
+            self.__stream.disconnect()
+            del self.__stream
 
-    def __disconnect_all_streams(self):
-        """
-        Disconnects all connected streams and deletes the object from memory.
-        """
-        for _, stream in self.__connected_streams.items():
-            if stream.connected:
-                stream.disconnect()
+    def __rename_40_channels(self):
+        waves = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']
+        channels = ['F3', 'F4', 'Cz', 'C3', 'C4', 'Pz', 'P3', 'P4']
+        current_position = 0
+        mapping = {}
+        for wave in waves:
+            for channel in channels:
+                mapping[str(current_position)] = wave +'_' + channel
+                current_position += 1
+        return mapping
