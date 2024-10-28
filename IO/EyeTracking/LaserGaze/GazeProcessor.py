@@ -143,5 +143,5 @@ class GazeProcessor:
         :return:
         """
         self.cap.release()
-        self.running = False4
+        self.running = False
 

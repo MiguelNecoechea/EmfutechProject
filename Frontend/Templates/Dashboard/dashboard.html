@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
+    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
+    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
+    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
+    <link rel="stylesheet" href="/Frontend/Css/pages/deshboard.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="user-login">
+                <img src="../assets/icons/user.png" alt="User Icon">
+                <span>Login User</span>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active"><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
+                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
+                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
+                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
+                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
+                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
+                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
+                    <li><a href="#">Account</a></li>
+                    <li><a href="#">Support</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header Navigation -->
+            <nav class="top-nav">
+                <ul class="nav-tabs">
+                    <li><a href="#" class="active">Summary</a></li>
+                    <li><a href="#">Real-time status</a></li>
+                    <li><a href="#">Key indicators</a></li>
+                    <li><a href="#">Metrics</a></li>
+                </ul>
+                <div class="playback-controls">
+                    <button class="start-btn">Start</button>
+                    <div class="control-buttons">
+                        <button>⏮</button>
+                        <button>⏸</button>
+                        <button>▶</button>
+                        <button>⟳</button>
+                        <button>⏭</button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <div class="page-header">
+                    <h1><i class="icon-page"></i>Page / Dashboard</h1>
+                </div>
+
+                <div class="live-feeds">
+                    <h2>Live Feeds</h2>
+                    <div class="feeds-grid">
+                        <div class="feed-box">
+                            <h3>Signs</h3>
+                            <!-- Feed content -->
+                        </div>
+                        <div class="feed-box">
+                            <h3>Signs</h3>
+                            <!-- Feed content -->
+                        </div>
+                        <div class="feed-box">
+                            <h3>Signs</h3>
+                            <!-- Feed content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../Script/global/app.js"></script>
+    <script src="../Script/layouts/sidebar.js"></script>
+    <script src="../Script/layouts/header.js"></script>
+    <script src="../Script/pages/dashboard.js"></script>
+</body>
+</html>

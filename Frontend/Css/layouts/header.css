@@ -1,0 +1,35 @@
+.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: var(--header-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 20px;
+    list-style: none;
+}
+
+.nav-tabs a {
+    text-decoration: none;
+    color: var(--text-color);
+    padding: 5px 10px;
+}
+
+.nav-tabs a.active {
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 5px;
+}

@@ -1,0 +1,14 @@
+{
+    "liveServer.settings.root": "/",
+    "liveServer.settings.port": 5500,
+    "liveServer.settings.mount": [
+        ["/", "./"]
+    ],
+    "liveServer.settings.ignoreFiles": [
+        ".vscode/**",
+        "**/*.py",
+        "**/*.pyc",
+        "**/__pycache__/**"
+    ]
+}
+

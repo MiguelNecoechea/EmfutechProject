@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration</title>
+    <!-- Links CSS -->
+    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
+    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
+    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
+    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
+    <link rel="stylesheet" href="/Frontend/Css/pages/configuration.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="user-login">
+                <img src="/Frontend/assets/icons/user.png" alt="Login User">
+                <span>Login User</span>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
+                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
+                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
+                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
+                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
+                    <li class="active"><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
+                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
+                    <li><a href="#">Account</a></li>
+                    <li><a href="#">Support</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <!-- Header Navigation -->
+            <nav class="top-nav config-nav">
+                <ul class="nav-tabs">
+                    <li><a href="#" class="active">Attention Levels Chart <i class="icon-download"></i></a></li>
+                    <li><a href="#">Attention Performance Summary <i class="icon-download"></i></a></li>
+                    <li><a href="#">Exportable Data <i class="icon-download"></i></a></li>
+                </ul>
+            </nav>
+
+            <div class="page-content">
+                <div class="page-header">
+                    <h1><i class="icon-configuration"></i>Page / Configuration</h1>
+                </div>
+
+                <!-- Search and Options Bar -->
+                <div class="search-options-bar">
+                    <div class="search-filters">
+                        <select class="filter-select">
+                            <option>Study Name</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>Description</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>Study Objectives</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>Study Duration</option>
+                        </select>
+                    </div>
+                    <div class="options-group">
+                        <button class="option-btn">Assign Groups</button>
+                        <button class="option-btn">Segmentation</button>
+                        <button class="option-btn">Group Editing</button>
+                    </div>
+                </div>
+
+                <!-- Configuration Grid -->
+                <div class="config-grid">
+                    <div class="config-card device-settings">
+                        <h3>Device Settings</h3>
+                        <div class="device-selection">
+                            <h4>Connected Device Selection</h4>
+                            <div class="device-options">
+                                <label class="device-option">
+                                    <input type="checkbox" name="device" value="eeg">
+                                    EEG
+                                </label>
+                                <label class="device-option">
+                                    <input type="checkbox" name="device" value="eyeTracking">
+                                    Eye Tracking
+                                </label>
+                                <label class="device-option">
+                                    <input type="checkbox" name="device" value="emotions">
+                                    Emotions
+                                </label>
+                            </div>
+
+                            <div class="settings-group">
+                                <div class="setting">
+                                    <label>Signal Capture Frequency</label>
+                                    <select class="setting-select">
+                                        <option>Default Frequency Setting</option>
+                                    </select>
+                                </div>
+                                <div class="setting">
+                                    <label>Threshold Settings</label>
+                                    <select class="setting-select">
+                                        <option>Configure Threshold Level</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>Study Dashboard</h3>
+                        <div class="dashboard-content"></div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>Participant Progress</h3>
+                        <div class="progress-content"></div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>Results Management</h3>
+                        <div class="results-content"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/Frontend/Script/global/app.js"></script>
+    <script src="/Frontend/Script/global/init.js"></script>
+    <script src="/Frontend/Script/layouts/sidebar.js"></script>
+    <script src="/Frontend/Script/layouts/header.js"></script>
+    <script src="/Frontend/Script/pages/configuration.js"></script>
+</body>
+</html>
