@@ -1,7 +1,6 @@
 import os
 import csv
 
-
 class Writer:
     def __init__(self, output_path, file_name, initial_line):
         """
@@ -20,6 +19,8 @@ class Writer:
         """
         Creates a new file and file writer, it also writes the name of each of the channels passed by the initial line,
         """
+        os.makedirs(os.path.dirname(self._path), exist_ok=True)
+
         self._csv_file = open(self._path, 'w')
         self._csv_writer = csv.writer(self._csv_file)
         self._is_writer_opened = True
