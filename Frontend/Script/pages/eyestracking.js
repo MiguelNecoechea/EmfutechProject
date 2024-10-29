@@ -1,3 +1,5 @@
+const { remote } = require('@electron/remote');
+
 class EyeTrackingCalibration {
     constructor() {
         this.calibrationArea = document.getElementById('calibrationArea');
@@ -9,10 +11,17 @@ class EyeTrackingCalibration {
     }
 
     setupEventListeners() {
-        this.startButton.addEventListener('click', () => {
-            document.documentElement.requestFullscreen();
-            this.startButton.style.display = 'none';
-            this.initializeCalibration();
+        this.startButton.addEventListener('click', async () => {
+            try {
+                const win = remote.getCurrentWindow();
+                await win.setFullScreen(true);
+                this.startButton.style.display = 'none';
+                this.initializeCalibration();
+            } catch (error) {
+                document.documentElement.requestFullscreen();
+                this.startButton.style.display = 'none';
+                this.initializeCalibration();
+            }
         });
     }
 
@@ -79,16 +88,16 @@ class EyeTrackingCalibration {
         };
         this.coordinateLog.push(coordinates);
 
-        // Enviar al servidor en tiempo real
         fetch('http://localhost:5000/log-point', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(coordinates)
+        }).catch(error => {
+            console.error('Error al enviar punto al servidor:', error);
         });
 
-        // Mostrar en consola del navegador
         console.log(`Punto ${pointNumber}: X=${Math.round(x)}px, Y=${Math.round(y)}px`);
     }
 
@@ -106,33 +115,37 @@ class EyeTrackingCalibration {
         }
     }
 
-    finishCalibration() {
-        // Enviar datos completos al servidor
-        fetch('http://localhost:5000/save-calibration', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(this.coordinateLog)
-        })
-        .then(response => response.json())
-        .then(data => {
+    async finishCalibration() {
+        try {
+            const response = await fetch('http://localhost:5000/save-calibration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(this.coordinateLog)
+            });
+
+            const data = await response.json();
             console.log('=== Calibración Completada ===');
             console.log(`Datos guardados en: ${data.filename}`);
             console.table(this.coordinateLog);
             
-            setTimeout(() => {
-                document.exitFullscreen();
+            setTimeout(async () => {
+                try {
+                    const win = remote.getCurrentWindow();
+                    await win.setFullScreen(false);
+                } catch (error) {
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    }
+                }
                 this.reset();
             }, 1000);
-        })
-        .catch(error => {
+
+        } catch (error) {
             console.error('Error al guardar los datos:', error);
-            setTimeout(() => {
-                document.exitFullscreen();
-                this.reset();
-            }, 1000);
-        });
+            this.reset();
+        }
     }
 
     reset() {

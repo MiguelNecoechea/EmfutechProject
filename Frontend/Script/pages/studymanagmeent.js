@@ -1,3 +1,7 @@
+// Init: Javier Reyes
+// Date: 2021-09-15
+// Update: 2021-09-15
+// Description: Script para la página de gestión de estudios
 class StudyManager {
     constructor() {
         this.initializeComponents();

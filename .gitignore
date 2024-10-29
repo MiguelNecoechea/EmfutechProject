@@ -1,4 +1,79 @@
-__pycache__
-*.pyc
-**/__pycache__/
-/fotos-prueba
+
+# Dependencias de Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Archivos y carpetas de compilación de Electron
+dist/
+out/
+build/
+release/
+
+# Archivos de empaquetado de Electron
+*.asar
+*.dmg
+*.exe
+*.app
+*.deb
+*.rpm
+
+# Configuración del sistema operativo y editores
+.DS_Store        # macOS
+Thumbs.db        # Windows
+.idea/           # Configuración de IntelliJ IDEA
+.vscode/         # Configuración de Visual Studio Code
+*.suo            # Visual Studio
+*.ntvs*          # Visual Studio Node.js Tools
+*.njsproj        # Visual Studio
+*.vcxproj        # Visual Studio C++
+*.swp            # Archivos temporales de Vim
+*.sublime*       # Configuración de Sublime Text
+
+# Archivos de entorno (si tienes información sensible)
+.env
+.env.local
+.env.*.local
+
+# Archivos de caché y logs
+.cache/
+logs/
+*.log
+
+# Caché de empaquetado
+cache/
+tmp/
+temp/
+
+# Archivos de empaquetado de GitHub Actions (si usas GitHub Actions para despliegue)
+*.bak
+*.tmp
+
+# Archivos de Python
+__pycache__/    # Carpeta de caché de Python
+__pycache__     # Carpeta de caché de Python
+*.pyc           
+**/__pycache__/  # Carpeta de caché de Python
+*.py[cod]        # Archivos compilados de Python
+*.so             # Archivos de biblioteca compartida
+*.pyd            # Archivos de biblioteca compartida en Windows
+.venv/           # Entorno virtual Python (si usa virtualenv o venv)
+env/             # Entorno virtual Python (nombres comunes)
+*.egg            # Distribución de paquete Python
+*.egg-info/
+*.eggs/
+Pipfile          # Archivo de dependencias de Python (Pipenv)
+Pipfile.lock     # Bloqueo de dependencias de Python (Pipenv)
+poetry.lock      # Bloqueo de dependencias de Python (Poetry)
+poetry.toml      # Configuración de Poetry
+.env             # Variables de entorno
+
+# Archivos de caché y logs
+.cache/
+logs/
+*.log
+
+# Archivos de empaquetado de GitHub Actions (si usas GitHub Actions para despliegue)
+*.bak
