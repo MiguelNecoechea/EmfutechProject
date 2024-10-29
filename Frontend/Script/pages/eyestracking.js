@@ -1,4 +1,9 @@
-const { remote } = require('@electron/remote');
+let remote;
+try {
+    remote = require('@electron/remote');
+} catch (e) {
+    console.warn('Error loading remote:', e);
+}
 
 class EyeTrackingCalibration {
     constructor() {
@@ -6,21 +11,25 @@ class EyeTrackingCalibration {
         this.startButton = document.getElementById('startButton');
         this.points = [];
         this.currentPointIndex = 0;
-        this.coordinateLog = [];
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        this.startButton.addEventListener('click', async () => {
-            try {
+        this.startButton.addEventListener('click', () => {
+            this.startButton.style.display = 'none';
+            if (remote) {
                 const win = remote.getCurrentWindow();
-                await win.setFullScreen(true);
-                this.startButton.style.display = 'none';
-                this.initializeCalibration();
-            } catch (error) {
-                document.documentElement.requestFullscreen();
-                this.startButton.style.display = 'none';
-                this.initializeCalibration();
+                win.setFullScreen(true)
+                    .then(() => this.initializeCalibration())
+                    .catch(() => {
+                        document.documentElement.requestFullscreen()
+                            .then(() => this.initializeCalibration())
+                            .catch(err => console.error(err));
+                    });
+            } else {
+                document.documentElement.requestFullscreen()
+                    .then(() => this.initializeCalibration())
+                    .catch(err => console.error(err));
             }
         });
     }
@@ -30,35 +39,13 @@ class EyeTrackingCalibration {
         const width = window.innerWidth;
         const height = window.innerHeight;
 
-        const keyPoints = [
+        return [
             { x: padding, y: padding },                    // Esquina superior izquierda
             { x: width - padding, y: padding },            // Esquina superior derecha
             { x: width/2, y: height/2 },                   // Centro
             { x: padding, y: height - padding },           // Esquina inferior izquierda
-            { x: width - padding, y: height - padding },   // Esquina inferior derecha
+            { x: width - padding, y: height - padding }    // Esquina inferior derecha
         ];
-
-        const randomPoints = [];
-        for (let i = 0; i < 4; i++) {
-            randomPoints.push({
-                x: Math.floor(Math.random() * (width - 2 * padding)) + padding,
-                y: Math.floor(Math.random() * (height - 2 * padding)) + padding
-            });
-        }
-
-        const allPoints = [...keyPoints, ...randomPoints];
-        const firstPoint = keyPoints[Math.floor(Math.random() * 4)];
-        const centerPoint = keyPoints[2];
-        const remainingPoints = allPoints.filter(p => 
-            p !== firstPoint && p !== centerPoint
-        );
-
-        for (let i = remainingPoints.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remainingPoints[i], remainingPoints[j]] = [remainingPoints[j], remainingPoints[i]];
-        }
-
-        return [firstPoint, ...remainingPoints, centerPoint];
     }
 
     initializeCalibration() {
@@ -75,30 +62,9 @@ class EyeTrackingCalibration {
         point.style.display = 'none';
         this.calibrationArea.appendChild(point);
         
-        this.logCoordinates(x, y, this.currentPointIndex + 1);
+        // Enviar coordenadas a Python
+        eel.get_coordinates(Math.round(x), Math.round(y))();
         return point;
-    }
-
-    logCoordinates(x, y, pointNumber) {
-        const coordinates = {
-            pointNumber: pointNumber,
-            x: Math.round(x),
-            y: Math.round(y),
-            timestamp: new Date().toISOString()
-        };
-        this.coordinateLog.push(coordinates);
-
-        fetch('http://localhost:5000/log-point', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(coordinates)
-        }).catch(error => {
-            console.error('Error al enviar punto al servidor:', error);
-        });
-
-        console.log(`Punto ${pointNumber}: X=${Math.round(x)}px, Y=${Math.round(y)}px`);
     }
 
     showNextPoint() {
@@ -115,46 +81,27 @@ class EyeTrackingCalibration {
         }
     }
 
-    async finishCalibration() {
-        try {
-            const response = await fetch('http://localhost:5000/save-calibration', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(this.coordinateLog)
-            });
-
-            const data = await response.json();
-            console.log('=== Calibración Completada ===');
-            console.log(`Datos guardados en: ${data.filename}`);
-            console.table(this.coordinateLog);
-            
-            setTimeout(async () => {
-                try {
-                    const win = remote.getCurrentWindow();
-                    await win.setFullScreen(false);
-                } catch (error) {
-                    if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                    }
-                }
-                this.reset();
-            }, 1000);
-
-        } catch (error) {
-            console.error('Error al guardar los datos:', error);
-            this.reset();
+    finishCalibration() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
         }
+        if (remote) {
+            const win = remote.getCurrentWindow();
+            win.setFullScreen(false);
+        }
+        setTimeout(() => {
+            this.reset();
+        }, 1000);
     }
 
     reset() {
         this.points.forEach(point => point.remove());
         this.points = [];
         this.currentPointIndex = 0;
-        this.coordinateLog = [];
         this.startButton.style.display = 'block';
     }
 }
 
-window.addEventListener('load', () => new EyeTrackingCalibration());
+document.addEventListener('DOMContentLoaded', () => {
+    new EyeTrackingCalibration();
+});

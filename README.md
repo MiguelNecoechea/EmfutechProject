@@ -1,6 +1,13 @@
 # The dependencies and libraries needed for the project will be added in this place.
 
 ## Frontend
+* Html 5
+* Css  3
+* Node.js v20.18.0
+* Taitailwind v
+* Electron v28.0.0
+* Eel v0.17.0
+* Bootstrap v5.3.2
 
 ## Backend
 * dlib 19.24.6
