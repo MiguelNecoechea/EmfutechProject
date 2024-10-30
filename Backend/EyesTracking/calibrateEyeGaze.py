@@ -1,3 +1,4 @@
+# Backend/EyesTracking/calibrateEyeGaze.py
 #  Backend/EyesTracking/EyesTrackingRecorded.py
 # pip install eel
 # pip install bottle-websocket
@@ -7,17 +8,6 @@
 import eel
 import os
 
-class EyeTrackingRecorder:
-    def __init__(self):
-        self.current_coordinates = None
-        self.coordinates_history = []
-
-    def get_current_point(self):
-        """
-        Retorna las coordenadas actuales del punto de calibración
-        """
-        return self.current_coordinates
-
 @eel.expose
 def get_coordinates(x, y):
     """
@@ -26,10 +16,18 @@ def get_coordinates(x, y):
     print(f"Punto de calibración: X={x}, Y={y}")
     return x, y
 
-
-def init_eel():
+def main():
+    print("Iniciando servidor de Eye Tracking...")
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     eel.init(os.path.join(base_dir, 'Frontend'))
-    return EyeTrackingRecorder()
+    try:
+        eel.start('Templates/EyesTracking/index.html', 
+                  mode=None,
+                  port=8000, block=True)
 
+    except Exception as e:
+        print(f"Error al iniciar el servidor: {e}")
 
+if __name__ == "__main__":
+    main()
+    print("Finished ")
