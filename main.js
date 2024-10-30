@@ -16,6 +16,7 @@ function startPythonServer() {
     });
 
     pythonProcess.on('close', (code) => {
+        eel.stop_eye_gaze()();
         console.log(`Servidor Python cerrado con código ${code}`);
     });
 }
@@ -48,7 +49,7 @@ function createWindow() {
     setTimeout(() => {
         win.loadURL('http://localhost:8000/Templates/EyesTracking/index.html')
         win.webContents.openDevTools()
-    }, 3000)
+    }, 4000)
 }
 
 app.whenReady().then(() => {
