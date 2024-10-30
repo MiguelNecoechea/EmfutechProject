@@ -17,32 +17,24 @@ class EyeTrackingCalibration {
     }
 
     setupEventListeners() {
-        this.startButton.addEventListener('click', () => {
+        this.startButton.addEventListener('click', async () => {
             this.startButton.style.display = 'none';
-            if (remote) {
-                const win = remote.getCurrentWindow();
-                win.setFullScreen(true)
-                    .then(() => {
-                        setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
-                    })
-                    .catch(() => {
-                        document.documentElement.requestFullscreen()
-                            .then(() => {
-                                setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
-                            })
-                            .catch(err => console.error(err));
-                    });
-            } else {
-                document.documentElement.requestFullscreen()
-                    .then(() => {
-                        setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
-                    })
-                    .catch(err => console.error(err));
+            try {
+                if (remote) {
+                    const win = remote.getCurrentWindow();
+                    await win.setFullScreen(true);
+                } else {
+                    await document.documentElement.requestFullscreen();
+                }
+                setTimeout(() => this.initializeCalibration()); // Unified delay to ensure full-screen mode is activated
+            } catch (err) {
+                console.error('Error activating full-screen mode:', err);
             }
         });
     }
 
     generateCalibrationPoints() {
+
         const padding = 10;
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -64,9 +56,13 @@ class EyeTrackingCalibration {
 
     initializeCalibration() {
         window.addEventListener('resize', () => {
-            const calibrationPoints = this.generateCalibrationPoints();
-            this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
-            this.showNextPoint();
+            // eel.start_eye_gaze()();
+            setTimeout(() => {
+                const calibrationPoints = this.generateCalibrationPoints();
+                this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
+                this.showNextPoint();
+            }, 500)
+
         }, { once: true });
     }
 
@@ -99,7 +95,7 @@ class EyeTrackingCalibration {
             this.currentY = parseInt(currentPoint.dataset.y);
             console.log(this.currentX, this.currentY);
             this.currentPointIndex++;
-            setTimeout(() => this.showNextPoint(), 2000);
+            setTimeout(() => this.showNextPoint(), 4000);
         } else {
             this.finishCalibration();
         }
