@@ -55,14 +55,13 @@ class EyeTrackingCalibration {
     }
 
     initializeCalibration() {
-        window.addEventListener('resize', () => {
-            // eel.start_eye_gaze()();
-            setTimeout(() => {
+        window.addEventListener('resize', async () => {
+            setTimeout(async () => {
+                await eel.start_eye_gaze()();
                 const calibrationPoints = this.generateCalibrationPoints();
                 this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
                 this.showNextPoint();
-            }, 500)
-
+            }, 500);
         }, { once: true });
     }
 
@@ -75,12 +74,8 @@ class EyeTrackingCalibration {
         point.dataset.x = x;
         point.dataset.y = y;
         this.calibrationArea.appendChild(point);
-        
-        return point;
-    }
 
-    getCurrentPointLocation() {
-        return { x: this.currentX, y: this.currentY };
+        return point;
     }
 
     showNextPoint() {
@@ -99,7 +94,7 @@ class EyeTrackingCalibration {
         } else {
             this.finishCalibration();
         }
-        eel.get_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
+        eel.set_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
     }
 
     finishCalibration() {
