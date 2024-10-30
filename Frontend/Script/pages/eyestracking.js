@@ -10,6 +10,8 @@ class EyeTrackingCalibration {
         this.calibrationArea = document.getElementById('calibrationArea');
         this.startButton = document.getElementById('startButton');
         this.points = [];
+        this.currentX = 0;
+        this.currentY = 0;
         this.currentPointIndex = 0;
         this.setupEventListeners();
     }
@@ -20,38 +22,52 @@ class EyeTrackingCalibration {
             if (remote) {
                 const win = remote.getCurrentWindow();
                 win.setFullScreen(true)
-                    .then(() => this.initializeCalibration())
+                    .then(() => {
+                        setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
+                    })
                     .catch(() => {
                         document.documentElement.requestFullscreen()
-                            .then(() => this.initializeCalibration())
+                            .then(() => {
+                                setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
+                            })
                             .catch(err => console.error(err));
                     });
             } else {
                 document.documentElement.requestFullscreen()
-                    .then(() => this.initializeCalibration())
+                    .then(() => {
+                        setTimeout(() => this.initializeCalibration(), 100); // Add a delay to ensure full-screen mode is activated
+                    })
                     .catch(err => console.error(err));
             }
         });
     }
 
     generateCalibrationPoints() {
-        const padding = 50;
+        const padding = 10;
         const width = window.innerWidth;
         const height = window.innerHeight;
-
+        console.log(width, height);
         return [
-            { x: padding, y: padding },                    // Esquina superior izquierda
-            { x: width - padding, y: padding },            // Esquina superior derecha
-            { x: width/2, y: height/2 },                   // Centro
-            { x: padding, y: height - padding },           // Esquina inferior izquierda
-            { x: width - padding, y: height - padding }    // Esquina inferior derecha
+            { x: padding, y: padding }, // Top-left corner
+            { x: width / 2, y: padding }, // Top-center
+            { x: width - padding, y: padding }, // Top-right corner
+
+            { x: padding, y: height / 2 }, // Middle-left
+            { x: width / 2, y: height / 2 }, // Center
+            { x: width - padding, y: height / 2 }, // Middle-right
+
+            { x: padding, y: height - padding }, // Bottom-left corner
+            { x: width / 2, y: height - padding }, // Bottom-center
+            { x: width - padding, y: height - padding } // Bottom-right corner
         ];
     }
 
     initializeCalibration() {
-        const calibrationPoints = this.generateCalibrationPoints();
-        this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
-        this.showNextPoint();
+        window.addEventListener('resize', () => {
+            const calibrationPoints = this.generateCalibrationPoints();
+            this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
+            this.showNextPoint();
+        }, { once: true });
     }
 
     createPoint(x, y) {
@@ -60,11 +76,15 @@ class EyeTrackingCalibration {
         point.style.left = `${x}px`;
         point.style.top = `${y}px`;
         point.style.display = 'none';
+        point.dataset.x = x;
+        point.dataset.y = y;
         this.calibrationArea.appendChild(point);
         
-        // Enviar coordenadas a Python
-        eel.get_coordinates(Math.round(x), Math.round(y))();
         return point;
+    }
+
+    getCurrentPointLocation() {
+        return { x: this.currentX, y: this.currentY };
     }
 
     showNextPoint() {
@@ -73,12 +93,17 @@ class EyeTrackingCalibration {
         }
 
         if (this.currentPointIndex < this.points.length) {
-            this.points[this.currentPointIndex].style.display = 'block';
+            const currentPoint = this.points[this.currentPointIndex];
+            currentPoint.style.display = 'block';
+            this.currentX = parseInt(currentPoint.dataset.x);
+            this.currentY = parseInt(currentPoint.dataset.y);
+            console.log(this.currentX, this.currentY);
             this.currentPointIndex++;
             setTimeout(() => this.showNextPoint(), 2000);
         } else {
             this.finishCalibration();
         }
+        eel.get_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
     }
 
     finishCalibration() {
