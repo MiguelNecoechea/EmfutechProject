@@ -12,11 +12,12 @@
 
 import mediapipe as mp
 import cv2
+import os
 import time
 from .landmarks import *
-from face_model import *
-from AffineTransformer import AffineTransformer
-from EyeballDetector import EyeballDetector
+from .face_model import *
+from .AffineTransformer import AffineTransformer
+from .EyeballDetector import EyeballDetector
 
 
 class GazeProcessor:
@@ -41,7 +42,7 @@ class GazeProcessor:
         self.cap = None
         self.landmarker = None
         # Can be downloaded from https://developers.google.com/mediapipe/solutions/vision/face_landmarker
-        model_path = "./face_landmarker.task"
+        model_path = os.path.join(os.path.dirname(__file__), 'face_landmarker.task')
 
         BaseOptions = mp.tasks.BaseOptions
         self.FaceLandmarker = mp.tasks.vision.FaceLandmarker
