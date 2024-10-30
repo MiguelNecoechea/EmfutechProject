@@ -5,7 +5,6 @@ from EyesTrackingRecorded import init_eel
 def main():
     print("Iniciando servidor de Eye Tracking...")
     recorder = init_eel()
-    
     try:
         eel.start('Templates/EyesTracking/index.html', 
                   mode=None,
