@@ -20,6 +20,11 @@
 * pandas 2.2.3
 * Numpy 1.26.4
 * Pynput 1.7.7
+
+## Backend and fromtend communication
+* Eel
+* bottle-websocket
+* gevent
 ## Languages
 * Python 3.11.5
 * C++ 17
