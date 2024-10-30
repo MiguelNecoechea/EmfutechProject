@@ -7,7 +7,7 @@ let pythonProcess = null
 
 function startPythonServer() {
     console.log('Iniciando servidor Python...');
-    pythonProcess = spawn('python', ['Backend/EyesTracking/start_eel.py'], {
+    pythonProcess = spawn('python', ['Backend/EyesTracking/calibrateEyeGaze.py'], {
         stdio: 'inherit'
     });
 
