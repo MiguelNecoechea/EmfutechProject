@@ -30,6 +30,8 @@ class Writer:
         """
         Opens a file in append mode so previous stored data is preserved.
         """
+        os.makedirs(os.path.dirname(self._path), exist_ok=True)
+
         self._csv_file = open(self._path, 'a')
         self._csv_writer = csv.writer(self._csv_file)
         self._is_writer_opened = True
