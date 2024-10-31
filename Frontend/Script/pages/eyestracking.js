@@ -91,9 +91,10 @@ class EyeTrackingCalibration {
             this.currentY = parseInt(currentPoint.dataset.y);
             console.log(this.currentX, this.currentY);
             this.currentPointIndex++;
-            setTimeout(() => this.showNextPoint(), 4000);
+            setTimeout(() => this.showNextPoint(), 6000);
         } else {
             eel.stop_recording()();
+            eel.start_regressor()();
             this.finishCalibration();
         }
         eel.set_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
