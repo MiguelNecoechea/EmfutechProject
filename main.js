@@ -17,6 +17,7 @@ function startPythonServer() {
 
     pythonProcess.on('close', (code) => {
         eel.stop_eye_gaze()();
+        eel.stop_regression()();
         console.log(`Servidor Python cerrado con código ${code}`);
     });
 }
