@@ -37,19 +37,22 @@ import sys
 import os
 import time
 import threading
+
 # Add the parent directory of 'IO' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import eel
 from IO.FileWriting.GazeWriter import GazeWriter
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
+from Backend.EyesTracking.EyeCoordinateRegressor import PositionRegressor
 
 _gaze_processor = GazeProcessor()
 _data_writer = GazeWriter('data', 'gaze_data.csv')
 _current_x_coordinate = 0
 _current_y_coordinate = 0
 _recording_data = False
-
+_regressor = None
+_regressor_running = False
 
 # Functions exposed to the web interface
 @eel.expose
@@ -117,6 +120,29 @@ def stop_recording():
     _recording_data = False
     _data_writer.close_file()
 
+@eel.expose
+def start_regressor():
+    """
+    Starts the regressor thread. This function is called when the user wants to start the predictions of the eye position
+    based on the gaze vector. When the final version is up this function will be called when the experiment begins.
+    :return:
+    """
+    global _regressor
+    global _regressor_running
+    _regressor = PositionRegressor('data/gaze_data.csv')
+    _regressor_running = True
+    _regressor.train_create_model()
+    regressor_thread = threading.Thread(target=run_regressor)
+    regressor_thread.start()
+
+@eel.expose
+def stop_regression():
+    """
+    Stops the regressor thread. by setting a boolean to false.
+    """
+    global _regressor_running
+    _regressor_running = False
+
 # Python only functions
 def record_gaze_data():
     """
@@ -137,6 +163,24 @@ def write_gaze_data():
     data = _gaze_processor.get_gaze_vector()
     combined_data = list(data[0]) + list(data[1]) + [_current_x_coordinate, _current_y_coordinate]
     _data_writer.write(combined_data)
+
+def run_regressor():
+    """
+    Alpha version of the regressor function. This function is supposed to run in a separate thread.
+    It constantly retrieves the gaze data from the GazeProcessor and makes a prediction using the PositionRegressor.
+    For now is just printing the result. but the plan is to store the data to be able to visualize it later in a heatmap.
+    :return:
+    """
+    global _regressor
+    if _regressor is None:
+        _regressor = PositionRegressor('data/gaze_data.csv')
+    while _regressor_running:
+        gaze_data = _gaze_processor.get_gaze_vector()
+        if gaze_data[0] is not None and gaze_data[1] is not None:
+            data = [[gaze_data[0][0], gaze_data[0][1], gaze_data[0][2], gaze_data[1][0], gaze_data[1][1], gaze_data[1][2]]]
+            result = _regressor.make_prediction(data)
+            print(result)
+        time.sleep(0.1)
 
 def main():
     """
