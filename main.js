@@ -49,7 +49,7 @@ function createWindow() {
     setTimeout(() => {
         win.loadURL('http://localhost:8000/Templates/EyesTracking/index.html')
         win.webContents.openDevTools()
-    }, 4000)
+    }, 5000)
 }
 
 app.whenReady().then(() => {
