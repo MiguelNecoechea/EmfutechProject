@@ -58,6 +58,7 @@ class EyeTrackingCalibration {
         window.addEventListener('resize', async () => {
             setTimeout(async () => {
                 await eel.start_eye_gaze()();
+                eel.start_recording()();
                 const calibrationPoints = this.generateCalibrationPoints();
                 this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
                 this.showNextPoint();
@@ -92,6 +93,7 @@ class EyeTrackingCalibration {
             this.currentPointIndex++;
             setTimeout(() => this.showNextPoint(), 4000);
         } else {
+            eel.stop_recording()();
             this.finishCalibration();
         }
         eel.set_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
