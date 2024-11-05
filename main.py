@@ -2,14 +2,22 @@ import time
 
 import matplotlib.pyplot as plt
 
+from IO.FileWriting.AuraDataWriter import AuraDataWriter
+from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 # from IO.ScreenRecording.WindowsScreenRecorder import WindowsScreenRecorder
 from IO.SignalProcessing.AuraSignalHandler import AuraLslStreamHandler
+from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 
-# handler = VideoHandler()
-# processor = EmotionRecognizer('opencv')
-# data_handler = AuraLslStreamHandler(1)
-# lsl_writer = AuraDataWriter('/Users/mnecoea/PycharmProjects/AuraSignalProcessing', 'test.csv')
-# emotion_writer = EmotionPredictedWriter('/Users/mnecoea/PycharmProjects/AuraSignalProcessing', 'test1.csv')
+out_path = '/Users/mnecoea/PycharmProjects/AuraSignalProcessing/TestingOutput'
+finished_data_collection = False
+
+emotions = EmotionRecognizer('opencv')
+data_handler = AuraLslStreamHandler(1, 'AURA_Power')
+lsl_writer = AuraDataWriter(out_path, 'aura_data.csv')
+emotion_writer = EmotionPredictedWriter(out_path, 'emotions.csv')
+
+
+
 # channel = 'filtered'
 # time = 1
 # data_handler.connect_stream(channel)
@@ -80,8 +88,3 @@ from IO.SignalProcessing.AuraSignalHandler import AuraLslStreamHandler
 # monitors = screeninfo.get_monitors()
 #
 # print(monitors)
-
-
-
-
-# channel = 'AURA_Power'
