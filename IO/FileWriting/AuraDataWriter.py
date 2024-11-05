@@ -4,14 +4,13 @@ from IO.FileWriting.Writer import Writer
 
 
 class AuraDataWriter(Writer):
-    def __init__(self, output_path, file_name):
+    def __init__(self, output_path, file_name, initial_line):
         """
         Creates a writer object for the specified for handling 8 channel aura signals.
         :param output_path: the folder where the data is going to be written.
         :param file_name: the name of the file to be written.
         """
-        super().__init__(output_path, file_name, ['Time and date', 'F3', 'F4', 'Cz', 'C3',
-                                                  'Pz', 'C4', 'P3', 'P4'])
+        super().__init__(output_path, file_name, initial_line)
 
     def write_data(self, timestamp, data) -> bool:
         """
