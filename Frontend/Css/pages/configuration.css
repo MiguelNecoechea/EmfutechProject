@@ -1,3 +1,4 @@
+/* Estilos generales de configuración */
 .config-nav {
     background-color: var(--light-bg);
     border-bottom: 1px solid var(--border-color);
@@ -103,4 +104,90 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Estilos específicos para Configuraciones Avanzadas de Aura */
+.advanced-configurations {
+    margin-top: 20px;
+}
+
+.channel-management,
+.route-management {
+    margin-top: 20px;
+}
+
+.channel-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.aura-signal-display {
+    margin-top: 20px;
+}
+
+.aura-signal-display h5 {
+    margin-bottom: 10px;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Estilos específicos para la tabla de señales de Aura */
+.aura-signal-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+}
+
+.aura-signal-table th,
+.aura-signal-table td {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+.aura-signal-table th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 600;
+}
+
+.aura-signal-table tbody tr:nth-child(even) {
+    background-color: var(--light-bg);
+}
+
+/* Botones de acción en Configuraciones Avanzadas de Aura */
+.btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.btn-outline {
+    border: 1px solid var(--border-color);
+    background-color: transparent;
+    color: var(--text-color);
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }

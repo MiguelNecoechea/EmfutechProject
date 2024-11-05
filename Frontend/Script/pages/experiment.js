@@ -5,29 +5,29 @@ class ExperimentManager {
     }
 
     initializeForm() {
-        // Inicializar selectores y campos del formulario
         this.form = document.querySelector('.experiment-form');
-        this.signalTypes = document.querySelectorAll('.signal-types input[type="checkbox"]');
+        
+        // Referencias a los campos del formulario
+        this.experimentName = document.getElementById('experimentName');
+        this.description = document.getElementById('description');
+        this.objective = document.getElementById('objective');
+        this.duration = document.getElementById('duration');
+        this.participants = document.getElementById('participants');
+        this.activeSensors = document.getElementById('activeSensors');
+        this.stimulusConfig = document.getElementById('stimulusConfig');
+        this.frequency = document.getElementById('frequency');
     }
 
     attachEventListeners() {
-        // Event listeners para los tabs de navegación
         const navTabs = document.querySelectorAll('.nav-tabs a');
         navTabs.forEach(tab => {
             tab.addEventListener('click', this.handleTabClick.bind(this));
         });
 
-        // Event listener para el formulario
         if (this.form) {
             this.form.addEventListener('submit', this.handleFormSubmit.bind(this));
         }
 
-        // Event listeners para los checkboxes de tipos de señales
-        this.signalTypes.forEach(checkbox => {
-            checkbox.addEventListener('change', this.handleSignalTypeChange.bind(this));
-        });
-
-        // Event listeners para los selectores
         document.querySelectorAll('select').forEach(select => {
             select.addEventListener('change', this.handleSelectChange.bind(this));
         });
@@ -42,38 +42,30 @@ class ExperimentManager {
 
     handleFormSubmit(event) {
         event.preventDefault();
+        
         // Recopilar datos del formulario
-        const formData = new FormData(this.form);
-        console.log('Form submitted:', Object.fromEntries(formData));
-    }
+        const formData = {
+            experimentName: this.experimentName.value,
+            description: this.description.value,
+            objective: this.objective.value,
+            duration: this.duration.value,
+            participants: this.participants.value,
+            activeSensors: this.activeSensors.value,
+            stimulusConfig: this.stimulusConfig.value,
+            frequency: this.frequency.value
+        };
 
-    handleSignalTypeChange(event) {
-        const signalType = event.target.nextSibling.textContent.trim();
-        console.log(`Signal type ${signalType} ${event.target.checked ? 'selected' : 'unselected'}`);
-        this.updateSignalPreview();
+        // Guardar datos en LocalStorage o enviar a backend
+        localStorage.setItem('experimentFormData', JSON.stringify(formData));
+        
+        alert('Experiment data saved successfully!');
+        console.log('Form Data:', formData);
     }
 
     handleSelectChange(event) {
         const selectId = event.target.id;
         const selectedValue = event.target.value;
         console.log(`${selectId} changed to: ${selectedValue}`);
-    }
-
-    updateSignalPreview() {
-        // Actualizar la vista previa de señales basado en las selecciones
-        const preview = document.querySelector('.signal-preview');
-        const selectedSignals = Array.from(this.signalTypes)
-            .filter(checkbox => checkbox.checked)
-            .map(checkbox => checkbox.nextSibling.textContent.trim());
-        
-        if (preview) {
-            preview.innerHTML = `
-                <h3>Sign:</h3>
-                <div class="selected-signals">
-                    ${selectedSignals.join(', ') || 'No signals selected'}
-                </div>
-            `;
-        }
     }
 }
 

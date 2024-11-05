@@ -34,7 +34,6 @@ class EyeTrackingCalibration {
     }
 
     generateCalibrationPoints() {
-
         const padding = 10;
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -108,9 +107,14 @@ class EyeTrackingCalibration {
             const win = remote.getCurrentWindow();
             win.setFullScreen(false);
         }
+
+        // Mensaje de finalización
+        alert("Calibración completada. Redirigiendo al panel principal...");
+
+        // Redirigir a dashboard.html después de mostrar el mensaje
         setTimeout(() => {
-            this.reset();
-        }, 1000);
+            window.location.href = "../Dashboard/dashboard.html";
+        }, 1000); // Espera de 1 segundo para que el mensaje se muestre antes de redirigir
     }
 
     reset() {

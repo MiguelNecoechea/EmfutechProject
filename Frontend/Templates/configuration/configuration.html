@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuration</title>
     <!-- Links CSS -->
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/configuration.css">
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/configuration.css">
 </head>
 <body>
     <div class="app-container">
@@ -22,13 +22,13 @@
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li class="active"><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Dashboard</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experiment</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Measurement</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reports</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
+                    <li class="active"><a href="../../Templates/Configuration/configuration.html">Configuration</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">File manager</a></li>
                     <li><a href="#">Account</a></li>
                     <li><a href="#">Support</a></li>
                 </ul>
@@ -53,23 +53,23 @@
                 <!-- Search and Options Bar -->
                 <div class="search-options-bar">
                     <div class="search-filters">
-                        <select class="filter-select">
+                        <select class="filter-select form-control">
                             <option>Study Name</option>
                         </select>
-                        <select class="filter-select">
+                        <select class="filter-select form-control">
                             <option>Description</option>
                         </select>
-                        <select class="filter-select">
+                        <select class="filter-select form-control">
                             <option>Study Objectives</option>
                         </select>
-                        <select class="filter-select">
+                        <select class="filter-select form-control">
                             <option>Study Duration</option>
                         </select>
                     </div>
                     <div class="options-group">
-                        <button class="option-btn">Assign Groups</button>
-                        <button class="option-btn">Segmentation</button>
-                        <button class="option-btn">Group Editing</button>
+                        <button class="option-btn btn btn-primary">Assign Groups</button>
+                        <button class="option-btn btn btn-secondary">Segmentation</button>
+                        <button class="option-btn btn btn-outline">Group Editing</button>
                     </div>
                 </div>
 
@@ -79,16 +79,16 @@
                         <h3>Device Settings</h3>
                         <div class="device-selection">
                             <h4>Connected Device Selection</h4>
-                            <div class="device-options">
-                                <label class="device-option">
+                            <div class="device-options checkbox-group">
+                                <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="eeg">
                                     EEG
                                 </label>
-                                <label class="device-option">
+                                <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="eyeTracking">
                                     Eye Tracking
                                 </label>
-                                <label class="device-option">
+                                <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="emotions">
                                     Emotions
                                 </label>
@@ -96,19 +96,68 @@
 
                             <div class="settings-group">
                                 <div class="setting">
-                                    <label>Signal Capture Frequency</label>
-                                    <select class="setting-select">
+                                    <label class="form-label">Signal Capture Frequency</label>
+                                    <select class="setting-select form-control">
                                         <option>Default Frequency Setting</option>
                                     </select>
                                 </div>
                                 <div class="setting">
-                                    <label>Threshold Settings</label>
-                                    <select class="setting-select">
+                                    <label class="form-label">Threshold Settings</label>
+                                    <select class="setting-select form-control">
                                         <option>Configure Threshold Level</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Configuraciones Avanzadas de Aura -->
+                        <div class="advanced-configurations">
+                            <h4>Configuraciones Avanzadas de Aura</h4>
+                            
+                            <!-- Barra desplegable personalizada para señales de Aura -->
+                            <div class="aura-signal-dropdown">
+                                <label class="form-label">Gestionar Canales de Aura:</label>
+                                <select id="auraChannelSelect" class="dropdown-select form-control">
+                                    <option disabled selected>Seleccionar señales de Aura</option>
+                                    <!-- Las opciones de canales se llenarán dinámicamente -->
+                                </select>
+                            </div>
+
+                            <div class="channel-buttons">
+                                <button id="refreshChannels" class="btn btn-primary">Refrescar Canales</button>
+                                <button id="connectAura" class="btn btn-secondary">Conectar Aura</button>
+                                <button id="disconnectAura" class="btn btn-outline">Desconectar Aura</button>
+                                <button id="removeSelectedChannels" class="btn btn-primary">Eliminar Canales Seleccionados</button>
+                                <button id="selectChannels" class="btn btn-secondary">Escoger Canales</button>
+                            </div>
+                            <!-- Visualización de Señales de Aura -->
+                            <div class="aura-signal-display">
+                                <h5>Estado de Señales de Aura</h5>
+                                <table id="auraSignalTable" class="form-control">
+                                    <thead>
+                                        <tr>
+                                            <th>Canal</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Las filas se llenarán dinámicamente -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Guardar Rutas -->
+                            <div class="route-management">
+                                <h5>Guardar Rutas</h5>
+                                <label for="routeType" class="form-label">Tipo de Ruta:</label>
+                                <select id="routeType" class="form-control">
+                                    <option value="individual">Individual</option>
+                                    <option value="grupo">Grupo</option>
+                                </select>
+                                <button id="saveRoute" class="btn btn-primary">Guardar Ruta</button>
+                            </div>
+                        </div>
+                        <!-- Fin de Configuraciones Avanzadas de Aura -->
                     </div>
                     
                     <div class="config-card">
@@ -131,10 +180,11 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/Frontend/Script/global/app.js"></script>
-    <script src="/Frontend/Script/global/init.js"></script>
-    <script src="/Frontend/Script/layouts/sidebar.js"></script>
-    <script src="/Frontend/Script/layouts/header.js"></script>
-    <script src="/Frontend/Script/pages/configuration.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/global/init.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/configuracion.js"></script>
+    
 </body>
 </html>

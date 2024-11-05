@@ -4,18 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Experiment</title>
-    <!-- Corregir rutas CSS -->
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/experiment.css">
-    <link rel="stylesheet" href="/Frontend/Css/components/forms.css">
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/experiment.css">
+    <link rel="stylesheet" href="../../Css/components/forms.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="user-login">
                 <img src="/Frontend/assets/icons/user.png" alt="User Icon">
@@ -23,13 +21,13 @@
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li class="active"><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Dashboard</a></li>
+                    <li class="active"><a href="../../Templates/Experiment/Experiment.html">Experiment</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Measurement</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reports</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuration</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">File manager</a></li>
                     <li><a href="#">Account</a></li>
                     <li><a href="#">Support</a></li>
                 </ul>
@@ -37,7 +35,6 @@
         </aside>
 
         <main class="main-content">
-            <!-- Header Navigation -->
             <nav class="top-nav experiment-nav">
                 <ul class="nav-tabs">
                     <li><a href="#" class="active">Create new experiment</a></li>
@@ -46,7 +43,6 @@
                 </ul>
             </nav>
 
-            <!-- Page Content -->
             <div class="page-content">
                 <div class="page-header">
                     <h1><i class="icon-experiment"></i>Page / Experiment</h1>
@@ -56,19 +52,66 @@
                     <h2>Record</h2>
                     <form class="experiment-form">
                         <div class="form-grid">
-                            <!-- Left Column -->
                             <div class="form-column">
-                                <!-- Los grupos de formulario se mantienen igual -->
-                                <!-- ... -->
+                                <div class="form-group">
+                                    <label for="experimentName">Experiment Name</label>
+                                    <input type="text" id="experimentName" placeholder="Write here" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="description">Description</label>
+                                    <input type="text" id="description" placeholder="Write here" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="objective">Objective</label>
+                                    <select id="objective" class="form-control">
+                                        <option>Purpose and Goals</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="duration">Duration of the Experiment</label>
+                                    <select id="duration" class="form-control">
+                                        <option value="1">1 minute</option>
+                                        <option value="3">3 minutes</option>
+                                        <option value="5">5 minutes</option>
+                                        <option value="7">7 minutes</option>
+                                        <option value="10">10 minutes</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="participants">Participants</label>
+                                    <select id="participants" class="form-control">
+                                        <option value="individual">Individual</option>
+                                        <option value="group">Group</option>
+                                    </select>
+                                </div>
                             </div>
 
-                            <!-- Right Column -->
                             <div class="form-column">
-                                <!-- Los grupos de formulario se mantienen igual -->
-                                <!-- ... -->
+                                <div class="form-group">
+                                    <label for="activeSensors">Active Sensors</label>
+                                    <select id="activeSensors" class="form-control">
+                                        <option>Select sensor</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="stimulusConfig">Stimulus Configuration</label>
+                                    <select id="stimulusConfig" class="form-control">
+                                        <option value="image">Image</option>
+                                        <option value="video">Video</option>
+                                        <option value="sound">Sound</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="frequency">Frecuencia de Medición</label>
+                                    <select id="frequency" class="form-control">
+                                        <option value="1">1 second</option>
+                                        <option value="5">5 seconds</option>
+                                        <option value="10">10 seconds</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <!-- Agregar botones de acción -->
+
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">Save Experiment</button>
                             <button type="button" class="btn btn-secondary">Cancel</button>
@@ -79,11 +122,10 @@
         </main>
     </div>
 
-    <!-- Corregir rutas de Scripts -->
-    <script src="/Frontend/Script/global/app.js"></script>
-    <script src="/Frontend/Script/global/init.js"></script>
-    <script src="/Frontend/Script/layouts/sidebar.js"></script>
-    <script src="/Frontend/Script/layouts/header.js"></script>
-    <script src="/Frontend/Script/pages/experiment.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/global/init.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/experiment.js"></script>
 </body>
 </html>

@@ -36,6 +36,7 @@ Thumbs.db        # Windows
 .env
 .env.local
 .env.*.local
+Neuromarketing/
 
 # Archivos de caché y logs
 .cache/

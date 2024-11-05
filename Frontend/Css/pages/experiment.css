@@ -3,6 +3,13 @@
     border-radius: 10px;
     padding: 20px;
     margin: 20px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.page-header h1 {
+    font-weight: 700;
+    font-size: 24px;
+    color: var(--text-color);
 }
 
 .form-grid {
@@ -18,14 +25,8 @@
     gap: 20px;
 }
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
 .form-group label {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-color);
 }
 
@@ -36,34 +37,38 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 14px;
+    background-color: #f5f5f5;
+    color: #333;
 }
 
-.form-group textarea {
-    min-height: 100px;
-    resize: vertical;
+.form-group input[type="text"]::placeholder {
+    color: #aaa;
 }
 
 .signal-types {
     display: flex;
-    gap: 20px;
+    gap: 10px;
 }
 
 .signal-types label {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
+    font-size: 14px;
+    color: var(--text-color);
 }
 
 .signal-preview {
-    background-color: var(--card-bg);
+    background-color: #f5f5f5;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 4px;
     padding: 15px;
-    min-height: 200px;
-    margin-top: 20px;
+    min-height: 150px;
+    color: #666;
 }
 
-.experiment-nav {
-    background-color: var(--light-bg);
-    border-bottom: 1px solid var(--border-color);
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
 }

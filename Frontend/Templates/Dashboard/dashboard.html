@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/deshboard.css">
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/dashboard.css">
 </head>
 <body>
     <div class="app-container">
@@ -22,12 +22,12 @@
             <nav class="sidebar-nav">
                 <ul>
                     <li class="active"><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experiment</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Measurement</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reports</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuration</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">File manager</a></li>
                     <li><a href="#">Account</a></li>
                     <li><a href="#">Support</a></li>
                 </ul>
@@ -65,17 +65,22 @@
                 <div class="live-feeds">
                     <h2>Live Feeds</h2>
                     <div class="feeds-grid">
-                        <div class="feed-box">
-                            <h3>Signs</h3>
-                            <!-- Feed content -->
+                        <div class="feed-box" id="signal-feed-1">
+                            <h3>EEG Signals</h3>
+                            <!-- Contenedor para la imagen de la gráfica generada con matplotlib -->
                         </div>
-                        <div class="feed-box">
-                            <h3>Signs</h3>
-                            <!-- Feed content -->
+                        <div class="feed-box" id="signal-feed-2">
+                            <h3>Eye Tracking</h3>
+                            <!-- Aquí puedes agregar otro gráfico en el futuro -->
                         </div>
-                        <div class="feed-box">
-                            <h3>Signs</h3>
-                            <!-- Feed content -->
+                        <div class="feed-box" id="signal-feed-3">
+                            <h3>Emotion Signals</h3>
+                            <!-- Aquí puedes agregar otro gráfico en el futuro -->
+                        </div>
+                        <div class="feed-box" id="camera-feed">
+                            <h3>Camera Feed</h3>
+                            <!-- Aquí se insertará el video de la cámara -->
+                            <video id="cameraStream" autoplay muted></video>
                         </div>
                     </div>
                 </div>
@@ -83,9 +88,9 @@
         </main>
     </div>
 
-    <script src="../Script/global/app.js"></script>
-    <script src="../Script/layouts/sidebar.js"></script>
-    <script src="../Script/layouts/header.js"></script>
-    <script src="../Script/pages/dashboard.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/dashboard.js"></script>
 </body>
 </html>
