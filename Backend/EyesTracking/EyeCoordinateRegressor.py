@@ -20,18 +20,20 @@ class PositionRegressor:
         these scalers are used to normalize the data before training the neural network. and also normalize the predictions.
         :param data_path:
         """
-        #TODO Handle not existing file
-        data = pd.read_csv(data_path)
-        X = data[['l_x', 'l_y', 'l_z', 'r_x', 'r_y', 'r_z']].values
-        y = data[['x', 'y']].values
-        self._model = None
-        self._scaler_X = StandardScaler()
-        self._scaler_y = StandardScaler()
+        try:
+            data = pd.read_csv(data_path)
+            X = data[['l_x', 'l_y', 'l_z', 'r_x', 'r_y', 'r_z']].values
+            y = data[['x', 'y']].values
+            self._model = None
+            self._scaler_X = StandardScaler()
+            self._scaler_y = StandardScaler()
 
-        X = self._scaler_X.fit_transform(X)
-        y = self._scaler_y.fit_transform(y)
+            X = self._scaler_X.fit_transform(X)
+            y = self._scaler_y.fit_transform(y)
 
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        except FileNotFoundError:
+            raise FileNotFoundError("The file does not exist")
 
     def __create_model(self):
         """
