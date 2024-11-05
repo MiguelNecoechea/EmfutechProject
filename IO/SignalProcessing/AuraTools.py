@@ -43,6 +43,10 @@ def rename_aura_channels(stream) -> bool:
     return named_changed
 
 def rename_40_channels():
+    """
+    Creates a mapping for an AURA Power Signal.
+    :return: An array with the mapping of the channels.
+    """
     waves = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']
     channels = ['F3', 'F4', 'Cz', 'C3', 'C4', 'Pz', 'P3', 'P4']
     current_position = 0
@@ -54,6 +58,12 @@ def rename_40_channels():
     return mapping
 
 def delete_channels(stream: Stream, waves: list[str], channels: list[str]):
+    """
+    Delete the channels from the stream. It handles both the 8 channel and 40 channel aura signals.
+    :param stream: The stream to remove the channels from.
+    :param waves: The name of the type of waves to remove.
+    :param channels: The name of the electrodes to remove.
+    """
     channels_to_dlt = []
     if len(waves) == 0 and len(channels) != 0:
         for channel in channels:
