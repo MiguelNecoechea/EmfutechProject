@@ -150,9 +150,10 @@ def record_gaze_data():
     :return:
     """
     global _recording_data
-    while _recording_data:
+    while True:
         write_gaze_data()
-        time.sleep(0.1)
+        if not _recording_data:
+            break
 
 def write_gaze_data():
     """
