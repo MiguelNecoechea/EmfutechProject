@@ -47,7 +47,7 @@ from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 from Backend.EyeCoordinateRegressor import PositionRegressor
 
 _gaze_processor = GazeProcessor()
-_data_writer = GazeWriter('data', 'gaze_data.csv')
+__trining_data_writer = GazeWriter('data', 'training_data.csv')
 _current_x_coordinate = 0
 _current_y_coordinate = 0
 _recording_data = False
@@ -101,25 +101,25 @@ def stop_eye_gaze():
     _gaze_processor.stop_processing()
 
 @eel.expose
-def start_recording():
+def start_recording_training_data():
     """
     Starts recording the gaze data in a separate thread. The recording will continue until stop_recording is called.
     :return:
     """
     global _recording_data
     _recording_data = True
-    recording_thread = threading.Thread(target=record_gaze_data)
+    recording_thread = threading.Thread(target=record_gaze_training_data)
     recording_thread.start()
 
 @eel.expose
-def stop_recording():
+def stop_recording_training_data():
     """
     Stops recording the gaze data and closes the data file. This function should be called when the training is over.
     :return:
     """
     global _recording_data
     _recording_data = False
-    _data_writer.close_file()
+    __trining_data_writer.close_file()
 
 @eel.expose
 def start_regressor():
@@ -130,11 +130,9 @@ def start_regressor():
     """
     global _regressor
     global _regressor_running
-    _regressor = PositionRegressor('data/gaze_data.csv')
+    _regressor = PositionRegressor('data/training_data.csv')
     _regressor_running = True
     _regressor.train_create_model()
-    regressor_thread = threading.Thread(target=run_regressor)
-    regressor_thread.start()
 
 @eel.expose
 def stop_regression():
@@ -145,44 +143,26 @@ def stop_regression():
     _regressor_running = False
 
 # Python only functions
-def record_gaze_data():
+def record_gaze_training_data():
     """
     Continuously records gaze data while _recording_data is True. This function is supposed to run in a separate thread.
     :return:
     """
     global _recording_data
     while True:
-        write_gaze_data()
+        write_gaze_traing_data()
         if not _recording_data:
             break
 
-def write_gaze_data():
+def write_gaze_traing_data():
     """
     Writes the current gaze data and calibration point to the data file. This uses the Writing classes from the IO
     module.
-    :return:
     """
     data = _gaze_processor.get_gaze_vector()
-    combined_data = list(data[0]) + list(data[1]) + [_current_x_coordinate, _current_y_coordinate]
-    _data_writer.write(combined_data)
-
-def run_regressor():
-    """
-    Alpha version of the regressor function. This function is supposed to run in a separate thread.
-    It constantly retrieves the gaze data from the GazeProcessor and makes a prediction using the PositionRegressor.
-    For now is just printing the result. but the plan is to store the data to be able to visualize it later in a heatmap.
-    :return:
-    """
-    global _regressor
-    if _regressor is None:
-        raise RuntimeError("Regressor not trained yet")
-    while _regressor_running:
-        gaze_data = _gaze_processor.get_gaze_vector()
-        if gaze_data[0] is not None and gaze_data[1] is not None:
-            data = [[gaze_data[0][0], gaze_data[0][1], gaze_data[0][2], gaze_data[1][0], gaze_data[1][1], gaze_data[1][2]]]
-            result = _regressor.make_prediction(data)
-            print(result)
-        time.sleep(0.1)
+    if data[0] is not None and data[1] is not None:
+        combined_data = list(data[0]) + list(data[1]) + [_current_x_coordinate, _current_y_coordinate]
+        __trining_data_writer.write(combined_data)
 
 def make_prediction():
     if _regressor is None:
@@ -193,22 +173,3 @@ def make_prediction():
         result = _regressor.make_prediction(data)
         return result
     return None
-
-def main():
-    """
-    Initializes the Eel server and starts the web interface.
-    """
-    print("Iniciando servidor de Eye Tracking...")
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    _data_writer.create_new_file()
-
-    eel.init(os.path.join(base_dir, 'Frontend'))
-    try:
-        eel.start('Templates/EyesTracking/index.html',
-                  mode=None,
-                  port=8000, block=True)
-    except Exception as e:
-        print(f"Error al iniciar el servidor: {e}")
-
-if __name__ == "__main__":
-    main()
