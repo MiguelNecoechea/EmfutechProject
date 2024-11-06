@@ -20,13 +20,18 @@ class PositionRegressor:
         these scalers are used to normalize the data before training the neural network. and also normalize the predictions.
         :param data_path:
         """
+        self.data_path = data_path
+        self._model = None
+        self._scaler_X = StandardScaler()
+        self._scaler_y = StandardScaler()
+        self.load_data()
+
+    def load_data(self):
         try:
-            data = pd.read_csv(data_path)
+            data = pd.read_csv(self.data_path)
+            print(data.shape)
             X = data[['l_x', 'l_y', 'l_z', 'r_x', 'r_y', 'r_z']].values
             y = data[['x', 'y']].values
-            self._model = None
-            self._scaler_X = StandardScaler()
-            self._scaler_y = StandardScaler()
 
             X = self._scaler_X.fit_transform(X)
             y = self._scaler_y.fit_transform(y)
