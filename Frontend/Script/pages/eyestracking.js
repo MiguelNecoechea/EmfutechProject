@@ -34,7 +34,6 @@ class EyeTrackingCalibration {
     }
 
     generateCalibrationPoints() {
-
         const padding = 10;
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -57,8 +56,8 @@ class EyeTrackingCalibration {
     initializeCalibration() {
         window.addEventListener('resize', async () => {
             setTimeout(async () => {
-                // await eel.start_eye_gaze()();
-                // eel.start_recording()();
+                await eel.start_eye_gaze()();
+
                 const calibrationPoints = this.generateCalibrationPoints();
                 this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
                 this.showNextPoint();
