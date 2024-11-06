@@ -39,12 +39,12 @@ import time
 import threading
 
 # Add the parent directory of 'IO' to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import eel
 from IO.FileWriting.GazeWriter import GazeWriter
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
-from Backend.EyesTracking.EyeCoordinateRegressor import PositionRegressor
+from Backend.EyeCoordinateRegressor import PositionRegressor
 
 _gaze_processor = GazeProcessor()
 _data_writer = GazeWriter('data', 'gaze_data.csv')
@@ -174,7 +174,7 @@ def run_regressor():
     """
     global _regressor
     if _regressor is None:
-        _regressor = PositionRegressor('data/gaze_data.csv')
+        raise RuntimeError("Regressor not trained yet")
     while _regressor_running:
         gaze_data = _gaze_processor.get_gaze_vector()
         if gaze_data[0] is not None and gaze_data[1] is not None:
@@ -182,6 +182,16 @@ def run_regressor():
             result = _regressor.make_prediction(data)
             print(result)
         time.sleep(0.1)
+
+def make_prediction():
+    if _regressor is None:
+        raise RuntimeError("Regressor not trained yet")
+    gaze_data = _gaze_processor.get_gaze_vector()
+    if gaze_data[0] is not None and gaze_data[1] is not None:
+        data = [[gaze_data[0][0], gaze_data[0][1], gaze_data[0][2], gaze_data[1][0], gaze_data[1][1], gaze_data[1][2]]]
+        result = _regressor.make_prediction(data)
+        return result
+    return None
 
 def main():
     """
