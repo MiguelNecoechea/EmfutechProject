@@ -78,23 +78,25 @@ async function createWindow() {
         callback({
             responseHeaders: {
                 ...details.responseHeaders,
-                'Content-Security-Policy': ['default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' http://localhost:8000 ws://localhost:8000']  // Added WebSocket
+                'Content-Security-Policy': ['default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' http://localhost:8000 ws://localhost:8000 ws://127.0.0.1:8000']  // Added ws://127.0.0.1:8000
             }
         })
     })
 
     try {
         // Try to connect to the server
-        await waitForServer('http://127.0.0.1:8000/Templates/EyesTracking/index.html');
+        // let url_to_connect = 'http://localhost:8000/Templates/EyesTracking/index.html';
+        let url_to_connect = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html';
+        await waitForServer(url_to_connect);
 
         // Once server is ready, load the URL
-        const url = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html'
-        console.log('Loading URL:', url)
+        // const url = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html'
+        console.log('Loading URL:', url_to_connect)
 
         // Add an additional small delay before loading the URL
         await new Promise(resolve => setTimeout(resolve, 1000))
 
-        await mainWindow.loadURL(url)
+        await mainWindow.loadURL(url_to_connect)
         mainWindow.webContents.openDevTools()
     } catch (error) {
         console.error('Failed to load application:', error)
@@ -125,10 +127,18 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
     if (pythonProcess) {
+        eel.stop_data_collection()();
         pythonProcess.kill()
     }
     if (process.platform !== 'darwin') {
         app.quit()
+    }
+})
+
+app.on('quit', () => {
+    if (pythonProcess) {
+        eel.stop_data_collection()();
+        pythonProcess.kill()
     }
 })
 
