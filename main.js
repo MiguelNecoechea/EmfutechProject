@@ -128,6 +128,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
     if (pythonProcess) {
         eel.stop_data_collection()();
+        eel.stop_eye_gaze()();
         pythonProcess.kill()
     }
     if (process.platform !== 'darwin') {
@@ -138,9 +139,11 @@ app.on('window-all-closed', () => {
 app.on('quit', () => {
     if (pythonProcess) {
         eel.stop_data_collection()();
-        pythonProcess.kill()
+        setTimeout(() => {
+            pythonProcess.kill();
+        }, 1000);
     }
-})
+});
 
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
