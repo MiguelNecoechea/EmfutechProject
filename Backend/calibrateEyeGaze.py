@@ -78,6 +78,7 @@ def start_eye_gaze():
     instance.
     """
     global _gaze_processor
+    print("Starting eye gaze tracking...")
     _gaze_processor.start()
 
     while True:
