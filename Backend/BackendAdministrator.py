@@ -5,7 +5,7 @@ import os
 
 from mne_lsl.stream import StreamLSL as Stream
 
-from calibrateEyeGaze import start_eye_gaze, make_prediction, start_recording
+from calibrateEyeGaze import make_prediction
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
@@ -89,11 +89,7 @@ def handle_emotion(output_path='.', file_name='emotions.csv'):
 
 @eel.expose
 def handle_gaze():
-    print("Starting gaze tracking...")
-    # start_eye_gaze()
-    # gaze_writer = GazeWriter(__OUT_TESTING_PATH, 'gaze_data.csv')
-    # gaze_writer.create_new_file()
-    # start_recording()
+    raise NotImplementedError("Gaze collection is not implemented yet.")
 
 # EEL server to allow communication with the frontend.
 def start_eel():
