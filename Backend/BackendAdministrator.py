@@ -5,7 +5,7 @@ import os
 
 from mne_lsl.stream import StreamLSL as Stream
 
-from calibrateEyeGaze import start_eye_gaze, make_prediction
+from calibrateEyeGaze import start_eye_gaze, make_prediction, start_recording
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
@@ -89,9 +89,11 @@ def handle_emotion(output_path='.', file_name='emotions.csv'):
 
 @eel.expose
 def handle_gaze():
-    start_eye_gaze()
-    gaze_writer = GazeWriter(__OUT_TESTING_PATH, 'gaze_data.csv')
-    gaze_writer.create_new_file()
+    print("Starting gaze tracking...")
+    # start_eye_gaze()
+    # gaze_writer = GazeWriter(__OUT_TESTING_PATH, 'gaze_data.csv')
+    # gaze_writer.create_new_file()
+    # start_recording()
 
 # EEL server to allow communication with the frontend.
 def start_eel():
@@ -107,7 +109,7 @@ def start_eel():
         print(f"Serving files from: {frontend_path}")
 
         # Initialize eel with the frontend directory
-        eel.init(frontend_path, allowed_extensions=['.js', '.html', '.css'])
+        eel.init(frontend_path)
 
         # Start the application
         # TODO Move to localhost so it can be Ipv4 and Ipv6 compatible
@@ -120,17 +122,15 @@ def start_eel():
     except Exception as e:
         print(f"Error starting server: {e}")
         print(f"Current working directory: {os.getcwd()}")
-
-
-    except Exception as e:
-        print(f"Error starting server: {e}")
-        print(f"Current working directory: {os.getcwd()}")
         print(f"Frontend path: {frontend_path}")
 
 # Main function.
 def main():
     global finished_data_collection
     start_eel()
+    # eel_thread = threading.Thread(target=start_eel)
+    # eel_thread.start()
+    print("Hello main is free")
     # handle_aura_signal('AURA_Power', 1, __OUT_TESTING_PATH, 'aura_data.csv')
     # handle_emotion(__OUT_TESTING_PATH)
     # handle_gaze()
