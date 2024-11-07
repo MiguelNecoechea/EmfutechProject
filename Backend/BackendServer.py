@@ -8,14 +8,15 @@ import os
 from contextlib import contextmanager
 
 from mne_lsl.stream import StreamLSL as Stream
+from pyqtgraph.examples.console_exception_inspection import thread
 
 
 # from EyeGaze import make_prediction
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from EyeGaze import create_new_eye_gaze
+from Backend.WritingRutines import write_gaze_traing_data
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
@@ -27,10 +28,13 @@ class BackendServer:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PAIR)
         self.socket.bind(f"tcp://*:{port}")
-
+        self.current_x_coordinate = 0
+        self.current_y_coordinate = 0
         self.running = False
         self.eye_gaze_running = False
         self.eye_gaze = None
+        self.gaze_writer = GazeWriter('testing', 'gaze_data.csv')
+        self.gaze_writer.create_new_file()
         self.data_collection_active = False
         self.threads = []
 
@@ -38,37 +42,7 @@ class BackendServer:
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
 
-    def cleanup(self):
-        """Clean up resources before shutting down"""
-        self.running = False
-        self.data_collection_active = False
-
-        # Wait for all threads to complete
-        for thread in self.threads:
-            if thread.is_alive():
-                thread.join(timeout=1.0)
-
-        # Clean up ZMQ resources
-        if hasattr(self, 'socket') and self.socket:
-            self.socket.close()
-        if hasattr(self, 'context') and self.context:
-            self.context.term()
-
-    @contextmanager
-    def thread_tracking(self, thread):
-        """Context manager to track active threads"""
-        self.threads.append(thread)
-        try:
-            yield thread
-        finally:
-            if thread in self.threads:
-                self.threads.remove(thread)
-
-    def signal_handler(self, signum, frame):
-        print("Signal received, cleaning up...")
-        self.cleanup()
-        sys.exit(0)
-
+    # Server Handling Functions
     def start(self):
         self.running = True
         print("Backend server started...")
@@ -88,6 +62,41 @@ class BackendServer:
                 except:
                     pass
 
+    def cleanup(self):
+        """Clean up resources before shutting down"""
+        self.running = False
+        self.data_collection_active = False
+
+        # Wait for all threads to complete
+        for thread in self.threads:
+            if thread.is_alive():
+                thread.join(timeout=1.0)
+
+        # Clean up ZMQ resources
+        if hasattr(self, 'socket') and self.socket:
+            self.socket.close()
+        if hasattr(self, 'context') and self.context:
+            self.context.term()
+
+    def signal_handler(self, signum, frame):
+        print("Signal received, cleaning up...")
+        self.cleanup()
+        sys.exit(0)
+
+    # Server Handling Functions End
+
+    # Thread Management Functions
+    @contextmanager
+    def thread_tracking(self, thread):
+        """Context manager to track active threads"""
+        self.threads.append(thread)
+        try:
+            yield thread
+        finally:
+            if thread in self.threads:
+                self.threads.remove(thread)
+
+    # Thread Management Functions End
 
     def handle_message(self, message):
         command = message.get("command")
@@ -97,33 +106,38 @@ class BackendServer:
             "start_eye_gaze": self.handle_eye_gaze,
             "calibrate_eye_tracking": self.start_et_calibration,
             "start_testing": self.start_testing,
-            # "start_recording_training_data": self.handle_training_data,
-            # "stop_recording_training_data": self.handle_stop_recording,
-            # "set_coordinates": self.handle_coordinates,
+            "start_recording_training_data": self.handle_training_data,
+            "stop_recording_training_data": self.handle_stop_recording,
+            "set_coordinates": self.handle_coordinates,
             # "start_regressor": self.handle_regressor,
             # "handle_aura_signal": self.handle_aura_signal,
             # "handle_emotion": self.handle_emotion,
             "stop": self.handle_stop
         }
-
+        print(message)
         handler = handlers.get(command)
         if handler:
             return handler(**params)
-        return {"error": f"Unknown command: {command}"}
+        else:
+            return {"error": f"Unknown command: {command}"}
 
     def handle_eye_gaze(self):
-        # Your eye gaze initialization code here
-        print("Eye gaze tracking started")
-        self.eye_gaze = create_new_eye_gaze()
-        self.eye_gaze_running = True
+        def eye_gaze_task():
+            self.eye_gaze = create_new_eye_gaze()
+            self.eye_gaze_running = True
+            print("Eye gaze tracking started")
+
+        local_thread = threading.Thread(target=eye_gaze_task)
+        local_thread.start()
         return {"status": "success", "message": "Eye gaze tracking started"}
 
     def start_et_calibration(self):
         if self.eye_gaze_running:
             print("Starting Calibration")
+            return {"status": "start-calibration", "message": "Eye gaze tracking started"}
         else:
             print("Eye gaze tracking not started")
-        return {"status": "success", "message": "Eye gaze tracking started"}
+            return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def start_testing(self):
         print("Starting testing")
@@ -136,17 +150,32 @@ class BackendServer:
 
     def handle_training_data(self):
         self.data_collection_active = True
-        # Initialize training data collection
-        return {"status": "success", "message": "Training data recording started"}
+        def training_data_task():
+            while self.data_collection_active:
+                # Make prediction and write to file
+                gaze_vector = self.eye_gaze.get_gaze_vector()
+                if self.current_y_coordinate != 0 and self.current_x_coordinate != 0:
+                    write_gaze_traing_data(self.gaze_writer, gaze_vector, self.current_x_coordinate, self.current_y_coordinate)
+
+        if self.eye_gaze_running:
+            print("Starting training data recording")
+            local_thread = threading.Thread(target=training_data_task)
+            local_thread.start()
+            return {"status": "success", "message": "Training data recording started"}
+        else:
+            print("Eye gaze tracking not started")
+            return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def handle_stop_recording(self):
         self.data_collection_active = False
-        # Cleanup code here
+        self.gaze_writer.close_file()
         return {"status": "success", "message": "Recording stopped"}
 
     def handle_coordinates(self, x, y):
         # Handle the coordinates update
         print(f"Coordinates updated: {x}, {y}")
+        self.current_x_coordinate = x
+        self.current_y_coordinate = y
         return {"status": "success", "coordinates": [x, y]}
 
     def handle_regressor(self):
