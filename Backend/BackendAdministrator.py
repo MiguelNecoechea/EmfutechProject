@@ -20,6 +20,7 @@ finished_data_collection = False
 @eel.expose
 def stop_data_collection():
     global finished_data_collection
+    print("Stopping data collection")
     finished_data_collection = True
 
 
