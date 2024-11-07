@@ -2,6 +2,11 @@ from IO.FileWriting.Writer import Writer
 
 class GazeWriter(Writer):
     def __init__(self, file_path, file_name):
+        """
+        Initializes the GazeWriter object with the file path and file name.
+        :param file_path: The path where the file will be saved.
+        :param file_name: The name of the file to store the data.
+        """
         super().__init__(file_path, file_name, ['l_x', 'l_y', 'l_z', 'r_x', 'r_y', 'r_z', 'x', 'y'])
 
     def write(self, data):
