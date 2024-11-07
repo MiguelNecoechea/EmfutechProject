@@ -1,5 +1,5 @@
 """
-calibrateEyeGaze.py
+EyeGaze.py
 
 This module handles the calibration and recording of eye gaze data using the GazeProcessor and GazeWriter classes.
 It exposes several functions to the main web interface using the Eel library.
@@ -41,7 +41,6 @@ import threading
 # Add the parent directory of 'IO' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import eel
 from IO.FileWriting.GazeWriter import GazeWriter
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 from Backend.EyeCoordinateRegressor import PositionRegressor
@@ -55,7 +54,6 @@ _regressor = None
 _regressor_running = False
 
 # Functions exposed to the web interface
-@eel.expose
 def set_coordinates(x, y):
     """
     Receives and stores the current calibration point coordinates. the coordinates are retrieved from the javascript
@@ -70,7 +68,6 @@ def set_coordinates(x, y):
     _current_x_coordinate = x
     _current_y_coordinate = y
 
-@eel.expose
 def start_eye_gaze():
     """
     Starts the eye gaze tracking and attempts to perform the internal calibration of the gaze processor.
@@ -92,7 +89,6 @@ def start_eye_gaze():
             _gaze_processor = GazeProcessor()
             _gaze_processor.start()
 
-@eel.expose
 def stop_eye_gaze():
     """
     Stops the eye gaze tracking process. This function should be called when the experiment is over or the user wants to
@@ -100,7 +96,6 @@ def stop_eye_gaze():
     """
     _gaze_processor.stop_processing()
 
-@eel.expose
 def start_recording_training_data():
     """
     Starts recording the gaze data in a separate thread. The recording will continue until stop_recording is called.
@@ -111,7 +106,6 @@ def start_recording_training_data():
     recording_thread = threading.Thread(target=record_gaze_training_data)
     recording_thread.start()
 
-@eel.expose
 def stop_recording_training_data():
     """
     Stops recording the gaze data and closes the data file. This function should be called when the training is over.
@@ -121,7 +115,6 @@ def stop_recording_training_data():
     _recording_data = False
     __trining_data_writer.close_file()
 
-@eel.expose
 def start_regressor():
     """
     Starts the regressor thread. This function is called when the user wants to start the predictions of the eye position
@@ -134,7 +127,6 @@ def start_regressor():
     _regressor_running = True
     _regressor.train_create_model()
 
-@eel.expose
 def stop_regression():
     """
     Stops the regressor thread. by setting a boolean to false.
