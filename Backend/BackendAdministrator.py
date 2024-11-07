@@ -5,7 +5,7 @@ import os
 
 from mne_lsl.stream import StreamLSL as Stream
 
-from calibrateEyeGaze import make_prediction
+from EyeGaze import make_prediction
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
