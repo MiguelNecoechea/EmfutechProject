@@ -41,6 +41,8 @@ class Writer:
         Closes the file and disables the writer.
         """
         if self._is_writer_opened:
+            self._csv_file.flush()  # Ensure all data is written to the file
+            os.fsync(self._csv_file.fileno())  # Ensure the file is written to disk
             self._csv_file.close()
             self._is_writer_opened = False
 
