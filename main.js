@@ -1,11 +1,33 @@
-const { app, BrowserWindow } = require('electron')
-const path = require('path')
-const { spawn } = require('child_process')
-const http = require('http')
-require('@electron/remote/main').initialize()
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+const http = require('http');
+require('@electron/remote/main').initialize();
 
 let pythonProcess = null
 let mainWindow = null
+
+// Window management functions
+app.on('window-all-closed', () => {
+    if (pythonProcess) {
+        pythonProcess.kill()
+    }
+    if (process.platform !== 'darwin') {
+        app.quit()
+    }
+})
+
+app.on('quit', () => {
+    if (pythonProcess) {
+        pythonProcess.kill()
+    }
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow()
+    }
+})
 
 function checkServerStatus(url) {
     return new Promise((resolve, reject) => {
@@ -125,28 +147,7 @@ app.whenReady().then(async () => {
     await createWindow()
 })
 
-app.on('window-all-closed', () => {
-    if (pythonProcess) {
-        eel.stop_data_collection()();
-        eel.stop_eye_gaze()();
-        pythonProcess.kill()
-    }
-    if (process.platform !== 'darwin') {
-        app.quit()
-    }
-})
-
-app.on('quit', () => {
-    if (pythonProcess) {
-        eel.stop_data_collection()();
-        setTimeout(() => {
-            pythonProcess.kill();
-        }, 1000);
-    }
+// Inter-process communication Functions
+ipcMain.on('some-event', () => {
+    mainWindow.webContents.send('call-eyestracking-function', 'exampleFunction');
 });
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow()
-    }
-})
