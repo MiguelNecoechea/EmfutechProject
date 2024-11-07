@@ -4,11 +4,18 @@ import time
 import threading
 import signal
 import sys
+import os
 from contextlib import contextmanager
 
 from mne_lsl.stream import StreamLSL as Stream
 
-from EyeGaze import make_prediction
+
+# from EyeGaze import make_prediction
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from EyeGaze import create_new_eye_gaze
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
@@ -20,7 +27,10 @@ class BackendServer:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PAIR)
         self.socket.bind(f"tcp://*:{port}")
+
         self.running = False
+        self.eye_gaze_running = False
+        self.eye_gaze = None
         self.data_collection_active = False
         self.threads = []
 
@@ -85,12 +95,14 @@ class BackendServer:
 
         handlers = {
             "start_eye_gaze": self.handle_eye_gaze,
-            "start_recording_training_data": self.handle_training_data,
-            "stop_recording_training_data": self.handle_stop_recording,
-            "set_coordinates": self.handle_coordinates,
-            "start_regressor": self.handle_regressor,
-            "handle_aura_signal": self.handle_aura_signal,
-            "handle_emotion": self.handle_emotion,
+            "calibrate_eye_tracking": self.start_et_calibration,
+            "start_testing": self.start_testing,
+            # "start_recording_training_data": self.handle_training_data,
+            # "stop_recording_training_data": self.handle_stop_recording,
+            # "set_coordinates": self.handle_coordinates,
+            # "start_regressor": self.handle_regressor,
+            # "handle_aura_signal": self.handle_aura_signal,
+            # "handle_emotion": self.handle_emotion,
             "stop": self.handle_stop
         }
 
@@ -102,7 +114,25 @@ class BackendServer:
     def handle_eye_gaze(self):
         # Your eye gaze initialization code here
         print("Eye gaze tracking started")
+        self.eye_gaze = create_new_eye_gaze()
+        self.eye_gaze_running = True
         return {"status": "success", "message": "Eye gaze tracking started"}
+
+    def start_et_calibration(self):
+        if self.eye_gaze_running:
+            print("Starting Calibration")
+        else:
+            print("Eye gaze tracking not started")
+        return {"status": "success", "message": "Eye gaze tracking started"}
+
+    def start_testing(self):
+        print("Starting testing")
+        return {"status": "success", "message": "Eye gaze tracking started"}
+
+    def handle_stop(self):
+        print("Stopping server...")
+        self.cleanup()
+        return {"status": "success", "message": "Server stopped"}
 
     def handle_training_data(self):
         self.data_collection_active = True
@@ -160,11 +190,6 @@ class BackendServer:
             return {"status": "success", "message": "Emotion recognition started"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
-
-    def handle_stop(self):
-        print("Stopping server...")
-        self.cleanup()
-        return {"status": "success", "message": "Server stopped"}
 
     def _data_collection_loop(self, stream, data_writer):
         while self.data_collection_active:
