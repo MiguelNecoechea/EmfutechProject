@@ -58,7 +58,7 @@ class ApplicationManager {
             this.mainWindow = null;
         });
 
-        await this.mainWindow.loadFile('Frontend/Templates/EyesTracking/index.html');
+        await this.mainWindow.loadFile('Frontend/index.html');
         this.mainWindow.webContents.openDevTools();
         // if (process.env.NODE_ENV === 'development') {
         //     this.mainWindow.webContents.openDevTools();
