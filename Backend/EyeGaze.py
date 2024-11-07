@@ -36,8 +36,6 @@ Run this script to start the Eye Tracking server and expose the functions to the
 import sys
 import os
 import time
-import asyncio
-import threading
 
 # Add the parent directory of 'IO' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
