@@ -1,153 +1,211 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const http = require('http');
-require('@electron/remote/main').initialize();
+const zmq = require('zeromq');
 
-let pythonProcess = null
-let mainWindow = null
-
-// Window management functions
-app.on('window-all-closed', () => {
-    if (pythonProcess) {
-        pythonProcess.kill()
+class ApplicationManager {
+    constructor() {
+        this.pythonProcess = null;
+        this.mainWindow = null;
+        this.socket = null;
+        this.isShuttingDown = false;
+        this.setupEventHandlers();
     }
-    if (process.platform !== 'darwin') {
-        app.quit()
+
+    setupEventHandlers() {
+        app.whenReady().then(() => this.onAppReady());
+        app.on('window-all-closed', () => this.onWindowAllClosed());
+        app.on('before-quit', async (event) => {
+            event.preventDefault();
+            await this.cleanup();
+            app.exit(0);
+        });
+        app.on('activate', () => this.onActivate());
+
+        // Handle uncaught exceptions
+        process.on('uncaughtException', async (error) => {
+            console.error('Uncaught Exception:', error);
+            await this.cleanup();
+            app.exit(1);
+        });
     }
-})
 
-app.on('quit', () => {
-    if (pythonProcess) {
-        pythonProcess.kill()
-    }
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow()
-    }
-})
-
-function checkServerStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (res) => {
-            if (res.statusCode === 200) {
-                resolve(true)
-            } else {
-                reject(new Error(`Server returned status code: ${res.statusCode}`))
-            }
-        }).on('error', (err) => {
-            reject(err)
-        })
-    })
-}
-
-function startPythonServer() {
-    return new Promise((resolve) => {
-        console.log('Iniciando servidor Python...')
-
-        const scriptPath = path.join(__dirname, 'Backend', 'BackendAdministrator.py')
-        console.log('Starting Python script at:', scriptPath)
-
-        pythonProcess = spawn('python', [scriptPath], {
-            stdio: 'inherit'
-        })
-
-        pythonProcess.on('error', (err) => {
-            console.error('Error al iniciar Python:', err)
-        })
-
-        pythonProcess.on('close', (code) => {
-            console.log(`Servidor Python cerrado con código ${code}`)
-        })
-
-        // Give Python some time to initialize
-        setTimeout(resolve, 5000)
-    })
-}
-
-async function waitForServer(url, maxAttempts = 30) {  // Increased max attempts
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    async onAppReady() {
         try {
-            await checkServerStatus(url)
-            console.log('Server is ready!')
-            return true
-        } catch (err) {
-            console.log(`Attempt ${attempt + 1}/${maxAttempts}: Server not ready yet...`)
-            console.log('Error:', err.message)
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            await this.startPythonBackend();
+            await this.createWindow();
+            await this.setupZMQSocket();
+            this.setupIPCHandlers();
+        } catch (error) {
+            console.error('Error during app initialization:', error);
+            await this.cleanup();
+            app.exit(1);
         }
     }
-    throw new Error('Server failed to start after maximum attempts')
-}
 
-async function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            enableRemoteModule: true,
-            webSecurity: false // Solo para desarrollo
-        }
-    })
-
-    require('@electron/remote/main').enable(mainWindow.webContents)
-
-    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-        callback({
-            responseHeaders: {
-                ...details.responseHeaders,
-                'Content-Security-Policy': ['default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' http://localhost:8000 ws://localhost:8000 ws://127.0.0.1:8000']  // Added ws://127.0.0.1:8000
+    async createWindow() {
+        this.mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
             }
-        })
-    })
+        });
 
-    try {
-        // Try to connect to the server
-        // let url_to_connect = 'http://localhost:8000/Templates/EyesTracking/index.html';
-        let url_to_connect = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html';
-        await waitForServer(url_to_connect);
+        this.mainWindow.on('closed', () => {
+            this.mainWindow = null;
+        });
 
-        // Once server is ready, load the URL
-        // const url = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html'
-        console.log('Loading URL:', url_to_connect)
+        await this.mainWindow.loadFile('Frontend/Templates/EyesTracking/index.html');
+        this.mainWindow.webContents.openDevTools();
+        // if (process.env.NODE_ENV === 'development') {
+        //     this.mainWindow.webContents.openDevTools();
+        // }
+    }
 
-        // Add an additional small delay before loading the URL
-        await new Promise(resolve => setTimeout(resolve, 1000))
+    async startPythonBackend() {
+        const scriptPath = path.join(__dirname, 'Backend', 'BackendServer.py');
+        console.log('Starting Python backend:', scriptPath);
 
-        await mainWindow.loadURL(url_to_connect)
-        mainWindow.webContents.openDevTools()
-    } catch (error) {
-        console.error('Failed to load application:', error)
-        await mainWindow.loadURL(`data:text/html,
-            <html>
-                <body>
-                    <h2>Failed to start application</h2>
-                    <pre>${error.message}</pre>
-                    <p>Please check if:</p>
-                    <ul>
-                        <li>Python is installed and in PATH</li>
-                        <li>All required Python packages are installed</li>
-                        <li>The server script path is correct</li>
-                    </ul>
-                </body>
-            </html>
-        `)
+        this.pythonProcess = spawn('python', [scriptPath], {
+            stdio: 'inherit',
+            detached: false // Ensure the process is terminated with the parent
+        });
+
+        return new Promise((resolve, reject) => {
+            this.pythonProcess.on('error', (err) => {
+                console.error('Failed to start Python backend:', err);
+                reject(err);
+            });
+
+            this.pythonProcess.on('spawn', () => {
+                // Wait for the process to fully start
+                setTimeout(resolve, 2000);
+            });
+
+            // Handle Python process exit
+            this.pythonProcess.on('exit', (code, signal) => {
+                console.log(`Python backend exited with code ${code} and signal ${signal}`);
+                this.pythonProcess = null;
+            });
+        });
+    }
+
+    async setupZMQSocket() {
+        if (this.socket) {
+            await this.socket.close();
+        }
+
+        this.socket = new zmq.Pair();
+        await this.socket.connect("tcp://localhost:5556");
+
+        // Handle incoming messages
+        this.startMessageLoop();
+    }
+
+    async startMessageLoop() {
+        try {
+            for await (const [msg] of this.socket) {
+                if (this.isShuttingDown) break;
+
+                const response = JSON.parse(msg.toString());
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('python-message', response);
+                }
+            }
+        } catch (error) {
+            if (!this.isShuttingDown) {
+                console.error('ZMQ message loop error:', error);
+            }
+        }
+    }
+
+    setupIPCHandlers() {
+        ipcMain.handle('python-command', async (event, command, params) => {
+            try {
+                await this.sendToPython(command, params);
+                return { status: 'success' };
+            } catch (error) {
+                console.error('Error sending command to Python:', error);
+                return { status: 'error', message: error.toString() };
+            }
+        });
+    }
+
+    async sendToPython(command, params = {}) {
+        if (!this.socket || this.isShuttingDown) return;
+
+        const message = { command, params };
+        await this.socket.send(JSON.stringify(message));
+    }
+
+    async cleanup() {
+        if (this.isShuttingDown) return;
+
+        this.isShuttingDown = true;
+        console.log('Starting cleanup...');
+
+        // Send stop command to Python backend
+        if (this.socket) {
+            try {
+                await this.sendToPython('stop');
+                await this.socket.close();
+                console.log('ZMQ socket closed');
+            } catch (error) {
+                console.error('Error closing ZMQ socket:', error);
+            }
+            this.socket = null;
+        }
+
+        // Terminate Python process
+        if (this.pythonProcess) {
+            try {
+                this.pythonProcess.kill('SIGTERM');
+                // Wait for process to terminate
+                await new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        if (this.pythonProcess) {
+                            this.pythonProcess.kill('SIGKILL');
+                        }
+                        resolve();
+                    }, 5000);
+
+                    this.pythonProcess.on('exit', () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    });
+                });
+                console.log('Python process terminated');
+            } catch (error) {
+                console.error('Error terminating Python process:', error);
+            }
+            this.pythonProcess = null;
+        }
+
+        // Close main window
+        if (this.mainWindow) {
+            this.mainWindow.destroy();
+            this.mainWindow = null;
+        }
+
+        console.log('Cleanup completed');
+    }
+
+    async onWindowAllClosed() {
+        await this.cleanup();
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    }
+
+    onActivate() {
+        if (!this.mainWindow) {
+            this.createWindow();
+        }
     }
 }
 
-app.whenReady().then(async () => {
-    // First start Python and wait for initial setup
-    await startPythonServer()
-
-    // Then create the window
-    await createWindow()
-})
-
-// Inter-process communication Functions
-ipcMain.on('some-event', () => {
-    mainWindow.webContents.send('call-eyestracking-function', 'exampleFunction');
-});
+// Initialize the application
+const appManager = new ApplicationManager();
