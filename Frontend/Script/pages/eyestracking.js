@@ -1,3 +1,4 @@
+const { ipcRenderer } = require('electron');
 let remote;
 try {
     remote = require('@electron/remote');
@@ -33,6 +34,11 @@ class EyeTrackingCalibration {
         });
     }
 
+    /**
+     * Generates the calibration points on the screen. The points are fixated in the screen, however, a future is
+     * expected to move the points in a random order to improve the calibration process.
+     * @returns {Array} Array of point objects with x and y coordinates.
+     */
     generateCalibrationPoints() {
         const padding = 10;
         const width = window.innerWidth;
@@ -53,6 +59,9 @@ class EyeTrackingCalibration {
         ];
     }
 
+    /**
+     * Initializes the calibration process by setting up the calibration points and starting the eye gaze recording.
+     */
     initializeCalibration() {
         window.addEventListener('resize', async () => {
             setTimeout(async () => {
@@ -67,6 +76,12 @@ class EyeTrackingCalibration {
         }, { once: true });
     }
 
+    /**
+     * Creates a calibration point element and appends it to the calibration area.
+     * @param {number} x - The x-coordinate of the point.
+     * @param {number} y - The y-coordinate of the point.
+     * @returns {HTMLElement} The created point element.
+     */
     createPoint(x, y) {
         const point = document.createElement('div');
         point.className = 'calibration-point';
@@ -80,6 +95,9 @@ class EyeTrackingCalibration {
         return point;
     }
 
+    /**
+     * Displays the next calibration point and sends its coordinates to the backend.
+     */
     async showNextPoint() {
         if (this.currentPointIndex > 0) {
             this.points[this.currentPointIndex - 1].style.display = 'none';
@@ -101,6 +119,9 @@ class EyeTrackingCalibration {
         eel.set_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
     }
 
+    /**
+     * Finishes the calibration process and exits full-screen mode.
+     */
     finishCalibration() {
         if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -114,14 +135,38 @@ class EyeTrackingCalibration {
         }, 1000);
     }
 
+    /**
+     * Resets the calibration process, clearing all points and resetting the start button.
+     */
     reset() {
         this.points.forEach(point => point.remove());
         this.points = [];
         this.currentPointIndex = 0;
         this.startButton.style.display = 'block';
     }
+
+    // Example function to be called from main.js
+    exampleFunction() {
+        console.log('Example function called from main.js');
+    }
+
+    // Listen for IPC messages to execute functions
+    listenForIpcMessages() {
+        ipcRenderer.on('execute-eyestracking-function', (event, functionName, ...args) => {
+            if (typeof this[functionName] === 'function') {
+                this[functionName](...args);
+            } else {
+                console.error(`Function ${functionName} not found in EyeTrackingCalibration`);
+            }
+        });
+    }
+
 }
 
+/**
+ * Initializes the EyeTrackingCalibration class when the DOM content is loaded.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     new EyeTrackingCalibration();
+    eyeTrackingCalibration.listenForIpcMessages();
 });
