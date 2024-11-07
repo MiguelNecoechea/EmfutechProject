@@ -1,7 +1,12 @@
 class EyeTrackingCalibration {
     constructor() {
-        this.calibrationArea = document.getElementById('calibrationArea');
-        this.startButton = document.getElementById('startButton');
+        // this.calibrationArea = document.getElementById('calibrationArea');
+
+        this.startGaze = document.getElementById('startGaze');
+        this.calibrateTracking = document.getElementById('calibrateTracking');
+        this.startTesting = document.getElementById('startTesting');
+        this.endTesting = document.getElementById('endTesting');
+
         this.points = [];
         this.currentX = 0;
         this.currentY = 0;
@@ -21,15 +26,22 @@ class EyeTrackingCalibration {
 
     setupEventListeners() {
         // Start button listener
-        this.startButton.addEventListener('click', async () => {
-            this.startButton.style.display = 'none';
-            try {
-                await this.initializeCalibration();
-            } catch (err) {
-                console.error('Error starting calibration:', err);
-                this.handleError(err);
-            }
-        });
+        // this.startButton.addEventListener('click', async () => {
+        //     this.startButton.style.display = 'none';
+        //     try {
+        //         await this.initializeCalibration();
+        //     } catch (err) {
+        //         console.error('Error starting calibration:', err);
+        //         this.handleError(err);
+        //     }
+        // });
+
+        // Add event listeners for other buttons
+        this.startGaze.addEventListener('click', () => this.sendCommandToBackend('start_eye_gaze'));
+        this.calibrateTracking.addEventListener('click', () => this.sendCommandToBackend('calibrate_eye_tracking'));
+        this.startTesting.addEventListener('click', () => this.sendCommandToBackend('start_testing'));
+        this.endTesting.addEventListener('click', () => this.sendCommandToBackend('stop'));
+
 
         // Window resize listener with debouncing
         window.addEventListener('resize', () => {
@@ -53,11 +65,20 @@ class EyeTrackingCalibration {
             }
         });
     }
+    async sendCommandToBackend(command) {
+        try {
+            const response = await window.electronAPI.sendPythonCommand(command);
+            console.log(`Response from Python for ${command}:`, response);
+        } catch (error) {
+            console.error(`Error sending ${command} to backend:`, error);
+        }
+    }
 
     async initializeCalibration() {
         try {
             this.isCalibrating = true;
-            await window.electronAPI.sendPythonCommand('start_eye_gaze');
+            const response = await window.electronAPI.sendPythonCommand('start_eye_gaze');
+            console.log('Response from Python:', response);
             await window.electronAPI.sendPythonCommand('start_recording_training_data');
             await document.documentElement.requestFullscreen();
 
@@ -75,6 +96,7 @@ class EyeTrackingCalibration {
 
     generateCalibrationPoints() {
         const padding = Math.min(window.innerWidth, window.innerHeight) * 0.05; // Responsive padding
+        // const padding = 15; // Fixed padding
         const width = window.innerWidth;
         const height = window.innerHeight;
 
