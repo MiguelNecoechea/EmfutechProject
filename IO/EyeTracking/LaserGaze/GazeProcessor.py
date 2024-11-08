@@ -134,4 +134,3 @@ class GazeProcessor:
         if self.__cap:
             self.__cap.release()
         self._running = False
-

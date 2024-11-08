@@ -55,9 +55,3 @@ def create_new_eye_gaze() -> GazeProcessor:
         gaze_data = gaze_processor.get_gaze_vector()
         if gaze_data[0] is not None and gaze_data[1] is not None:
             return gaze_processor
-        elif (gaze_data[0] is None and gaze_data[1] is not None) or (gaze_data[0] is not None and gaze_data[1] is None):
-            gaze_processor.stop_processing()
-            del gaze_processor
-            time.sleep(1)
-            gaze_processor = GazeProcessor()
-            gaze_processor.start()
