@@ -57,10 +57,10 @@ python-engineio==4.10.1
 python-socketio==5.11.4
 QtPy==2.4.1
 retina-face==0.0.17
-creeninfo==0.8.1
+screeninfo==0.8.1
 simple-websocket==1.1.0
 sounddevice==0.5.1
-ensorflow-io-gcs-filesystem==0.37.1
+tensorflow-io-gcs-filesystem==0.37.1
 tqdm==4.66.5
 tzdata==2024.2
 webencodings==0.5.1
