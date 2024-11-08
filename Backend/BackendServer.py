@@ -151,11 +151,22 @@ class BackendServer:
     def handle_training_data(self):
         self.data_collection_active = True
         def training_data_task():
-            while self.data_collection_active:
+            while True:
                 # Make prediction and write to file
                 gaze_vector = self.eye_gaze.get_gaze_vector()
                 if self.current_y_coordinate != 0 and self.current_x_coordinate != 0:
-                    write_gaze_traing_data(self.gaze_writer, gaze_vector, self.current_x_coordinate, self.current_y_coordinate)
+                    data = []
+                    for i in gaze_vector[0]:
+                        data.append(i)
+                    for i in gaze_vector[1]:
+                        data.append(i)
+                    data.append(self.current_x_coordinate)
+                    data.append(self.current_y_coordinate)
+                    # data = gaze_vector[0] + gaze_vector[1] + [self.current_x_coordinate, self.current_y_coordinate]
+                    self.gaze_writer.write(data)
+                if self.data_collection_active is False:
+                    self.gaze_writer.close_file()
+                    break
 
         if self.eye_gaze_running:
             print("Starting training data recording")
@@ -168,7 +179,6 @@ class BackendServer:
 
     def handle_stop_recording(self):
         self.data_collection_active = False
-        self.gaze_writer.close_file()
         return {"status": "success", "message": "Recording stopped"}
 
     def handle_coordinates(self, x, y):
