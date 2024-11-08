@@ -7,6 +7,19 @@ class Dashboard {
     }
 
     initializeEventListeners() {
+        // Configurar los eventos de navegación para la barra lateral
+        const navLinks = document.querySelectorAll('.sidebar-nav a');
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', event => {
+                event.preventDefault();
+                const pagePath = link.getAttribute('data-path');
+                if (pagePath) {
+                    this.loadPage(pagePath);
+                }
+            });
+        });
+
         // Botones de control
         const controlButtons = document.querySelectorAll('.control-buttons button');
         controlButtons.forEach(button => {
@@ -18,12 +31,11 @@ class Dashboard {
         if (startButton) {
             startButton.addEventListener('click', this.toggleScreenRecording.bind(this));
         }
+    }
 
-        // Tabs de navegación
-        const navTabs = document.querySelectorAll('.nav-tabs a');
-        navTabs.forEach(tab => {
-            tab.addEventListener('click', this.handleTabClick.bind(this));
-        });
+    loadPage(pagePath) {
+        // Llama a Electron para cargar la página en la misma ventana
+        window.electronAPI.loadPage(pagePath);
     }
 
     initializeCharts() {
@@ -98,7 +110,7 @@ class Dashboard {
             });
         }
     }
-
+/*
     initializeCameraFeed() {
         const cameraStream = document.getElementById('cameraStream');
 
@@ -115,7 +127,7 @@ class Dashboard {
             console.error("getUserMedia no es compatible con este navegador.");
         }
     }
-
+*/
     handleControlButton(event) {
         console.log('Botón de control presionado:', event.target.textContent);
     }
@@ -138,16 +150,6 @@ class Dashboard {
                 console.error('Error al detener la grabación de pantalla:', error);
             }
         }
-    }
-
-    handleTabClick(event) {
-        event.preventDefault();
-        // Quitar clase active de todos los tabs
-        document.querySelectorAll('.nav-tabs a').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        // Agregar clase active al tab clickeado
-        event.target.classList.add('active');
     }
 
     updateCharts(data) {

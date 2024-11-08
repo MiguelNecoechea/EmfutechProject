@@ -31,6 +31,7 @@ Thumbs.db        # Windows
 *.vcxproj        # Visual Studio C++
 *.swp            # Archivos temporales de Vim
 *.sublime*       # Configuración de Sublime Text
+Lib/
 
 # Archivos de entorno (si tienes información sensible)
 .env

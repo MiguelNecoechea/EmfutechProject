@@ -1,0 +1,68 @@
+{
+    "timestamp": "20241029_120947",
+    "total_points": 9,
+    "points": [
+        {
+            "pointNumber": 1,
+            "x": 50,
+            "y": 50,
+            "timestamp": "2024-10-29T03:09:29.496Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 1082,
+            "y": 364,
+            "timestamp": "2024-10-29T03:09:29.496Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 996,
+            "y": 472,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 589,
+            "y": 484,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 1087,
+            "y": 401,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 1134,
+            "y": 50,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 50,
+            "y": 691,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 1134,
+            "y": 691,
+            "timestamp": "2024-10-29T03:09:29.497Z"
+        },
+        {
+            "pointNumber": 1,
+            "x": 592,
+            "y": 371,
+            "timestamp": "2024-10-29T03:09:29.498Z"
+        }
+    ],
+    "statistics": {
+        "average_x": 746.0,
+        "average_y": 397.1111111111111,
+        "min_x": 50,
+        "max_x": 1134,
+        "min_y": 50,
+        "max_y": 691
+    }
+}

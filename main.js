@@ -1,25 +1,41 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs').promises;
 const { spawn } = require('child_process');
+const eel = require('eel-electron');
 require('@electron/remote/main').initialize();
 
 let pythonProcess = null;
 let mainWindow = null;
-let screenRecorderProcess = null; // Variable para manejar el proceso de grabación de pantalla
+let screenRecorderProcess = null;
 
 function startPythonServer() {
-    console.log('Iniciando servidor Python...');
-    pythonProcess = spawn('python', ['Backend/EyesTracking/calibrateEyeGaze.py'], {
-        stdio: 'inherit',
-        env: { ...process.env, PYTHONPATH: path.join(__dirname) } // Agregar PYTHONPATH al entorno
+    console.log('Starting Python server...');
+    const pythonPath = process.platform === 'win32' ? '.\\venv\\Scripts\\python.exe' : './venv/bin/python';
+    
+    pythonProcess = spawn(pythonPath, ['Backend/EyesTracking/calibrateEyeGaze.py'], {
+        stdio: 'pipe',
+        env: { 
+            ...process.env, 
+            PYTHONPATH: path.join(__dirname),
+            PYTHONUNBUFFERED: '1'
+        }
+    });
+
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`Python stdout: ${data.toString()}`);
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`Python stderr: ${data.toString()}`);
     });
 
     pythonProcess.on('error', (err) => {
-        console.error('Error al iniciar Python:', err);
+        console.error('Error starting Python server:', err);
     });
 
     pythonProcess.on('close', (code) => {
-        console.log(`Servidor Python cerrado con código ${code}`);
+        console.log(`Python server exited with code ${code}`);
     });
 }
 
@@ -28,10 +44,10 @@ function createWindow() {
         width: 1200,
         height: 800,
         webPreferences: {
-            nodeIntegration: true,
+            nodeIntegration: false,
             contextIsolation: true,
             enableRemoteModule: true,
-            preload: path.join(__dirname, 'Frontend', 'Script', 'global', 'preload.js') // Ruta correcta para preload.js
+            preload: path.join(__dirname, 'Frontend', 'Script', 'global', 'preload.js')
         }
     });
 
@@ -41,60 +57,142 @@ function createWindow() {
         callback({
             responseHeaders: {
                 ...details.responseHeaders,
-                'Content-Security-Policy': ['default-src \'self\' \'unsafe-inline\' \'unsafe-eval\'']
+                'Content-Security-Policy': [
+                    "default-src 'self' 'unsafe-inline' 'unsafe-eval'",
+                    "connect-src 'self' http://localhost:8000",
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+                ].join('; ')
             }
         });
     });
 
-    mainWindow.loadFile(path.join(__dirname, 'Frontend', 'Templates', 'Dashboard', 'dashboard.html'));
-    mainWindow.webContents.openDevTools();
+    // Iniciar con index.html en lugar de la página de calibración
+    mainWindow.loadFile('index.html');
+
+    // Monitorear errores de carga
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Failed to load:', errorCode, errorDescription);
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools();
+    }
 }
 
-// Handlers para controlar la grabación de pantalla
-ipcMain.handle('start-recording', async () => {
-    if (!screenRecorderProcess) {
-        screenRecorderProcess = spawn('python', ['./IO/ScreenRecording/WindowsScreenRecorder.py'], {
-            env: { ...process.env, PYTHONIOENCODING: 'utf-8' } // Configuración de entorno UTF-8
-        });
-        console.log('Grabacion de pantalla iniciada');
-
-        screenRecorderProcess.stdout.on('data', (data) => {
-            console.log(`Salida de grabacion: ${data}`);
-        }); 
-
-        screenRecorderProcess.stderr.on('data', (data) => {
-            console.error(`Error de grabacion: ${data}`);
-        });
-
-        screenRecorderProcess.on('close', (code) => {
-            console.log(`Grabacion de pantalla detenida con codigo ${code}`);
-            screenRecorderProcess = null; // Resetear el proceso cuando se detiene
-        });
+// IPC handlers
+ipcMain.handle('load-page', async (event, pagePath) => {
+    try {
+        const fullPath = path.join(__dirname, 'Frontend', 'Templates', pagePath);
+        console.log('Loading page:', fullPath);
+        
+        // Verificar que el archivo existe antes de cargarlo
+        await fs.access(fullPath);
+        
+        await mainWindow.loadFile(fullPath);
+        return { success: true };
+    } catch (error) {
+        console.error('Error loading page:', error);
+        return { success: false, error: error.message };
     }
 });
 
+ipcMain.handle('calibration-complete', async () => {
+    try {
+        if (mainWindow) {
+            const dashboardPath = path.join(__dirname, 'Frontend', 'Templates', 'Dashboard', 'dashboard.html');
+            await mainWindow.loadFile(dashboardPath);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Error completing calibration:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('start-calibration', async () => {
+    console.log('Starting calibration...');
+    return { success: true };
+});
+
+ipcMain.handle('start-recording', async () => {
+    console.log('Starting recording...');
+    try {
+        // Implementar lógica de inicio de grabación
+        return { success: true };
+    } catch (error) {
+        console.error('Error starting recording:', error);
+        return { success: false, error: error.message };
+    }
+});
 
 ipcMain.handle('stop-recording', async () => {
-    if (screenRecorderProcess) {
-        screenRecorderProcess.kill(); // Detener el proceso de grabación
-        console.log('Grabación de pantalla detenida');
-        screenRecorderProcess = null;
+    console.log('Stopping recording...');
+    try {
+        // Implementar lógica de detención de grabación
+        return { success: true };
+    } catch (error) {
+        console.error('Error stopping recording:', error);
+        return { success: false, error: error.message };
     }
 });
 
-app.whenReady().then(() => {
-    startPythonServer();
-    createWindow();
+// Manejador para abrir ventana de calibración
+ipcMain.on('open-calibration-window', () => {
+    console.log('Request to open calibration window received');
+    if (mainWindow) {
+        const calibrationPath = path.join(__dirname, 'Frontend', 'Templates', 'EyesTracking', 'index.html');
+        mainWindow.loadFile(calibrationPath)
+            .catch(error => console.error('Error loading calibration window:', error));
+    }
 });
 
-app.on('window-all-closed', () => {
+function cleanupProcesses() {
     if (pythonProcess) {
         pythonProcess.kill();
+        pythonProcess = null;
     }
     if (screenRecorderProcess) {
         screenRecorderProcess.kill();
+        screenRecorderProcess = null;
     }
+}
+
+// Initialize the application
+app.whenReady().then(() => {
+    try {
+        startPythonServer();
+        createWindow();
+    } catch (error) {
+        console.error('Error initializing application:', error);
+        app.quit();
+    }
+});
+
+app.on('window-all-closed', () => {
+    cleanupProcesses();
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    }
+});
+
+app.on('before-quit', () => {
+    cleanupProcesses();
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    cleanupProcesses();
+    app.quit();
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled Rejection:', error);
+    cleanupProcesses();
+    app.quit();
 });

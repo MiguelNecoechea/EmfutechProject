@@ -1,3 +1,5 @@
+// configuration.js
+
 class ExperimentManager {
     constructor() {
         this.initializeForm();
@@ -104,7 +106,7 @@ class ExperimentManager {
 
         localStorage.setItem('experimentFormData', JSON.stringify(formData));
     }
-
+        
     loadFormData() {
         const savedData = localStorage.getItem('experimentFormData');
 
@@ -161,24 +163,36 @@ class ExperimentManager {
 
     handleRefreshChannels() {
         console.log('Refrescando canales de Aura...');
-        // Aquí añadiríamos el código específico para refrescar los canales desde el backend o API
         alert('Canales de Aura actualizados.');
     }
 
     handleRemoveSelectedChannels() {
         console.log('Eliminando canales seleccionados...');
-        // Aquí se implementaría la lógica para identificar y eliminar los canales seleccionados
         alert('Canales seleccionados eliminados.');
     }
 
     handleSelectChannels() {
         console.log('Seleccionando canales...');
-        // Aquí se implementaría la lógica para seleccionar canales
         alert('Canales seleccionados con éxito.');
     }
 }
 
-// Inicializar el gestor de experimentos cuando el DOM esté listo
+// Clase para la calibración de Eyes Tracking
+class ConfigurationSettings {
+    constructor() {
+        this.initializeSettings();
+    }
+
+    initializeSettings() {
+        const calibrationButton = document.getElementById('calibrationButton');
+        calibrationButton.addEventListener('click', () => {
+            window.electronAPI.openCalibrationWindow(); // Usa la API expuesta por preload.js
+        });
+    }
+}
+
+// Inicializar el gestor de experimentos y configuración cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
     new ExperimentManager();
+    new ConfigurationSettings();
 });

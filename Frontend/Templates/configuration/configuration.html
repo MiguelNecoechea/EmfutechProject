@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuration</title>
+    <title>Configuración</title>
     <!-- Links CSS -->
     <link rel="stylesheet" href="../../Css/utils/reset.css">
     <link rel="stylesheet" href="../../Css/utils/variables.css">
@@ -14,71 +14,69 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Barra lateral -->
         <aside class="sidebar">
             <div class="user-login">
-                <img src="/Frontend/assets/icons/user.png" alt="Login User">
-                <span>Login User</span>
+                <img src="/Frontend/assets/icons/user.png" alt="Usuario">
+                <span>Inicio</span>
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="../../Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="../../Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="../../Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="../../Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li class="active"><a href="../../Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="../../Templates/FileManager/FileManager.html">File manager</a></li>
-                    <li><a href="#">Account</a></li>
-                    <li><a href="#">Support</a></li>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Panel Principal</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experimento</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Medición</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reporte</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Estudio</a></li>
+                    <li class="active"><a href="../../Templates/Configuration/configuration.html">Configuración</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">Administrador de archivos</a></li>
                 </ul>
             </nav>
         </aside>
 
         <main class="main-content">
-            <!-- Header Navigation -->
+            <!-- Navegación Superior -->
             <nav class="top-nav config-nav">
                 <ul class="nav-tabs">
-                    <li><a href="#" class="active">Attention Levels Chart <i class="icon-download"></i></a></li>
-                    <li><a href="#">Attention Performance Summary <i class="icon-download"></i></a></li>
-                    <li><a href="#">Exportable Data <i class="icon-download"></i></a></li>
+                    <li><a href="#" class="active">Niveles de atención <i class="icon-download"></i></a></li>
+                    <li><a href="#">Rendimiento de la atención <i class="icon-download"></i></a></li>
+                    <li><a href="#">Exportar Datos <i class="icon-download"></i></a></li>
                 </ul>
             </nav>
 
             <div class="page-content">
                 <div class="page-header">
-                    <h1><i class="icon-configuration"></i>Page / Configuration</h1>
+                    <h1><i class="icon-configuration"></i>Página / Configuración</h1>
                 </div>
 
-                <!-- Search and Options Bar -->
+                <!-- Barra de Búsqueda y Opciones -->
                 <div class="search-options-bar">
                     <div class="search-filters">
                         <select class="filter-select form-control">
-                            <option>Study Name</option>
+                            <option>Nombre del Estudio</option>
                         </select>
                         <select class="filter-select form-control">
-                            <option>Description</option>
+                            <option>Descripción</option>
                         </select>
                         <select class="filter-select form-control">
-                            <option>Study Objectives</option>
+                            <option>Objetivos del Estudio</option>
                         </select>
                         <select class="filter-select form-control">
-                            <option>Study Duration</option>
+                            <option>Duración del Estudio</option>
                         </select>
                     </div>
                     <div class="options-group">
-                        <button class="option-btn btn btn-primary">Assign Groups</button>
-                        <button class="option-btn btn btn-secondary">Segmentation</button>
-                        <button class="option-btn btn btn-outline">Group Editing</button>
+                        <button class="option-btn btn btn-primary">Asignar Grupos</button>
+                        <button class="option-btn btn btn-secondary">Segmentación</button>
+                        <button class="option-btn btn btn-outline">Edición de Grupos</button>
                     </div>
                 </div>
 
-                <!-- Configuration Grid -->
+                <!-- Cuadrícula de Configuración -->
                 <div class="config-grid">
                     <div class="config-card device-settings">
-                        <h3>Device Settings</h3>
+                        <h3>Configuración de Dispositivos</h3>
                         <div class="device-selection">
-                            <h4>Connected Device Selection</h4>
+                            <h4>Selección de Dispositivos Conectados</h4>
                             <div class="device-options checkbox-group">
                                 <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="eeg">
@@ -86,25 +84,27 @@
                                 </label>
                                 <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="eyeTracking">
-                                    Eye Tracking
+                                    Seguimiento Ocular
                                 </label>
                                 <label class="device-option checkbox-label">
                                     <input type="checkbox" name="device" value="emotions">
-                                    Emotions
+                                    Emociones
                                 </label>
+                                <div class="settings-group">
+                                    <button id="calibrationButton">Calibrar Seguimiento Ocular</button>
+                                </div>
                             </div>
-
                             <div class="settings-group">
                                 <div class="setting">
-                                    <label class="form-label">Signal Capture Frequency</label>
+                                    <label class="form-label">Frecuencia de Captura de Señal</label>
                                     <select class="setting-select form-control">
-                                        <option>Default Frequency Setting</option>
+                                        <option>Configuración de Frecuencia Predeterminada</option>
                                     </select>
                                 </div>
                                 <div class="setting">
-                                    <label class="form-label">Threshold Settings</label>
+                                    <label class="form-label">Configuración de Umbral</label>
                                     <select class="setting-select form-control">
-                                        <option>Configure Threshold Level</option>
+                                        <option>Configurar Nivel de Umbral</option>
                                     </select>
                                 </div>
                             </div>
@@ -114,12 +114,10 @@
                         <div class="advanced-configurations">
                             <h4>Configuraciones Avanzadas de Aura</h4>
                             
-                            <!-- Barra desplegable personalizada para señales de Aura -->
                             <div class="aura-signal-dropdown">
                                 <label class="form-label">Gestionar Canales de Aura:</label>
                                 <select id="auraChannelSelect" class="dropdown-select form-control">
                                     <option disabled selected>Seleccionar señales de Aura</option>
-                                    <!-- Las opciones de canales se llenarán dinámicamente -->
                                 </select>
                             </div>
 
@@ -130,7 +128,7 @@
                                 <button id="removeSelectedChannels" class="btn btn-primary">Eliminar Canales Seleccionados</button>
                                 <button id="selectChannels" class="btn btn-secondary">Escoger Canales</button>
                             </div>
-                            <!-- Visualización de Señales de Aura -->
+
                             <div class="aura-signal-display">
                                 <h5>Estado de Señales de Aura</h5>
                                 <table id="auraSignalTable" class="form-control">
@@ -141,12 +139,10 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Las filas se llenarán dinámicamente -->
                                     </tbody>
                                 </table>
                             </div>
 
-                            <!-- Guardar Rutas -->
                             <div class="route-management">
                                 <h5>Guardar Rutas</h5>
                                 <label for="routeType" class="form-label">Tipo de Ruta:</label>
@@ -157,21 +153,20 @@
                                 <button id="saveRoute" class="btn btn-primary">Guardar Ruta</button>
                             </div>
                         </div>
-                        <!-- Fin de Configuraciones Avanzadas de Aura -->
                     </div>
                     
                     <div class="config-card">
-                        <h3>Study Dashboard</h3>
+                        <h3>Panel de Estudio</h3>
                         <div class="dashboard-content"></div>
                     </div>
                     
                     <div class="config-card">
-                        <h3>Participant Progress</h3>
+                        <h3>Progreso del Participante</h3>
                         <div class="progress-content"></div>
                     </div>
                     
                     <div class="config-card">
-                        <h3>Results Management</h3>
+                        <h3>Gestión de Resultados</h3>
                         <div class="results-content"></div>
                     </div>
                 </div>

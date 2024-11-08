@@ -1,95 +1,56 @@
-.file-nav {
-    background-color: var(--light-bg);
-    border-bottom: 1px solid var(--border-color);
-}
-
 .file-search-bar {
-    padding: 15px 20px;
-    background-color: var(--white);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
 .search-filters {
     display: flex;
-    gap: 10px;
-    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
 }
 
 .filter-select {
-    padding: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    min-width: 150px;
-}
-
-.search-btn {
-    padding: 8px 15px;
-    background-color: var(--primary-color);
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-}
-
-.file-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.action-btn {
-    padding: 8px 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background-color: var(--white);
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.action-btn:hover {
-    background-color: var(--hover-bg);
+    background: var(--glass-dark);
+    border: 1px solid var(--glass-border);
+    padding: 10px 15px;
+    border-radius: 8px;
+    min-width: 180px;
+    transition: all var(--transition-normal);
 }
 
 .file-explorer {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
     margin: 20px;
-    background-color: var(--white);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
-.file-container {
-    min-height: 500px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* Estilos para la vista de archivos */
 .file-item {
+    background: var(--glass-dark);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 8px 0;
+    transition: all var(--transition-normal);
+    border: 1px solid var(--glass-border);
     display: flex;
     align-items: center;
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
 }
 
 .file-item:hover {
-    background-color: var(--hover-bg);
-}
-
-.file-icon {
-    margin-right: 10px;
-    color: var(--primary-color);
+    background: var(--glass-hover);
+    transform: translateX(5px);
+    box-shadow: var(--shadow-sm);
 }
 
 .file-details {
-    flex-grow: 1;
+    margin-left: 15px;
 }
 
 .file-name {
@@ -99,5 +60,6 @@
 
 .file-meta {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--text-light);
+    margin-top: 4px;
 }

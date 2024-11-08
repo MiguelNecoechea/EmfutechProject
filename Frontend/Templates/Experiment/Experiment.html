@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experiment</title>
+    <title>Experimento</title>
     <link rel="stylesheet" href="../../Css/utils/reset.css">
     <link rel="stylesheet" href="../../Css/utils/variables.css">
     <link rel="stylesheet" href="../../Css/global/style.css">
@@ -16,20 +16,18 @@
     <div class="app-container">
         <aside class="sidebar">
             <div class="user-login">
-                <img src="/Frontend/assets/icons/user.png" alt="User Icon">
-                <span>Login User</span>
+                <img src="/Frontend/assets/icons/user.png" alt="Icono de Usuario">
+                <span>Inicio</span>
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="../../Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li class="active"><a href="../../Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="../../Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="../../Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="../../Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="../../Templates/FileManager/FileManager.html">File manager</a></li>
-                    <li><a href="#">Account</a></li>
-                    <li><a href="#">Support</a></li>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Panel Principal</a></li>
+                    <li class="active"><a href="../../Templates/Experiment/Experiment.html">Experimento</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Medición</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reporte</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Estudio</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuración</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">Administrador de archivos</a></li>
                 </ul>
             </nav>
         </aside>
@@ -37,84 +35,68 @@
         <main class="main-content">
             <nav class="top-nav experiment-nav">
                 <ul class="nav-tabs">
-                    <li><a href="#" class="active">Create new experiment</a></li>
-                    <li><a href="#">Experiment Setup</a></li>
-                    <li><a href="#">Experiment history</a></li>
+                    <li><a href="#" class="active">Crear un Experimento</a></li>
                 </ul>
             </nav>
 
             <div class="page-content">
                 <div class="page-header">
-                    <h1><i class="icon-experiment"></i>Page / Experiment</h1>
+                    <h1><i class="icon-experiment"></i>Página / Experimento</h1>
                 </div>
 
                 <div class="experiment-form-container">
-                    <h2>Record</h2>
+                    <h2>Registro</h2>
                     <form class="experiment-form">
                         <div class="form-grid">
                             <div class="form-column">
                                 <div class="form-group">
-                                    <label for="experimentName">Experiment Name</label>
-                                    <input type="text" id="experimentName" placeholder="Write here" class="form-control">
+                                    <label for="experimentName">Nombre del Experimento</label>
+                                    <input type="text" id="experimentName" placeholder="Escriba aquí" class="form-control">
                                 </div>
                                 <div class="form-group">
-                                    <label for="description">Description</label>
-                                    <input type="text" id="description" placeholder="Write here" class="form-control">
+                                    <label for="description">Descripción</label>
+                                    <input type="text" id="description" placeholder="Escriba aquí" class="form-control">
                                 </div>
                                 <div class="form-group">
-                                    <label for="objective">Objective</label>
-                                    <select id="objective" class="form-control">
-                                        <option>Purpose and Goals</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="duration">Duration of the Experiment</label>
+                                    <label for="duration">Duración del Experimento</label>
                                     <select id="duration" class="form-control">
-                                        <option value="1">1 minute</option>
-                                        <option value="3">3 minutes</option>
-                                        <option value="5">5 minutes</option>
-                                        <option value="7">7 minutes</option>
-                                        <option value="10">10 minutes</option>
+                                        <option value="1">1 minuto</option>
+                                        <option value="3">3 minutos</option>
+                                        <option value="5">5 minutos</option>
+                                        <option value="7">7 minutos</option>
+                                        <option value="10">10 minutos</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="participants">Participants</label>
+                                    <label for="participants">Participantes</label>
                                     <select id="participants" class="form-control">
                                         <option value="individual">Individual</option>
-                                        <option value="group">Group</option>
+                                        <option value="group">Grupo</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="form-column">
                                 <div class="form-group">
-                                    <label for="activeSensors">Active Sensors</label>
+                                    <label for="activeSensors">Sensores activos</label>
                                     <select id="activeSensors" class="form-control">
-                                        <option>Select sensor</option>
+                                        <option>Seleccionar sensores</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="stimulusConfig">Stimulus Configuration</label>
+                                    <label for="stimulusConfig">Configuración de estímulo</label>
                                     <select id="stimulusConfig" class="form-control">
-                                        <option value="image">Image</option>
+                                        <option value="image">Imagen</option>
                                         <option value="video">Video</option>
-                                        <option value="sound">Sound</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="frequency">Frecuencia de Medición</label>
-                                    <select id="frequency" class="form-control">
-                                        <option value="1">1 second</option>
-                                        <option value="5">5 seconds</option>
-                                        <option value="10">10 seconds</option>
+                                        <option value="sound">Sonido</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Save Experiment</button>
-                            <button type="button" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Guardar experimento</button>
+                            <button type="button" class="btn btn-secondary">Iniciar Experimento</button>
                         </div>
                     </form>
                 </div>

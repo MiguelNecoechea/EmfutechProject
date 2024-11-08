@@ -1,4 +1,4 @@
-* {
+*, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -6,7 +6,24 @@
 
 html, body {
     height: 100%;
-    font-family: Arial, sans-serif;
+}
+
+body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+img, picture, video, canvas, svg {
+    display: block;
+    max-width: 100%;
+}
+
+input, button, textarea, select {
+    font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+    overflow-wrap: break-word;
 }
 
 a {
@@ -14,16 +31,12 @@ a {
     color: inherit;
 }
 
-ul {
-    list-style: none;
-}
-
 button {
-    border: none;
     background: none;
+    border: none;
     cursor: pointer;
 }
 
-input, select, textarea {
-    font-family: inherit;
+ul, ol {
+    list-style: none;
 }
