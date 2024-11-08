@@ -42,7 +42,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 
-
 def create_new_eye_gaze() -> GazeProcessor:
     """
     Attempts to create a working instance of the GazeProcessor class. If the instance cannot be created, it will retry
@@ -62,22 +61,3 @@ def create_new_eye_gaze() -> GazeProcessor:
             time.sleep(1)
             gaze_processor = GazeProcessor()
             gaze_processor.start()
-
-def create_regressor():
-    """
-    Creates a regressor object that can be used to predict the user's gaze based on the training data. The regressor
-    object also will be trained on the collected data before being returned.
-    :return A PositionRegressor object that is ready for making predictions.
-    """
-    raise NotImplementedError("This function is not implemented yet.")
-
-
-# def write_gaze_traing_data():
-#     """
-#     Writes the current gaze data and calibration point to the data file. This uses the Writing classes from the IO
-#     module.
-#     """
-#     data = _gaze_processor.get_gaze_vector()
-#     if data[0] is not None and data[1] is not None:
-#         combined_data = list(data[0]) + list(data[1]) + [_current_x_coordinate, _current_y_coordinate]
-#         __trining_data_writer.write(combined_data)

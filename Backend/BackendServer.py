@@ -6,6 +6,7 @@ import sys
 import os
 from contextlib import contextmanager
 
+
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -14,6 +15,7 @@ from IO.FileWriting.CoordinateWriter import CoordinateWriter
 
 from EyeGaze import create_new_eye_gaze
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
+from EyeCoordinateRegressor import PositionRegressor
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready, rename_40_channels
 from IO.FileWriting.GazeWriter import GazeWriter
@@ -59,8 +61,8 @@ class BackendServer:
         # Writers for the actual output data
 
         # Coordinate
-        self.gaze_writer = CoordinateWriter('testing', 'testing_gaze.csv')
-        self.gaze_writer.create_new_file()
+        self._coordinate_writer = CoordinateWriter('testing', 'testing_gaze.csv')
+        self._coordinate_writer.create_new_file()
 
         # Emotion
         self.emotion_writer = EmotionPredictedWriter('testing', 'testing_emotions.csv')
@@ -192,10 +194,13 @@ class BackendServer:
     def start_testing(self):
         if not self.data_collection_active:
             self.data_collection_active = True
+
             if self.aura_thread is not None:
                 self.aura_thread.start()
             if self.emotion_thread is not None:
                 self.emotion_thread.start()
+            if self.regressor_thread is not None:
+                self.regressor_thread.start()
 
             return {"status": "success", "message": "Eye gaze tracking started"}
         else:
@@ -248,6 +253,11 @@ class BackendServer:
 
     def handle_regressor(self):
         # Start your regressor
+        self.regressor = PositionRegressor('training/training_gaze.csv')
+        self.regressor.train_create_model()
+        self.regressor_thread = threading.Thread(
+            target=self._coordinate_regressor_loop
+        )
 
         return {"status": "success", "message": "Regressor started"}
 
@@ -327,6 +337,19 @@ class BackendServer:
                 break
 
         self.emotion_writer.close_file()
+
+    def _coordinate_regressor_loop(self):
+        while True:
+            gaze_vector = self.eye_gaze.get_gaze_vector()
+            if gaze_vector[0] is not None and gaze_vector[1] is not None:
+                gaze_vector_list = [[gaze_vector[0][0], gaze_vector[0][1], gaze_vector[0][2], gaze_vector[1][0], gaze_vector[1][1], gaze_vector[1][2]]]
+                data = self.regressor.make_prediction(gaze_vector_list)
+                data = [data[0][0], data[0][1]]
+                self._coordinate_writer.write(data)
+            if not self.data_collection_active:
+                break
+
+        self._coordinate_writer.close_file()
 
 
 if __name__ == "__main__":

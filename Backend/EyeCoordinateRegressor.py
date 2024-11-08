@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input
@@ -78,7 +79,14 @@ class PositionRegressor:
         """
         if self._model is None:
             raise RuntimeError("Model not trained yet")
+
+        # if len(data.shape) == 1:
+        #     data = np.array([data])
+        #     data = data.reshape(1, -1)
+
         data = self._scaler_X.transform(data)
         prediction = self._model.predict(data, verbose=0)
         predicted_original = self._scaler_y.inverse_transform(prediction)
+        print(predicted_original)
+
         return predicted_original
