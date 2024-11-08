@@ -149,8 +149,6 @@ class GazeProcessor:
     def stop_processing(self):
         """
         Releases the webcam from the current experiment.
-        :return:
         """
         self.__cap.release()
         self._running = False
-
