@@ -1,12 +1,18 @@
 .config-nav {
-    background-color: var(--light-bg);
-    border-bottom: 1px solid var(--border-color);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
 }
 
 .search-options-bar {
     padding: 15px 20px;
-    background-color: var(--white);
-    border-bottom: 1px solid var(--border-color);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    margin: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -22,6 +28,7 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     min-width: 150px;
+    background: var(--glass-dark);
 }
 
 .options-group {
@@ -37,11 +44,12 @@
 }
 
 .config-card {
-    background-color: var(--white);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: var(--card-shadow);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
 .config-card h3 {
@@ -87,20 +95,107 @@
     gap: 8px;
 }
 
-.setting-select {
+/* Configuraciones Avanzadas de Aura */
+.advanced-configurations {
+    margin-top: 20px;
+    background: var(--glass-dark);
+    padding: 20px;
+    border-radius: var(--border-radius);
+}
+
+.channel-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.aura-signal-dropdown {
+    margin: 15px 0;
+}
+
+.aura-signal-display {
+    margin-top: 20px;
+}
+
+.aura-signal-table {
     width: 100%;
-    padding: 8px;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: var(--glass-bg);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.aura-signal-table th,
+.aura-signal-table td {
+    padding: 12px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    text-align: left;
+}
+
+.aura-signal-table th {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    font-weight: 600;
+}
+
+.aura-signal-table tr:nth-child(even) {
+    background: var(--glass-dark);
+}
+
+.route-management {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
 }
 
 .dashboard-content,
 .progress-content,
 .results-content {
     height: 200px;
-    background-color: var(--light-bg);
-    border-radius: 4px;
+    background: var(--glass-dark);
+    border-radius: var(--border-radius);
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Estados de conexión */
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.status-connected {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4CAF50;
+}
+
+.status-disconnected {
+    background: rgba(244, 67, 54, 0.1);
+    color: #F44336;
+}
+
+/* Botones de acción */
+.action-button {
+    padding: 8px 16px;
+    border-radius: var(--border-radius);
+    transition: all var(--transition-normal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.action-button i {
+    font-size: 18px;
+}
+
+.action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }

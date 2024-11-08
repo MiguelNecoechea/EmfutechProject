@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron');
+/*
 let remote;
 try {
     remote = require('@electron/remote');
@@ -14,6 +14,7 @@ class EyeTrackingCalibration {
         this.currentX = 0;
         this.currentY = 0;
         this.currentPointIndex = 0;
+        this.calibrationPoints = [];
         this.setupEventListeners();
     }
 
@@ -27,61 +28,37 @@ class EyeTrackingCalibration {
                 } else {
                     await document.documentElement.requestFullscreen();
                 }
-                setTimeout(() => this.initializeCalibration()); // Unified delay to ensure full-screen mode is activated
+                // Iniciar la calibración después de entrar en pantalla completa
+                setTimeout(() => this.initializeCalibration(), 500);
             } catch (err) {
-                console.error('Error activating full-screen mode:', err);
+                console.error('Error starting calibration:', err);
             }
         });
     }
 
-    /**
-     * Generates the calibration points on the screen. The points are fixated in the screen, however, a future is
-     * expected to move the points in a random order to improve the calibration process.
-     * @returns {Array} Array of point objects with x and y coordinates.
-     */
     generateCalibrationPoints() {
         const padding = 10;
         const width = window.innerWidth;
         const height = window.innerHeight;
-        console.log(width, height);
         return [
-            { x: padding, y: padding }, // Top-left corner
-            { x: width / 2, y: padding }, // Top-center
-            { x: width - padding, y: padding }, // Top-right corner
-
-            { x: padding, y: height / 2 }, // Middle-left
-            { x: width / 2, y: height / 2 }, // Center
-            { x: width - padding, y: height / 2 }, // Middle-right
-
-            { x: padding, y: height - padding }, // Bottom-left corner
-            { x: width / 2, y: height - padding }, // Bottom-center
-            { x: width - padding, y: height - padding } // Bottom-right corner
+            { x: padding, y: padding },
+            { x: width / 2, y: padding },
+            { x: width - padding, y: padding },
+            { x: padding, y: height / 2 },
+            { x: width / 2, y: height / 2 },
+            { x: width - padding, y: height / 2 },
+            { x: padding, y: height - padding },
+            { x: width / 2, y: height - padding },
+            { x: width - padding, y: height - padding }
         ];
     }
 
-    /**
-     * Initializes the calibration process by setting up the calibration points and starting the eye gaze recording.
-     */
     initializeCalibration() {
-        window.addEventListener('resize', async () => {
-            setTimeout(async () => {
-                await eel.start_eye_gaze()();
-
-                eel.start_recording_training_data()();
-
-                const calibrationPoints = this.generateCalibrationPoints();
-                this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
-                this.showNextPoint();
-            }, 500);
-        }, { once: true });
+        this.calibrationPoints = this.generateCalibrationPoints();
+        this.points = this.calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
+        this.showNextPoint();
     }
 
-    /**
-     * Creates a calibration point element and appends it to the calibration area.
-     * @param {number} x - The x-coordinate of the point.
-     * @param {number} y - The y-coordinate of the point.
-     * @returns {HTMLElement} The created point element.
-     */
     createPoint(x, y) {
         const point = document.createElement('div');
         point.className = 'calibration-point';
@@ -91,13 +68,9 @@ class EyeTrackingCalibration {
         point.dataset.x = x;
         point.dataset.y = y;
         this.calibrationArea.appendChild(point);
-
         return point;
     }
 
-    /**
-     * Displays the next calibration point and sends its coordinates to the backend.
-     */
     async showNextPoint() {
         if (this.currentPointIndex > 0) {
             this.points[this.currentPointIndex - 1].style.display = 'none';
@@ -108,65 +81,210 @@ class EyeTrackingCalibration {
             currentPoint.style.display = 'block';
             this.currentX = parseInt(currentPoint.dataset.x);
             this.currentY = parseInt(currentPoint.dataset.y);
-            console.log(this.currentX, this.currentY);
+            
+            try {
+                await eel.set_coordinates(this.currentX, this.currentY)();
+            } catch (error) {
+                console.warn('Error setting coordinates:', error);
+            }
+            
             this.currentPointIndex++;
             setTimeout(() => this.showNextPoint(), 6000);
         } else {
-            await eel.stop_recording_training_data()();
-            eel.start_regressor()();
-            this.finishCalibration();
+            await this.finishCalibration();
         }
-        eel.set_coordinates(Math.round(this.currentX), Math.round(this.currentY))();
     }
 
-    /**
-     * Finishes the calibration process and exits full-screen mode.
-     */
-    finishCalibration() {
+    // En tu función finishCalibration o donde estés enviando el evento
+async finishCalibration() {
+    try {
         if (document.fullscreenElement) {
-            document.exitFullscreen();
+            await document.exitFullscreen();
         }
-        if (remote) {
-            const win = remote.getCurrentWindow();
-            win.setFullScreen(false);
-        }
-        setTimeout(() => {
-            this.reset();
-        }, 1000);
-    }
 
-    /**
-     * Resets the calibration process, clearing all points and resetting the start button.
-     */
+        // Si estás usando send
+        if (window.electron) {
+            window.electron.send('calibration-complete', {
+                status: 'success',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // O si estás usando invoke
+        if (window.electron && window.electron.invoke) {
+            await window.electron.invoke('calibration-complete', {
+                status: 'success',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // Como fallback, usar navegación directa
+        else {
+            window.location.href = '../Dashboard/dashboard.html';
+        }
+    } catch (error) {
+        console.error('Error en finishCalibration:', error);
+    }
+}
+
     reset() {
         this.points.forEach(point => point.remove());
         this.points = [];
         this.currentPointIndex = 0;
         this.startButton.style.display = 'block';
     }
+}
 
-    // Example function to be called from main.js
-    exampleFunction() {
-        console.log('Example function called from main.js');
+// Iniciar el eye tracking cuando se carga el DOM
+document.addEventListener('DOMContentLoaded', async () => {
+    const calibration = new EyeTrackingCalibration();
+    
+    try {
+        await eel.start_eye_gaze()();
+        await eel.start_recording()();
+    } catch (error) {
+        console.warn('Error starting eye tracking:', error);
+    }
+});
+*/
+
+let remote;
+try {
+    remote = require('@electron/remote');
+} catch (e) {
+    console.warn('Error loading remote:', e);
+}
+
+class EyeTrackingCalibration {
+    constructor() {
+        this.calibrationArea = document.getElementById('calibrationArea');
+        this.startButton = document.getElementById('startButton');
+        this.points = [];
+        this.currentX = 0;
+        this.currentY = 0;
+        this.currentPointIndex = 0;
+        this.calibrationPoints = [];
+        this.setupEventListeners();
     }
 
-    // Listen for IPC messages to execute functions
-    listenForIpcMessages() {
-        ipcRenderer.on('execute-eyestracking-function', (event, functionName, ...args) => {
-            if (typeof this[functionName] === 'function') {
-                this[functionName](...args);
-            } else {
-                console.error(`Function ${functionName} not found in EyeTrackingCalibration`);
+    setupEventListeners() {
+        this.startButton.addEventListener('click', async () => {
+            this.startButton.style.display = 'none';
+            try {
+                if (remote) {
+                    const win = remote.getCurrentWindow();
+                    await win.setFullScreen(true);
+                } else {
+                    await document.documentElement.requestFullscreen();
+                }
+                // Iniciar la calibración después de entrar en pantalla completa
+                setTimeout(() => this.initializeCalibration(), 500);
+            } catch (err) {
+                console.error('Error starting calibration:', err);
             }
         });
     }
 
+    generateCalibrationPoints() {
+        const padding = 10;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        return [
+            { x: padding, y: padding },
+            { x: width / 2, y: padding },
+            { x: width - padding, y: padding },
+            { x: padding, y: height / 2 },
+            { x: width / 2, y: height / 2 },
+            { x: width - padding, y: height / 2 },
+            { x: padding, y: height - padding },
+            { x: width / 2, y: height - padding },
+            { x: width - padding, y: height - padding }
+        ];
+    }
+
+    initializeCalibration() {
+        this.calibrationPoints = this.generateCalibrationPoints();
+        this.points = this.calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
+        this.showNextPoint();
+    }
+
+    createPoint(x, y) {
+        const point = document.createElement('div');
+        point.className = 'calibration-point';
+        point.style.left = `${x}px`;
+        point.style.top = `${y}px`;
+        point.style.display = 'none';
+        point.dataset.x = x;
+        point.dataset.y = y;
+        this.calibrationArea.appendChild(point);
+        return point;
+    }
+
+    async showNextPoint() {
+        if (this.currentPointIndex > 0) {
+            this.points[this.currentPointIndex - 1].style.display = 'none';
+        }
+
+        if (this.currentPointIndex < this.points.length) {
+            const currentPoint = this.points[this.currentPointIndex];
+            currentPoint.style.display = 'block';
+            this.currentX = parseInt(currentPoint.dataset.x);
+            this.currentY = parseInt(currentPoint.dataset.y);
+            
+            try {
+                await eel.set_coordinates(this.currentX, this.currentY)();
+            } catch (error) {
+                console.warn('Error setting coordinates:', error);
+            }
+            
+            this.currentPointIndex++;
+            setTimeout(() => this.showNextPoint(), 6000);
+        } else {
+            await this.finishCalibration();
+        }
+    }
+
+    async finishCalibration() {
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen();
+            }
+            if (remote) {
+                const win = remote.getCurrentWindow();
+                win.setFullScreen(false);
+            }
+
+            // Solo detener la grabación, mantener el eye tracking activo
+            try {
+                await eel.stop_recording()();
+                // Removido stop_eye_gaze para mantener el tracking activo
+            } catch (error) {
+                console.warn('Error stopping recording:', error);
+            }
+
+            // Notificar que la calibración ha terminado para cargar el dashboard
+            await window.electronAPI.finishCalibration();
+        } catch (error) {
+            console.error('Error finishing calibration:', error);
+        }
+    }
+
+    reset() {
+        this.points.forEach(point => point.remove());
+        this.points = [];
+        this.currentPointIndex = 0;
+        this.startButton.style.display = 'block';
+    }
 }
 
-/**
- * Initializes the EyeTrackingCalibration class when the DOM content is loaded.
- */
-document.addEventListener('DOMContentLoaded', () => {
-    new EyeTrackingCalibration();
-    eyeTrackingCalibration.listenForIpcMessages();
+// Iniciar el eye tracking cuando se carga el DOM
+document.addEventListener('DOMContentLoaded', async () => {
+    const calibration = new EyeTrackingCalibration();
+    
+    try {
+        await eel.start_eye_gaze()();
+        await eel.start_recording()();
+    } catch (error) {
+        console.warn('Error starting eye tracking:', error);
+    }
 });

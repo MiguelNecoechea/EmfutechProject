@@ -1,68 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Management</title>
-    <!-- Corregir rutas CSS -->
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/studymanagement.css">
+    <title>Gestión de Estudios</title>
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/studymanagement.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Barra lateral -->
         <aside class="sidebar">
             <div class="user-login">
-                <img src="/Frontend/assets/icons/user.png" alt="User Icon">
-                <span>Login User</span>
+                <img src="/Frontend/assets/icons/user.png" alt="Icono de Usuario">
+                <span>Usuario</span>
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li class="active"><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
-                    <li><a href="#">Account</a></li>
-                    <li><a href="#">Support</a></li>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Panel Principal</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experimento</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Medición</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reporte</a></li>
+                    <li class="active"><a href="../../Templates/StudyManagement/StudyManagement.html">Gestión de Estudios</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuración</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">Administrador de archivos</a></li>
                 </ul>
             </nav>
         </aside>
 
         <main class="main-content">
-            <!-- Header Navigation -->
+            <!-- Navegación Superior -->
             <nav class="top-nav study-nav">
                 <div class="study-filters">
                     <div class="filter-group">
                         <select class="filter-select">
-                            <option value="">Study Name</option>
-                            <option value="study1">Study 1</option>
-                            <option value="study2">Study 2</option>
+                            <option value="">Nombre del Estudio</option>
+                            <option value="study1">Estudio 1</option>
+                            <option value="study2">Estudio 2</option>
                         </select>
                         <select class="filter-select">
-                            <option value="">Description</option>
-                            <option value="desc1">Description 1</option>
-                            <option value="desc2">Description 2</option>
+                            <option value="">Descripción</option>
+                            <option value="desc1">Descripción 1</option>
+                            <option value="desc2">Descripción 2</option>
                         </select>
                         <select class="filter-select">
-                            <option value="">Study Objectives</option>
-                            <option value="obj1">Objective 1</option>
-                            <option value="obj2">Objective 2</option>
+                            <option value="">Objetivos del Estudio</option>
+                            <option value="obj1">Objetivo 1</option>
+                            <option value="obj2">Objetivo 2</option>
                         </select>
                         <select class="filter-select">
-                            <option value="">Study Duration</option>
-                            <option value="1month">1 Month</option>
-                            <option value="3months">3 Months</option>
+                            <option value="">Duración del Estudio</option>
+                            <option value="1month">1 Mes</option>
+                            <option value="3months">3 Meses</option>
                         </select>
                     </div>
                     <div class="search-container">
-                        <input type="text" placeholder="Search studies..." class="search-input">
+                        <input type="text" placeholder="Buscar estudios..." class="search-input">
                         <button class="search-btn"><i class="icon-search"></i></button>
                     </div>
                 </div>
@@ -70,33 +67,33 @@
 
             <div class="page-content">
                 <div class="page-header">
-                    <h1><i class="icon-study"></i>Page / Study Management</h1>
-                    <button class="new-study-btn"><i class="icon-plus"></i> New Study</button>
+                    <h1><i class="icon-study"></i>Página / Gestión de Estudios</h1>
+                    <button class="new-study-btn"><i class="icon-plus"></i> Nuevo Estudio</button>
                 </div>
 
-                <!-- Management Toolbar -->
+                <!-- Barra de Herramientas -->
                 <div class="management-toolbar">
                     <div class="toolbar-section">
                         <button class="toolbar-btn">
                             <i class="icon-group"></i>
-                            Assign Groups
+                            Asignar Grupos
                         </button>
                         <button class="toolbar-btn">
                             <i class="icon-segment"></i>
-                            Segmentation
+                            Segmentación
                         </button>
                         <button class="toolbar-btn">
                             <i class="icon-edit"></i>
-                            Group Editing
+                            Edición de Grupos
                         </button>
                     </div>
                 </div>
 
-                <!-- Study Grid -->
+                <!-- Cuadrícula de Estudios -->
                 <div class="study-grid">
                     <div class="study-card">
                         <div class="card-header">
-                            <h3><i class="icon-status"></i>Study Status</h3>
+                            <h3><i class="icon-status"></i>Estado del Estudio</h3>
                             <div class="card-actions">
                                 <button class="card-btn"><i class="icon-refresh"></i></button>
                                 <button class="card-btn"><i class="icon-more"></i></button>
@@ -105,15 +102,15 @@
                         <div class="study-content status-content">
                             <div class="status-indicators">
                                 <div class="status-item">
-                                    <span class="status-label">Active Studies:</span>
+                                    <span class="status-label">Estudios Activos:</span>
                                     <span class="status-value">5</span>
                                 </div>
                                 <div class="status-item">
-                                    <span class="status-label">Pending Reviews:</span>
+                                    <span class="status-label">Revisiones Pendientes:</span>
                                     <span class="status-value">3</span>
                                 </div>
                                 <div class="status-item">
-                                    <span class="status-label">Completed:</span>
+                                    <span class="status-label">Completados:</span>
                                     <span class="status-value">12</span>
                                 </div>
                             </div>
@@ -122,40 +119,40 @@
 
                     <div class="study-card">
                         <div class="card-header">
-                            <h3><i class="icon-dashboard"></i>Study Dashboard</h3>
+                            <h3><i class="icon-dashboard"></i>Panel del Estudio</h3>
                             <div class="card-actions">
                                 <button class="card-btn"><i class="icon-download"></i></button>
                                 <button class="card-btn"><i class="icon-fullscreen"></i></button>
                             </div>
                         </div>
                         <div class="study-content dashboard-content">
-                            <!-- Dashboard content here -->
+                            <!-- Contenido del panel aquí -->
                         </div>
                     </div>
 
                     <div class="study-card">
                         <div class="card-header">
-                            <h3><i class="icon-progress"></i>Participant Progress</h3>
+                            <h3><i class="icon-progress"></i>Progreso del Participante</h3>
                             <div class="card-actions">
                                 <button class="card-btn"><i class="icon-filter"></i></button>
                                 <button class="card-btn"><i class="icon-export"></i></button>
                             </div>
                         </div>
                         <div class="study-content progress-content">
-                            <!-- Progress content here -->
+                            <!-- Contenido del progreso aquí -->
                         </div>
                     </div>
 
                     <div class="study-card">
                         <div class="card-header">
-                            <h3><i class="icon-results"></i>Results Management</h3>
+                            <h3><i class="icon-results"></i>Gestión de Resultados</h3>
                             <div class="card-actions">
                                 <button class="card-btn"><i class="icon-chart"></i></button>
                                 <button class="card-btn"><i class="icon-download"></i></button>
                             </div>
                         </div>
                         <div class="study-content results-content">
-                            <!-- Results content here -->
+                            <!-- Contenido de resultados aquí -->
                         </div>
                     </div>
                 </div>
@@ -164,10 +161,10 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/Frontend/Script/global/app.js"></script>
-    <script src="/Frontend/Script/global/init.js"></script>
-    <script src="/Frontend/Script/layouts/sidebar.js"></script>
-    <script src="/Frontend/Script/layouts/header.js"></script>
-    <script src="/Frontend/Script/pages/studymanagement.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/global/init.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/studymanagement.js"></script>
 </body>
 </html>

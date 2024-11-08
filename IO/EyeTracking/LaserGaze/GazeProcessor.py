@@ -9,16 +9,15 @@
 #              3D model space, enabling precise gaze vector calculation.
 # Author: Sergey Kuldin
 # -----------------------------------------------------------------------------------
-
 import mediapipe as mp
 import cv2
 import os
 import time
+import numpy as np
 from .landmarks import *
 from .face_model import *
 from .AffineTransformer import AffineTransformer
 from .EyeballDetector import EyeballDetector
-
 
 class GazeProcessor:
     """
@@ -31,8 +30,7 @@ class GazeProcessor:
         Initializes the gaze processor with optional camera settings and visualization configurations.
         Args:
         - camera_idx (int): Index of the camera to be used for video capture.
-        - visualization_options (object): Options for visual feedback on the video frame. Supports visualization options
-        for calibration and tracking states.
+        - visualization_options (object): Options for visual feedback on the video frame.
         """
         self.__camera_idx = camera_idx
         self.__vis_options = visualization_options
@@ -41,9 +39,8 @@ class GazeProcessor:
         self._running = False
         self.__cap = None
         self.__landmarker = None
-        # Can be downloaded from https://developers.google.com/mediapipe/solutions/vision/face_landmarker
-        model_path = os.path.join(os.path.dirname(__file__), 'face_landmarker.task')
 
+        model_path = os.path.join(os.path.dirname(__file__), 'face_landmarker.task')
         BaseOptions = mp.tasks.BaseOptions
         self.FaceLandmarker = mp.tasks.vision.FaceLandmarker
         FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
@@ -66,25 +63,27 @@ class GazeProcessor:
         Starts the video processing loop to detect facial landmarks and calculate gaze vectors.
         Continuously updates the video display and invokes callback with gaze data.
         """
+        print("Inicializando cámara para Eye Tracking...")
         self.__cap = cv2.VideoCapture(self.__camera_idx)
+        if not self.__cap.isOpened():
+            print("Error al abrir la cámara. Verifique que la cámara esté conectada y reinicie la aplicación.")
+            return
         self.__landmarker = self.FaceLandmarker.create_from_options(self.options)
         self._running = True
+        print("Cámara inicializada correctamente.")
 
     def get_gaze_vector(self):
         """
         Detects the facial landmarks and estimate gaze vectors using the MediaPipe library and components from the laser
-        gaze module. From the facial landmarks a 3d gaze vector is obtained.
+        gaze module.
         :return: A tuple of None if the data is being calibrated, otherwise a tuple of vectors containing the gaze info.
-        The last element in the tuple is the frame that was processed.
         """
-
         if not self._running:
             raise RuntimeError("Gaze processor is not started, start() must be called first.")
 
         success, frame = self.__cap.read()
-        error_return = None, None, frame
         if not success:
-            return error_return
+            return None, None, frame
 
         timestamp_ms = int(time.time() * 1000)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
@@ -104,44 +103,26 @@ class GazeProcessor:
                                    model_hor_pts, model_ver_pts)
 
             indices_for_left_eye_center_detection = LEFT_IRIS + ADJACENT_LEFT_EYELID_PART
-            left_eye_iris_points = lms_s[indices_for_left_eye_center_detection, :]
+            left_eye_iris_points = lms_s[indices_for_left_eye_center_detection]
             left_eye_iris_points_in_model_space = [at.to_m2(mpp) for mpp in left_eye_iris_points]
             self.__left_detector.update(left_eye_iris_points_in_model_space, timestamp_ms)
 
             indices_for_right_eye_center_detection = RIGHT_IRIS + ADJACENT_RIGHT_EYELID_PART
-            right_eye_iris_points = lms_s[indices_for_right_eye_center_detection, :]
+            right_eye_iris_points = lms_s[indices_for_right_eye_center_detection]
             right_eye_iris_points_in_model_space = [at.to_m2(mpp) for mpp in right_eye_iris_points]
             self.__right_detector.update(right_eye_iris_points_in_model_space, timestamp_ms)
 
             left_gaze_vector, right_gaze_vector = None, None
-            left_pupil = left_proj_point = None
-            right_pupil = right_proj_point = None
 
-            if self.__left_detector.center_detected:  # and self.right_detector.center_detected
+            if self.__left_detector.center_detected:
                 left_eyeball_center = at.to_m1(self.__left_detector.eye_center)
                 left_pupil = lms_s[LEFT_PUPIL]
                 left_gaze_vector = left_pupil - left_eyeball_center
-                left_proj_point = left_pupil + left_gaze_vector * 5.0
 
             if self.__right_detector.center_detected:
                 right_eyeball_center = at.to_m1(self.__right_detector.eye_center)
                 right_pupil = lms_s[RIGHT_PUPIL]
                 right_gaze_vector = right_pupil - right_eyeball_center
-                right_proj_point = right_pupil + right_gaze_vector * 5.0
-
-            if self.__vis_options:
-
-                if self.__left_detector.center_detected and self.__right_detector.center_detected:
-                    p1 = relative(left_pupil[:2], frame.shape)
-                    p2 = relative(left_proj_point[:2], frame.shape)
-                    frame = cv2.line(frame, p1, p2, self.__vis_options.color, self.__vis_options.line_thickness)
-                    p1 = relative(right_pupil[:2], frame.shape)
-                    p2 = relative(right_proj_point[:2], frame.shape)
-                    frame = cv2.line(frame, p1, p2, self.__vis_options.color, self.__vis_options.line_thickness)
-                else:
-                    text_location = (10, frame.shape[0] - 10)
-                    cv2.putText(frame, "Calibration...", text_location, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                self.__vis_options.color, 2)
 
             return left_gaze_vector, right_gaze_vector, frame
         return None, None, frame
@@ -149,8 +130,8 @@ class GazeProcessor:
     def stop_processing(self):
         """
         Releases the webcam from the current experiment.
-        :return:
         """
-        self.__cap.release()
+        if self.__cap:
+            self.__cap.release()
         self._running = False
 

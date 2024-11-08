@@ -1,83 +1,159 @@
+const fs = require('fs');
+// Frontend/Script/pages/experiment.js
+
 class ExperimentManager {
     constructor() {
         this.initializeForm();
         this.attachEventListeners();
+        this.setupValidation();
     }
 
     initializeForm() {
-        // Inicializar selectores y campos del formulario
         this.form = document.querySelector('.experiment-form');
-        this.signalTypes = document.querySelectorAll('.signal-types input[type="checkbox"]');
+        this.experimentName = document.getElementById('experimentName');
+        this.description = document.getElementById('description');
+        this.duration = document.getElementById('duration');
+        this.participants = document.getElementById('participants');
+        this.activeSensors = document.getElementById('activeSensors');
+        this.stimulusConfig = document.getElementById('stimulusConfig');
+
+        // Botones
+        this.saveButton = document.querySelector('button[type="submit"]');
+        this.cancelButton = document.querySelector('button.btn-secondary');
+        this.startButton = document.querySelector('button:last-child');
+    }
+
+    setupValidation() {
+        this.requiredFields = ['experimentName', 'duration', 'participants'];
+        this.validationMessages = {
+            experimentName: 'El nombre del experimento es requerido',
+            duration: 'Debe seleccionar una duración',
+            participants: 'Debe seleccionar el tipo de participantes'
+        };
+    }
+
+    async handleFormSubmit(event) {
+        event.preventDefault();
+        
+        const { isValid, errors } = this.validateForm();
+        if (!isValid) {
+            this.showErrors(errors);
+            return;
+        }
+
+        const formData = {
+            experimentName: this.experimentName.value,
+            description: this.description.value,
+            duration: this.duration.value,
+            participants: this.participants.value,
+            activeSensors: this.activeSensors.value,
+            stimulusConfig: this.stimulusConfig.value
+        };
+
+        try {
+            this.showLoading();
+            // Usar Eel para guardar el experimento
+            const result = await eel.save_experiment(formData)();
+            
+            if (result.success) {
+                this.showSuccess(result.message);
+                this.resetForm();
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            this.showError(`Error al guardar el experimento: ${error.message}`);
+        } finally {
+            this.hideLoading();
+        }
     }
 
     attachEventListeners() {
-        // Event listeners para los tabs de navegación
-        const navTabs = document.querySelectorAll('.nav-tabs a');
-        navTabs.forEach(tab => {
-            tab.addEventListener('click', this.handleTabClick.bind(this));
-        });
-
-        // Event listener para el formulario
         if (this.form) {
             this.form.addEventListener('submit', this.handleFormSubmit.bind(this));
         }
 
-        // Event listeners para los checkboxes de tipos de señales
-        this.signalTypes.forEach(checkbox => {
-            checkbox.addEventListener('change', this.handleSignalTypeChange.bind(this));
+        this.cancelButton.addEventListener('click', () => {
+            if (confirm('¿Está seguro de que desea cancelar? Los cambios no guardados se perderán.')) {
+                this.resetForm();
+            }
         });
 
-        // Event listeners para los selectores
-        document.querySelectorAll('select').forEach(select => {
-            select.addEventListener('change', this.handleSelectChange.bind(this));
+        this.startButton.addEventListener('click', async () => {
+            const { isValid, errors } = this.validateForm();
+            if (!isValid) {
+                this.showErrors(errors);
+                return;
+            }
+
+            if (confirm('¿Desea iniciar el experimento ahora?')) {
+                // Aquí iría la lógica para iniciar el experimento
+                console.log('Iniciando experimento...');
+            }
         });
     }
 
-    handleTabClick(event) {
-        event.preventDefault();
-        const tabs = document.querySelectorAll('.nav-tabs a');
-        tabs.forEach(tab => tab.classList.remove('active'));
-        event.target.classList.add('active');
+    validateForm() {
+        let isValid = true;
+        const errors = [];
+
+        this.requiredFields.forEach(field => {
+            const element = this[field];
+            if (!element.value.trim()) {
+                isValid = false;
+                errors.push(this.validationMessages[field]);
+                element.classList.add('invalid');
+            } else {
+                element.classList.remove('invalid');
+            }
+        });
+
+        return { isValid, errors };
     }
 
-    handleFormSubmit(event) {
-        event.preventDefault();
-        // Recopilar datos del formulario
-        const formData = new FormData(this.form);
-        console.log('Form submitted:', Object.fromEntries(formData));
+    // Métodos de UI
+    showLoading() {
+        this.saveButton.disabled = true;
+        this.saveButton.innerHTML = '<span class="spinner"></span> Guardando...';
     }
 
-    handleSignalTypeChange(event) {
-        const signalType = event.target.nextSibling.textContent.trim();
-        console.log(`Signal type ${signalType} ${event.target.checked ? 'selected' : 'unselected'}`);
-        this.updateSignalPreview();
+    hideLoading() {
+        this.saveButton.disabled = false;
+        this.saveButton.textContent = 'Guardar experimento';
     }
 
-    handleSelectChange(event) {
-        const selectId = event.target.id;
-        const selectedValue = event.target.value;
-        console.log(`${selectId} changed to: ${selectedValue}`);
+    showSuccess(message) {
+        this.showNotification(message, 'success');
     }
 
-    updateSignalPreview() {
-        // Actualizar la vista previa de señales basado en las selecciones
-        const preview = document.querySelector('.signal-preview');
-        const selectedSignals = Array.from(this.signalTypes)
-            .filter(checkbox => checkbox.checked)
-            .map(checkbox => checkbox.nextSibling.textContent.trim());
-        
-        if (preview) {
-            preview.innerHTML = `
-                <h3>Sign:</h3>
-                <div class="selected-signals">
-                    ${selectedSignals.join(', ') || 'No signals selected'}
-                </div>
-            `;
-        }
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    showErrors(errors) {
+        errors.forEach(error => this.showNotification(error, 'error'));
+    }
+
+    showNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+
+    resetForm() {
+        this.form.reset();
+        this.requiredFields.forEach(field => {
+            this[field].classList.remove('invalid');
+        });
     }
 }
 
-// Inicializar el gestor de experimentos cuando el DOM esté listo
+// Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
     new ExperimentManager();
 });
+
+
+

@@ -1,92 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Measurement</title>
-    <!-- Corregir rutas CSS -->
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/measurement.css">
+    <title>Medición</title>
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/measurement.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Barra lateral -->
         <aside class="sidebar">
             <div class="user-login">
-                <img src="/Frontend/assets/icons/user.png" alt="User Icon">
-                <span>Login User</span>
+                <img src="/Frontend/assets/icons/user.png" alt="Icono de Usuario">
+                <span>Usuario</span>
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li class="active"><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
-                    <li><a href="#">Account</a></li>
-                    <li><a href="#">Support</a></li>
-                </ul>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Panel Principal</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experimento</a></li>
+                    <li class="active"><a href="../../Templates/Measurement/Measurement.html">Medición</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reporte/a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Gestión de Estudios</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuración</a></li>
+                    <li><a href="../../Templates/FileManager/FileManager.html">Administrador de archivos</a></li>
             </nav>
         </aside>
 
         <main class="main-content">
-            <!-- Header Navigation -->
+            <!-- Navegación Superior -->
             <nav class="top-nav measurement-nav">
                 <ul class="nav-tabs">
-                    <li><a href="#" class="active">Selection</a></li>
-                    <li><a href="#">Frequency setting</a></li>
-                    <li><a href="#">Calibration</a></li>
+                    <li><a href="#" class="active">Selección</a></li>
+                    <li><a href="#">Configuración de frecuencia</a></li>
+                    <li><a href="#">Calibración</a></li>
                 </ul>
             </nav>
 
             <div class="page-content">
                 <div class="page-header">
-                    <h1><i class="icon-measurement"></i>Page / Measurement</h1>
+                    <h1><i class="icon-measurement"></i>Página / Medición</h1>
                 </div>
 
-                <!-- Action Toolbar -->
+                <!-- Barra de Herramientas -->
                 <div class="action-toolbar">
                     <div class="toolbar-group">
                         <button class="toolbar-btn primary">
                             <i class="icon-test"></i>
-                            Test
+                            Prueba
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button class="toolbar-btn">
                             <i class="icon-record"></i>
-                            Record
+                            Grabar
                         </button>
                         <button class="toolbar-btn">
                             <i class="icon-export"></i>
-                            Data Export
+                            Exportar Datos
                         </button>
                         <button class="toolbar-btn">
                             <i class="icon-report"></i>
-                            Report Generation
+                            Generar Informe
                         </button>
                         <button class="toolbar-btn">
                             <i class="icon-config"></i>
-                            Configuration
+                            Configuración
                         </button>
                     </div>
                 </div>
 
-                <!-- Measurement Grid -->
+                <!-- Cuadrícula de Medición -->
                 <div class="measurement-grid">
                     <div class="measurement-card">
                         <h3>
                             <i class="icon-monitoring"></i>
-                            Real-Time Monitoring
+                            Monitoreo en Tiempo Real
                         </h3>
                         <div class="monitoring-content">
-                            <!-- Contenido del monitoreo en tiempo real -->
                             <div class="real-time-data">
                                 <div class="data-placeholder"></div>
                             </div>
@@ -98,7 +93,6 @@
                             EEG
                         </h3>
                         <div class="eeg-content">
-                            <!-- Contenido de EEG -->
                             <div class="eeg-data">
                                 <div class="data-placeholder"></div>
                             </div>
@@ -107,10 +101,9 @@
                     <div class="measurement-card">
                         <h3>
                             <i class="icon-eye"></i>
-                            Eye Tracking
+                            Seguimiento Ocular
                         </h3>
                         <div class="eye-tracking-content">
-                            <!-- Contenido de Eye Tracking -->
                             <div class="eye-tracking-data">
                                 <div class="data-placeholder"></div>
                             </div>
@@ -119,10 +112,9 @@
                     <div class="measurement-card">
                         <h3>
                             <i class="icon-emotion"></i>
-                            Emotional Response
+                            Respuesta Emocional
                         </h3>
                         <div class="emotional-content">
-                            <!-- Contenido de Respuesta Emocional -->
                             <div class="emotional-data">
                                 <div class="data-placeholder"></div>
                             </div>
@@ -130,14 +122,14 @@
                     </div>
                 </div>
 
-                <!-- Status Bar -->
+                <!-- Barra de Estado -->
                 <div class="status-bar">
                     <div class="status-item">
-                        <span class="status-label">Status:</span>
-                        <span class="status-value">Ready</span>
+                        <span class="status-label">Estado:</span>
+                        <span class="status-value">Listo</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Recording Time:</span>
+                        <span class="status-label">Tiempo de Grabación:</span>
                         <span class="status-value">00:00:00</span>
                     </div>
                 </div>
@@ -146,10 +138,10 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/Frontend/Script/global/app.js"></script>
-    <script src="/Frontend/Script/global/init.js"></script>
-    <script src="/Frontend/Script/layouts/sidebar.js"></script>
-    <script src="/Frontend/Script/layouts/header.js"></script>
-    <script src="/Frontend/Script/pages/measurement.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/global/init.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/measurement.js"></script>
 </body>
 </html>

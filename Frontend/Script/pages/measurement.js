@@ -1,109 +1,15 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Variables
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const actionButtons = document.querySelectorAll('.action-btn');
-    const monitorPanels = document.querySelectorAll('.monitor-panel');
-    let isRecording = false;
-
-    // Tab Navigation
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            updateContent(button.textContent);
-        });
-    });
-
-    // Action Button Handlers
-    actionButtons.forEach(button => {
-        if (button.textContent === 'Record') {
-            button.addEventListener('click', toggleRecording);
-        } else if (button.classList.contains('dropdown')) {
-            button.addEventListener('click', handleDropdown);
-        }
-    });
-
-    // Toggle Recording
-    function toggleRecording() {
-        isRecording = !isRecording;
-        const recordButton = document.querySelector('.action-btn');
-        recordButton.textContent = isRecording ? 'Stop' : 'Record';
-        recordButton.style.color = isRecording ? '#ff0000' : '';
-        
-        if (isRecording) {
-            startMonitoring();
-        } else {
-            stopMonitoring();
-        }
-    }
-
-    // Handle Dropdowns
-    function handleDropdown(e) {
-        const button = e.target;
-        // Aquí se implementaría la lógica del menú desplegable
-        console.log(`Clicked: ${button.textContent.trim()}`);
-    }
-
-    // Update Content based on Tab
-    function updateContent(tabName) {
-        console.log(`Switched to ${tabName} tab`);
-        // Aquí se implementaría la lógica para actualizar el contenido
-    }
-
-    // Monitoring Functions
-    function startMonitoring() {
-        monitorPanels.forEach(panel => {
-            const type = panel.querySelector('h3').textContent;
-            initializeMonitor(panel, type);
-        });
-    }
-
-    function stopMonitoring() {
-        monitorPanels.forEach(panel => {
-            const content = panel.querySelector('.monitor-content');
-            content.innerHTML = '';
-        });
-    }
-
-    function initializeMonitor(panel, type) {
-        const content = panel.querySelector('.monitor-content');
-        
-        // Simulación de datos en tiempo real
-        if (isRecording) {
-            setInterval(() => {
-                if (!isRecording) return;
-                
-                // Aquí se implementaría la lógica real de monitoreo
-                const timestamp = new Date().toLocaleTimeString();
-                content.innerHTML += `<div>${timestamp}: ${type} data point</div>`;
-                content.scrollTop = content.scrollHeight;
-            }, 1000);
-        }
-    }
-
-    // Inicialización
-    function initialize() {
-        // Configuración inicial de los paneles
-        monitorPanels.forEach(panel => {
-            const content = panel.querySelector('.monitor-content');
-            content.innerHTML = 'Waiting to start...';
-        });
-    }
-
-    initialize();
-
-
-});
-
 class MeasurementManager {
     constructor() {
         this.initializeComponents();
         this.attachEventListeners();
         this.monitoringActive = false;
+        this.recordingTime = 0;
+        this.statusLabel = document.querySelector('.status-label');
+        this.recordingTimeLabel = document.querySelector('.status-value:nth-child(2)');
     }
 
     initializeComponents() {
-        // Inicializar componentes de medición
+        // Inicializar contenedores de los paneles de medición
         this.monitoringContainer = document.querySelector('.monitoring-content');
         this.eegContainer = document.querySelector('.eeg-content');
         this.eyeTrackingContainer = document.querySelector('.eye-tracking-content');
@@ -129,11 +35,12 @@ class MeasurementManager {
         const tabs = document.querySelectorAll('.nav-tabs a');
         tabs.forEach(tab => tab.classList.remove('active'));
         event.target.classList.add('active');
+        this.updateContent(event.target.textContent);
     }
 
     handleToolbarAction(event) {
-        const action = event.target.textContent.toLowerCase();
-        switch(action) {
+        const action = event.target.textContent.trim().toLowerCase();
+        switch (action) {
             case 'test':
                 this.startTest();
                 break;
@@ -155,44 +62,73 @@ class MeasurementManager {
     startTest() {
         console.log('Starting test...');
         // Implementar lógica de prueba
+        alert("Test iniciado");
     }
 
     toggleRecording() {
         this.monitoringActive = !this.monitoringActive;
         if (this.monitoringActive) {
+            this.statusLabel.textContent = 'Recording...';
             this.startMonitoring();
         } else {
+            this.statusLabel.textContent = 'Stopped';
             this.stopMonitoring();
         }
     }
 
     startMonitoring() {
         console.log('Starting monitoring...');
-        // Implementar inicio de monitoreo
+        this.recordingTime = 0;
+        this.updateRecordingTime();
+        this.monitoringInterval = setInterval(() => {
+            this.recordingTime++;
+            this.updateRecordingTime();
+            this.updateMonitoringDisplay();
+        }, 1000);
     }
 
     stopMonitoring() {
         console.log('Stopping monitoring...');
-        // Implementar detención de monitoreo
+        clearInterval(this.monitoringInterval);
+        this.statusLabel.textContent = 'Ready';
+    }
+
+    updateRecordingTime() {
+        const hours = String(Math.floor(this.recordingTime / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((this.recordingTime % 3600) / 60)).padStart(2, '0');
+        const seconds = String(this.recordingTime % 60).padStart(2, '0');
+        this.recordingTimeLabel.textContent = `${hours}:${minutes}:${seconds}`;
     }
 
     exportData() {
         console.log('Exporting data...');
+        alert("Data exportada correctamente");
         // Implementar exportación de datos
     }
 
     generateReport() {
         console.log('Generating report...');
+        alert("Reporte generado");
         // Implementar generación de reportes
     }
 
     showConfiguration() {
         console.log('Showing configuration...');
         // Implementar visualización de configuración
+        alert("Configuración mostrada");
+    }
+
+    updateContent(tabName) {
+        console.log(`Switched to ${tabName} tab`);
+        // Implementar lógica para actualizar contenido basado en el tab seleccionado
     }
 
     updateMonitoringDisplay() {
-        // Actualizar visualizaciones en tiempo real
+        // Actualizar visualizaciones en tiempo real en los paneles de medición
+        this.monitoringContainer.innerHTML = `<div class="data-placeholder">Real-Time Data: ${new Date().toLocaleTimeString()}</div>`;
+        this.eegContainer.innerHTML = `<div class="data-placeholder">EEG Data: ${Math.random().toFixed(2)}</div>`;
+        this.eyeTrackingContainer.innerHTML = `<div class="data-placeholder">Eye Tracking: ${Math.random().toFixed(2)}</div>`;
+        this.emotionalContainer.innerHTML = `<div class="data-placeholder">Emotional Response: ${Math.random().toFixed(2)}</div>`;
     }
 }
 

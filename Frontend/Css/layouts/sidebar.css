@@ -1,25 +1,33 @@
 .sidebar {
-    width: 250px;
-    background-color: var(--sidebar-bg);
+    width: var(--sidebar-width);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
     height: 100vh;
-    padding: 20px;
+    padding: var(--spacing-lg);
     position: fixed;
     left: 0;
     top: 0;
+    border-right: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
 .user-login {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 20px;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-primary);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
 }
 
 .user-login img {
-    width: 30px;
-    height: 30px;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-light);
+    padding: 2px;
 }
 
 .sidebar-nav ul {
@@ -28,21 +36,27 @@
 }
 
 .sidebar-nav li {
-    margin-bottom: 10px;
+    margin-bottom: var(--spacing-sm);
 }
 
 .sidebar-nav a {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-md);
     text-decoration: none;
     color: var(--text-color);
-    transition: background-color 0.3s;
+    border-radius: 10px;
+    transition: all var(--transition-normal);
 }
 
-.sidebar-nav li.active a,
-.sidebar-nav a:hover {
-    background-color: var(--hover-bg);
-    border-radius: 5px;
+.sidebar-nav li.active a {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-md);
+}
+
+.sidebar-nav a:hover:not(.active) {
+    background: var(--hover-bg);
+    transform: translateX(5px);
 }

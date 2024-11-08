@@ -1,16 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src http://localhost:8000 ws://localhost:8000 ws://127.0.0.1:8000">
-    <title>Eye Tracking Calibration</title>
+    <title>Calibración de Seguimiento Ocular</title>
     <link rel="stylesheet" href="../../Css/pages/eyestracking.css">
-    <script type="text/javascript" src="/eel.js"></script>
 </head>
 <body>
-    <button id="startButton">Iniciar Calibración en Pantalla Completa</button>
-    <div id="calibrationArea"></div>
+    <div id="calibrationArea">
+        <div id="startButtonContainer">
+            <button id="startButton" class="primary-button">Iniciar Calibracion</button>
+            
+        </div>
+    </div>
+    <div id="redirectMessage" class="redirect-message">
+        <p>Calibración completada</p>
+        <div class="loader"></div>
+        <p>Redirigiendo al dashboard...</p>
+    </div>
     <script src="../../Script/pages/eyestracking.js"></script>
 </body>
 </html>

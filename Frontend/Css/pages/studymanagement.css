@@ -1,95 +1,77 @@
-.study-nav {
-    background-color: var(--light-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 15px 20px;
-}
-
 .study-filters {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     display: flex;
     gap: 15px;
-    align-items: center;
-}
-
-.filter-select {
-    padding: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background-color: var(--white);
-    min-width: 150px;
+    flex-wrap: wrap;
 }
 
 .search-container {
     display: flex;
     align-items: center;
-    margin-left: auto;
+    background: var(--glass-dark);
+    border-radius: 25px;
+    padding: 5px;
+    border: 1px solid var(--glass-border);
 }
 
 .search-input {
-    padding: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px 0 0 4px;
-    width: 200px;
-}
-
-.search-btn {
-    padding: 8px 15px;
-    background-color: var(--primary-color);
+    background: transparent;
     border: none;
-    border-radius: 0 4px 4px 0;
-    color: white;
-    cursor: pointer;
-}
-
-.management-options {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    background-color: var(--white);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.options-toolbar {
-    display: flex;
-    gap: 10px;
-}
-
-.option-btn {
-    padding: 8px 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background-color: var(--white);
-    cursor: pointer;
+    padding: 10px 15px;
+    width: 250px;
 }
 
 .study-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 25px;
     padding: 20px;
 }
 
 .study-card {
-    background-color: var(--white);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: var(--card-shadow);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
-.study-card h3 {
-    color: var(--text-color);
-    font-size: 16px;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.study-content {
-    height: 200px;
-    background-color: var(--light-bg);
-    border-radius: 4px;
+.management-toolbar {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    gap: 10px;
+    margin: 20px;
+}
+
+.toolbar-section {
+    display: flex;
+    gap: 10px;
+}
+
+.status-indicators {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.status-item {
+    background: var(--glass-dark);
+    padding: 15px;
+    border-radius: var(--border-radius);
+    text-align: center;
+}
+
+.status-value {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: 5px;
+    display: block;
 }

@@ -1,115 +1,198 @@
-class ConfigurationManager {
+// configuration.js
+
+class ExperimentManager {
     constructor() {
-        this.initializeComponents();
+        this.initializeForm();
         this.attachEventListeners();
+        this.loadFormData();
     }
 
-    initializeComponents() {
-        this.deviceCheckboxes = document.querySelectorAll('.device-option input');
-        this.filters = document.querySelectorAll('.filter-select');
-        this.settingSelects = document.querySelectorAll('.setting-select');
-        this.optionButtons = document.querySelectorAll('.option-btn');
+    initializeForm() {
+        this.form = document.querySelector('.experiment-form');
+        this.signalTypes = document.querySelectorAll('.signal-types input[type="checkbox"]');
+
+        // Campos del formulario
+        this.experimentName = document.getElementById('experimentName');
+        this.description = document.getElementById('description');
+        this.objective = document.getElementById('objective');
+        this.duration = document.getElementById('duration');
+        this.participants = document.getElementById('participants');
+        this.activeSensors = document.getElementById('activeSensors');
+        this.stimulusConfig = document.getElementById('stimulusConfig');
+        this.frequency = document.getElementById('frequency');
+        this.conectAura = document.getElementById('connectAura');
+        this.disconectAura = document.getElementById('disconnectAura');
+
+        // Nuevos botones
+        this.refreshChannels = document.getElementById('refreshChannels');
+        this.removeSelectedChannels = document.getElementById('removeSelectedChannels');
+        this.selectChannels = document.getElementById('selectChannels');
     }
 
     attachEventListeners() {
-        // Event listeners para dispositivos
-        this.deviceCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', this.handleDeviceSelection.bind(this));
+        const navTabs = document.querySelectorAll('.nav-tabs a');
+        navTabs.forEach(tab => {
+            tab.addEventListener('click', this.handleTabClick.bind(this));
         });
 
-        // Event listeners para filtros
-        this.filters.forEach(filter => {
-            filter.addEventListener('change', this.handleFilterChange.bind(this));
+        if (this.form) {
+            this.form.addEventListener('submit', this.handleFormSubmit.bind(this));
+        }
+
+        if (this.conectAura) {
+            this.conectAura.addEventListener('click', () => {
+                console.log('Aura conectado');
+                alert('¡Aura conectado exitosamente!');
+            });
+        }
+
+        if (this.disconectAura) {
+            this.disconectAura.addEventListener('click', () => {
+                console.log('Aura desconectado');
+                alert('¡Aura desconectado exitosamente!');
+            });
+        }
+
+        // Nuevos eventos para los botones añadidos
+        if (this.refreshChannels) {
+            this.refreshChannels.addEventListener('click', this.handleRefreshChannels.bind(this));
+        }
+
+        if (this.removeSelectedChannels) {
+            this.removeSelectedChannels.addEventListener('click', this.handleRemoveSelectedChannels.bind(this));
+        }
+
+        if (this.selectChannels) {
+            this.selectChannels.addEventListener('click', this.handleSelectChannels.bind(this));
+        }
+
+        this.signalTypes.forEach(checkbox => {
+            checkbox.addEventListener('change', this.handleSignalTypeChange.bind(this));
         });
 
-        // Event listeners para configuraciones
-        this.settingSelects.forEach(select => {
-            select.addEventListener('change', this.handleSettingChange.bind(this));
-        });
-
-        // Event listeners para botones de opciones
-        this.optionButtons.forEach(button => {
-            button.addEventListener('click', this.handleOptionClick.bind(this));
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', this.handleSelectChange.bind(this));
         });
     }
 
-    handleDeviceSelection(event) {
-        const device = event.target.value;
-        const isSelected = event.target.checked;
-        console.log(`Device ${device} ${isSelected ? 'selected' : 'unselected'}`);
-        this.updateDeviceSettings(device, isSelected);
+    handleTabClick(event) {
+        event.preventDefault();
+        const tabs = document.querySelectorAll('.nav-tabs a');
+        tabs.forEach(tab => tab.classList.remove('active'));
+        event.target.classList.add('active');
     }
 
-    handleFilterChange(event) {
-        const filterType = event.target.options[0].text;
-        const selectedValue = event.target.value;
-        console.log(`Filter ${filterType} changed to: ${selectedValue}`);
-        this.updateConfiguration();
+    handleFormSubmit(event) {
+        event.preventDefault();
+        this.saveFormData();
+        alert('Experiment data saved successfully!');
     }
 
-    handleSettingChange(event) {
-        const settingType = event.target.previousElementSibling.textContent;
-        const selectedValue = event.target.value;
-        console.log(`Setting ${settingType} changed to: ${selectedValue}`);
-        this.updateConfiguration();
-    }
+    saveFormData() {
+        const formData = {
+            experimentName: this.experimentName.value,
+            description: this.description.value,
+            objective: this.objective.value,
+            duration: this.duration.value,
+            participants: this.participants.value,
+            activeSensors: this.activeSensors.value,
+            stimulusConfig: this.stimulusConfig.value,
+            frequency: this.frequency.value,
+            signalTypes: Array.from(this.signalTypes).map(checkbox => ({
+                type: checkbox.nextSibling.textContent.trim(),
+                checked: checkbox.checked
+            }))
+        };
 
-    handleOptionClick(event) {
-        const option = event.target.textContent;
-        switch(option) {
-            case 'Assign Groups':
-                this.handleGroupAssignment();
-                break;
-            case 'Segmentation':
-                this.handleSegmentation();
-                break;
-            case 'Group Editing':
-                this.handleGroupEditing();
-                break;
+        localStorage.setItem('experimentFormData', JSON.stringify(formData));
+    }
+        
+    loadFormData() {
+        const savedData = localStorage.getItem('experimentFormData');
+
+        if (savedData) {
+            const formData = JSON.parse(savedData);
+
+            this.experimentName.value = formData.experimentName || '';
+            this.description.value = formData.description || '';
+            this.objective.value = formData.objective || '';
+            this.duration.value = formData.duration || '';
+            this.participants.value = formData.participants || '';
+            this.activeSensors.value = formData.activeSensors || '';
+            this.stimulusConfig.value = formData.stimulusConfig || '';
+            this.frequency.value = formData.frequency || '';
+
+            this.signalTypes.forEach(checkbox => {
+                const signalType = formData.signalTypes.find(
+                    signal => signal.type === checkbox.nextSibling.textContent.trim()
+                );
+                if (signalType) {
+                    checkbox.checked = signalType.checked;
+                }
+            });
         }
     }
 
-    updateDeviceSettings(device, isEnabled) {
-        // Actualizar configuraciones específicas del dispositivo
-        console.log(`Updating settings for ${device}`);
+    handleSignalTypeChange(event) {
+        const signalType = event.target.nextSibling.textContent.trim();
+        console.log(`Signal type ${signalType} ${event.target.checked ? 'selected' : 'unselected'}`);
+        this.updateSignalPreview();
     }
 
-    updateConfiguration() {
-        // Actualizar la configuración general
-        this.updateDashboard();
-        this.updateProgress();
-        this.updateResults();
+    handleSelectChange(event) {
+        const selectId = event.target.id;
+        const selectedValue = event.target.value;
+        console.log(`${selectId} changed to: ${selectedValue}`);
     }
 
-    updateDashboard() {
-        // Actualizar dashboard
-        console.log('Updating dashboard');
+    updateSignalPreview() {
+        const preview = document.querySelector('.signal-preview');
+        const selectedSignals = Array.from(this.signalTypes)
+            .filter(checkbox => checkbox.checked)
+            .map(checkbox => checkbox.nextSibling.textContent.trim());
+
+        if (preview) {
+            preview.innerHTML = `
+                <h3>Sign:</h3>
+                <div class="selected-signals">
+                    ${selectedSignals.join(', ') || 'No signals selected'}
+                </div>
+            `;
+        }
     }
 
-    updateProgress() {
-        // Actualizar progreso
-        console.log('Updating progress');
+    handleRefreshChannels() {
+        console.log('Refrescando canales de Aura...');
+        alert('Canales de Aura actualizados.');
     }
 
-    updateResults() {
-        // Actualizar resultados
-        console.log('Updating results');
+    handleRemoveSelectedChannels() {
+        console.log('Eliminando canales seleccionados...');
+        alert('Canales seleccionados eliminados.');
     }
 
-    handleGroupAssignment() {
-        console.log('Opening group assignment interface');
-    }
-
-    handleSegmentation() {
-        console.log('Opening segmentation interface');
-    }
-
-    handleGroupEditing() {
-        console.log('Opening group editing interface');
+    handleSelectChannels() {
+        console.log('Seleccionando canales...');
+        alert('Canales seleccionados con éxito.');
     }
 }
 
-// Inicializar el gestor de configuración cuando el DOM esté listo
+// Clase para la calibración de Eyes Tracking
+class ConfigurationSettings {
+    constructor() {
+        this.initializeSettings();
+    }
+
+    initializeSettings() {
+        const calibrationButton = document.getElementById('calibrationButton');
+        calibrationButton.addEventListener('click', () => {
+            window.electronAPI.openCalibrationWindow(); // Usa la API expuesta por preload.js
+        });
+    }
+}
+
+// Inicializar el gestor de experimentos y configuración cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    new ConfigurationManager();
+    new ExperimentManager();
+    new ConfigurationSettings();
 });

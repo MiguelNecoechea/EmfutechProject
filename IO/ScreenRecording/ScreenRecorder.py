@@ -11,8 +11,11 @@ class ScreenRecorder:
 
     @abstractmethod
     def start_recording(self):
+        print("Starting recording...")
         pass
 
     @abstractmethod
     def stop_recording(self):
         pass
+
+

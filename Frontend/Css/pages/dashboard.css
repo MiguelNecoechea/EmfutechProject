@@ -1,0 +1,46 @@
+.live-feeds {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border-radius: var(--border-radius);
+    padding: var(--card-padding);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.feeds-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.feed-box {
+    background: var(--bg-gradient);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-normal);
+    height: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.feed-box:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-md);
+}
+
+.feed-box h3 {
+    color: var(--text-color);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+#cameraStream {
+    width: 100%;
+    height: calc(100% - 40px);
+    object-fit: cover;
+    border-radius: var(--border-radius);
+}

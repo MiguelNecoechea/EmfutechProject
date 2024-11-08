@@ -1,153 +1,198 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs').promises;
 const { spawn } = require('child_process');
-const http = require('http');
+const eel = require('eel-electron');
 require('@electron/remote/main').initialize();
 
-let pythonProcess = null
-let mainWindow = null
-
-// Window management functions
-app.on('window-all-closed', () => {
-    if (pythonProcess) {
-        pythonProcess.kill()
-    }
-    if (process.platform !== 'darwin') {
-        app.quit()
-    }
-})
-
-app.on('quit', () => {
-    if (pythonProcess) {
-        pythonProcess.kill()
-    }
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow()
-    }
-})
-
-function checkServerStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (res) => {
-            if (res.statusCode === 200) {
-                resolve(true)
-            } else {
-                reject(new Error(`Server returned status code: ${res.statusCode}`))
-            }
-        }).on('error', (err) => {
-            reject(err)
-        })
-    })
-}
+let pythonProcess = null;
+let mainWindow = null;
+let screenRecorderProcess = null;
 
 function startPythonServer() {
-    return new Promise((resolve) => {
-        console.log('Iniciando servidor Python...')
-
-        const scriptPath = path.join(__dirname, 'Backend', 'BackendAdministrator.py')
-        console.log('Starting Python script at:', scriptPath)
-
-        pythonProcess = spawn('python', [scriptPath], {
-            stdio: 'inherit'
-        })
-
-        pythonProcess.on('error', (err) => {
-            console.error('Error al iniciar Python:', err)
-        })
-
-        pythonProcess.on('close', (code) => {
-            console.log(`Servidor Python cerrado con código ${code}`)
-        })
-
-        // Give Python some time to initialize
-        setTimeout(resolve, 5000)
-    })
-}
-
-async function waitForServer(url, maxAttempts = 30) {  // Increased max attempts
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-            await checkServerStatus(url)
-            console.log('Server is ready!')
-            return true
-        } catch (err) {
-            console.log(`Attempt ${attempt + 1}/${maxAttempts}: Server not ready yet...`)
-            console.log('Error:', err.message)
-            await new Promise(resolve => setTimeout(resolve, 1000))
+    console.log('Starting Python server...');
+    const pythonPath = process.platform === 'win32' ? '.\\venv\\Scripts\\python.exe' : './venv/bin/python';
+    
+    pythonProcess = spawn(pythonPath, ['Backend/EyesTracking/calibrateEyeGaze.py'], {
+        stdio: 'pipe',
+        env: { 
+            ...process.env, 
+            PYTHONPATH: path.join(__dirname),
+            PYTHONUNBUFFERED: '1'
         }
-    }
-    throw new Error('Server failed to start after maximum attempts')
+    });
+
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`Python stdout: ${data.toString()}`);
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`Python stderr: ${data.toString()}`);
+    });
+
+    pythonProcess.on('error', (err) => {
+        console.error('Error starting Python server:', err);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`Python server exited with code ${code}`);
+    });
 }
 
-async function createWindow() {
+function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
             enableRemoteModule: true,
-            webSecurity: false // Solo para desarrollo
+            preload: path.join(__dirname, 'Frontend', 'Script', 'global', 'preload.js')
         }
-    })
+    });
 
-    require('@electron/remote/main').enable(mainWindow.webContents)
+    require('@electron/remote/main').enable(mainWindow.webContents);
 
     mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
         callback({
             responseHeaders: {
                 ...details.responseHeaders,
-                'Content-Security-Policy': ['default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' http://localhost:8000 ws://localhost:8000 ws://127.0.0.1:8000']  // Added ws://127.0.0.1:8000
+                'Content-Security-Policy': [
+                    "default-src 'self' 'unsafe-inline' 'unsafe-eval'",
+                    "connect-src 'self' http://localhost:8000",
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+                ].join('; ')
             }
-        })
-    })
+        });
+    });
 
-    try {
-        // Try to connect to the server
-        // let url_to_connect = 'http://localhost:8000/Templates/EyesTracking/index.html';
-        let url_to_connect = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html';
-        await waitForServer(url_to_connect);
+    // Iniciar con index.html en lugar de la página de calibración
+    mainWindow.loadFile('index.html');
 
-        // Once server is ready, load the URL
-        // const url = 'http://127.0.0.1:8000/Templates/EyesTracking/index.html'
-        console.log('Loading URL:', url_to_connect)
+    // Monitorear errores de carga
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Failed to load:', errorCode, errorDescription);
+    });
 
-        // Add an additional small delay before loading the URL
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        await mainWindow.loadURL(url_to_connect)
-        mainWindow.webContents.openDevTools()
-    } catch (error) {
-        console.error('Failed to load application:', error)
-        await mainWindow.loadURL(`data:text/html,
-            <html>
-                <body>
-                    <h2>Failed to start application</h2>
-                    <pre>${error.message}</pre>
-                    <p>Please check if:</p>
-                    <ul>
-                        <li>Python is installed and in PATH</li>
-                        <li>All required Python packages are installed</li>
-                        <li>The server script path is correct</li>
-                    </ul>
-                </body>
-            </html>
-        `)
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools();
     }
 }
 
-app.whenReady().then(async () => {
-    // First start Python and wait for initial setup
-    await startPythonServer()
+// IPC handlers
+ipcMain.handle('load-page', async (event, pagePath) => {
+    try {
+        const fullPath = path.join(__dirname, 'Frontend', 'Templates', pagePath);
+        console.log('Loading page:', fullPath);
+        
+        // Verificar que el archivo existe antes de cargarlo
+        await fs.access(fullPath);
+        
+        await mainWindow.loadFile(fullPath);
+        return { success: true };
+    } catch (error) {
+        console.error('Error loading page:', error);
+        return { success: false, error: error.message };
+    }
+});
 
-    // Then create the window
-    await createWindow()
-})
+ipcMain.handle('calibration-complete', async () => {
+    try {
+        if (mainWindow) {
+            const dashboardPath = path.join(__dirname, 'Frontend', 'Templates', 'Dashboard', 'dashboard.html');
+            await mainWindow.loadFile(dashboardPath);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Error completing calibration:', error);
+        return { success: false, error: error.message };
+    }
+});
 
-// Inter-process communication Functions
-ipcMain.on('some-event', () => {
-    mainWindow.webContents.send('call-eyestracking-function', 'exampleFunction');
+ipcMain.handle('start-calibration', async () => {
+    console.log('Starting calibration...');
+    return { success: true };
+});
+
+ipcMain.handle('start-recording', async () => {
+    console.log('Starting recording...');
+    try {
+        // Implementar lógica de inicio de grabación
+        return { success: true };
+    } catch (error) {
+        console.error('Error starting recording:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('stop-recording', async () => {
+    console.log('Stopping recording...');
+    try {
+        // Implementar lógica de detención de grabación
+        return { success: true };
+    } catch (error) {
+        console.error('Error stopping recording:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Manejador para abrir ventana de calibración
+ipcMain.on('open-calibration-window', () => {
+    console.log('Request to open calibration window received');
+    if (mainWindow) {
+        const calibrationPath = path.join(__dirname, 'Frontend', 'Templates', 'EyesTracking', 'index.html');
+        mainWindow.loadFile(calibrationPath)
+            .catch(error => console.error('Error loading calibration window:', error));
+    }
+});
+
+function cleanupProcesses() {
+    if (pythonProcess) {
+        pythonProcess.kill();
+        pythonProcess = null;
+    }
+    if (screenRecorderProcess) {
+        screenRecorderProcess.kill();
+        screenRecorderProcess = null;
+    }
+}
+
+// Initialize the application
+app.whenReady().then(() => {
+    try {
+        startPythonServer();
+        createWindow();
+    } catch (error) {
+        console.error('Error initializing application:', error);
+        app.quit();
+    }
+});
+
+app.on('window-all-closed', () => {
+    cleanupProcesses();
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    }
+});
+
+app.on('before-quit', () => {
+    cleanupProcesses();
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    cleanupProcesses();
+    app.quit();
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled Rejection:', error);
+    cleanupProcesses();
+    app.quit();
 });

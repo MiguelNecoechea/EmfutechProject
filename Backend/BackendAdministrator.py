@@ -1,140 +1,122 @@
-import time
+
 import eel
-import threading
-import os
-
 from mne_lsl.stream import StreamLSL as Stream
-
-from calibrateEyeGaze import make_prediction
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
-from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
-from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
-from IO.FileWriting.GazeWriter import GazeWriter
-from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
+from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready, delete_channels
+from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 
-__OUT_TESTING_PATH = '/Users/mnecoea/PycharmProjects/AuraSignalProcessing/TestingOutput'
-__EEL_SERVER_PORT = 8000
+# Variables para el procesamiento y la transmisión de datos
 finished_data_collection = False
+aura_stream = None  # Variable global para el stream de Aura
+gaze_processor = GazeProcessor()  # Instancia de GazeProcessor para el seguimiento ocular
 
-# Global Stopping function
-@eel.expose
-def stop_data_collection():
-    global finished_data_collection
-    print("Stopping data collection")
-    finished_data_collection = True
-
-
-# Thread specific functions to collect data using other threads.
-def _data_collection_loop(stream, data_writer):
-    while True:
-        if is_stream_ready(stream):
-            data, ts = stream.get_data()
-            data_writer.write_data(ts, data)
-
-        if finished_data_collection:
-            break
-
-    data_writer.close_file()
-    stream.disconnect()
-    del data_writer
-    del stream
-
-def _emotion_collection_loop(emotion_handler, emotion_writer):
-    while True:
-        emotion = emotion_handler.recognize_emotion()
-        if emotion is not None:
-            emotion = emotion[0]['dominant_emotion']
-        else:
-            emotion = 'Undefined'
-        emotion_writer.write_data(time.time(), emotion)
-
-        if finished_data_collection:
-            break
-
-    emotion_writer.close_file()
-    del emotion_writer
-    del emotion_handler
-
-def _regressor_gaze_loop(gaze_writer):
-    while True:
-        gaze = make_prediction()
-        if gaze is not None:
-            gaze_writer.write_data(gaze)
-
-        if finished_data_collection:
-            break
-
-    del gaze_writer
-
-# Data specific handler for each type of "Signal" to be collected. This functions must be expiosed to the frontend.
-@eel.expose
-def handle_aura_signal(stream_id, buffer_size_multiplier, output_path='.', file_name='aura_data.csv'):
-    stream = Stream(bufsize=buffer_size_multiplier, source_id=stream_id)
-    stream.connect(processing_flags='all')
-    rename_aura_channels(stream)
-    channels = ['timestamp'] + stream.info['ch_names']
-    data_writer = AuraDataWriter(output_path, file_name, channels)
-    data_writer.create_new_file()
-
-    data_thread = threading.Thread(target=_data_collection_loop, args=(stream, data_writer))
-    data_thread.start()
+# Inicializar Eel con la ruta a los archivos frontend
+eel.init('Frontend')
 
 @eel.expose
-def handle_emotion(output_path='.', file_name='emotions.csv'):
-    emotion_handler = EmotionRecognizer('opencv')
-    emotion_writer = EmotionPredictedWriter(output_path, file_name)
-    emotion_writer.create_new_file()
-
-    emotion_thread = threading.Thread(target=_emotion_collection_loop, args=(emotion_handler, emotion_writer))
-    emotion_thread.start()
-
-@eel.expose
-def handle_gaze():
-    raise NotImplementedError("Gaze collection is not implemented yet.")
-
-# EEL server to allow communication with the frontend.
-def start_eel():
-    """
-     Initializes the Eel server and starts the web interface.
-     """
+def connect_aura(stream_id='filtered', buffer_size_multiplier=1):
+    global aura_stream
     try:
-        # Get the absolute path to the Frontend directory relative to this file
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        frontend_path = os.path.join(base_dir, 'Frontend')
-
-        print(f"Starting eye tracking server...")
-        print(f"Serving files from: {frontend_path}")
-
-        # Initialize eel with the frontend directory
-        eel.init(frontend_path)
-
-        # Start the application
-        # TODO Move to localhost so it can be Ipv4 and Ipv6 compatible
-        eel.start('Templates/EyesTracking/index.html',
-                  mode=None,
-                  host='127.0.0.1',
-                  port=__EEL_SERVER_PORT,
-                  block=True)
-
+        aura_stream = Stream(bufsize=buffer_size_multiplier, source_id=stream_id)
+        aura_stream.connect(processing_flags='all')
+        rename_aura_channels(aura_stream)
+        print("Aura connected with channels:", aura_stream.info['ch_names'])
+        return {"status": "success", "message": "Aura connected successfully."}
     except Exception as e:
-        print(f"Error starting server: {e}")
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Frontend path: {frontend_path}")
+        print("Error connecting Aura:", str(e))
+        return {"status": "error", "message": str(e)}
 
-# Main function.
-def main():
-    global finished_data_collection
-    start_eel()
-    # eel_thread = threading.Thread(target=start_eel)
-    # eel_thread.start()
-    print("Hello main is free")
-    # handle_aura_signal('AURA_Power', 1, __OUT_TESTING_PATH, 'aura_data.csv')
-    # handle_emotion(__OUT_TESTING_PATH)
-    # handle_gaze()
-    # for i in range(5):
-    #     print(i)
-    #     time.sleep(1)
-    # finished_data_collection = True
+@eel.expose
+def disconnect_aura():
+    global aura_stream
+    try:
+        if aura_stream:
+            aura_stream.disconnect()
+            aura_stream = None
+            print("Aura disconnected.")
+            return {"status": "success", "message": "Aura disconnected."}
+        else:
+            print("No Aura stream to disconnect.")
+            return {"status": "error", "message": "No Aura stream to disconnect."}
+    except Exception as e:
+        print("Error disconnecting Aura:", str(e))
+        return {"status": "error", "message": str(e)}
 
-if __name__ == '__main__':
-    main()
+@eel.expose
+def refresh_channels():
+    global aura_stream
+    try:
+        channels = aura_stream.info['ch_names'] if aura_stream else []
+        print("Available Aura channels:", channels)
+        return channels
+    except Exception as e:
+        print("Error refreshing channels:", str(e))
+        return {"status": "error", "message": str(e)}
+
+@eel.expose
+def remove_channels(channels_to_remove):
+    global aura_stream
+    try:
+        if aura_stream:
+            delete_channels(aura_stream, [], channels_to_remove)
+            print(f"Channels {channels_to_remove} removed successfully.")
+            return {"status": "success", "message": "Channels removed successfully."}
+        else:
+            print("No Aura stream connected.")
+            return {"status": "error", "message": "No Aura stream connected."}
+    except Exception as e:
+        print("Error removing channels:", str(e))
+        return {"status": "error", "message": str(e)}
+
+@eel.expose
+def save_route(route_type):
+    print(f"Saving route type '{route_type}'.")
+    return {"status": "success", "message": f"Route type '{route_type}' saved successfully."}
+
+@eel.expose
+def select_channels(selected_channels):
+    print(f"Channels selected for analysis: {', '.join(selected_channels)}")
+    return {"status": "success", "message": f"Channels {', '.join(selected_channels)} selected successfully."}
+
+# Funciones específicas para el GazeProcessor
+@eel.expose
+def start_eye_gaze():
+    try:
+        gaze_processor.start()
+        print("Gaze Processor started.")
+        return {"status": "success", "message": "Gaze Processor started."}
+    except Exception as e:
+        print("Error starting Gaze Processor:", str(e))
+        return {"status": "error", "message": str(e)}
+
+@eel.expose
+def stop_eye_gaze():
+    try:
+        gaze_processor.stop_processing()
+        print("Gaze Processor stopped.")
+        return {"status": "success", "message": "Gaze Processor stopped."}
+    except Exception as e:
+        print("Error stopping Gaze Processor:", str(e))
+        return {"status": "error", "message": str(e)}
+
+@eel.expose
+def get_gaze_data():
+    try:
+        left_gaze, right_gaze, frame = gaze_processor.get_gaze_vector()
+        return {
+            "status": "success",
+            "data": {
+                "left_gaze": left_gaze.tolist() if left_gaze is not None else None,
+                "right_gaze": right_gaze.tolist() if right_gaze is not None else None
+            }
+        }
+    except Exception as e:
+        print("Error getting gaze data:", str(e))
+        return {"status": "error", "message": str(e)}
+
+# Iniciar el servidor Eel y exponer los puntos de entrada para frontend
+if __name__ == "__main__":
+    try:
+        eel.start('Templates/Configuration/configuration.html', port=8000)
+    except Exception as e:
+        print(f"Error starting Eel server: {e}")

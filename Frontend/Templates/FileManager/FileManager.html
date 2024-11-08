@@ -1,113 +1,109 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Manager</title>
-    <!-- Corregir rutas CSS -->
-    <link rel="stylesheet" href="/Frontend/Css/utils/reset.css">
-    <link rel="stylesheet" href="/Frontend/Css/utils/variables.css">
-    <link rel="stylesheet" href="/Frontend/Css/global/style.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/sidebar.css">
-    <link rel="stylesheet" href="/Frontend/Css/layouts/header.css">
-    <link rel="stylesheet" href="/Frontend/Css/pages/filemanager.css">
+    <title>Administrador de Archivos</title>
+    <link rel="stylesheet" href="../../Css/utils/reset.css">
+    <link rel="stylesheet" href="../../Css/utils/variables.css">
+    <link rel="stylesheet" href="../../Css/global/style.css">
+    <link rel="stylesheet" href="../../Css/layouts/sidebar.css">
+    <link rel="stylesheet" href="../../Css/layouts/header.css">
+    <link rel="stylesheet" href="../../Css/pages/filemanager.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Barra lateral -->
         <aside class="sidebar">
             <div class="user-login">
-                <img src="/Frontend/assets/icons/user.png" alt="User Icon">
-                <span>Login User</span>
+                <img src="/Frontend/assets/icons/user.png" alt="Icono de Usuario">
+                <span>Usuario</span>
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li><a href="/Frontend/Templates/Dashboard/dashboard.html">Dashboard</a></li>
-                    <li><a href="/Frontend/Templates/Experiment/Experiment.html">Experiment</a></li>
-                    <li><a href="/Frontend/Templates/Measurement/Measurement.html">Measurement</a></li>
-                    <li><a href="/Frontend/Templates/Reports/Reports.html">Reports</a></li>
-                    <li><a href="/Frontend/Templates/StudyManagement/StudyManagement.html">Study Management</a></li>
-                    <li><a href="/Frontend/Templates/Configuration/configuration.html">Configuration</a></li>
-                    <li class="active"><a href="/Frontend/Templates/FileManager/FileManager.html">File manager</a></li>
-                    <li><a href="#">Account</a></li>
-                    <li><a href="#">Support</a></li>
-                </ul>
+                    <li><a href="../../Templates/Dashboard/dashboard.html">Panel Principal</a></li>
+                    <li><a href="../../Templates/Experiment/Experiment.html">Experimento</a></li>
+                    <li><a href="../../Templates/Measurement/Measurement.html">Medición</a></li>
+                    <li><a href="../../Templates/Reports/Reports.html">Reporte</a></li>
+                    <li><a href="../../Templates/StudyManagement/StudyManagement.html">Gestión de Estudios</a></li>
+                    <li><a href="../../Templates/Configuration/configuration.html">Configuración</a></li>
+                    <li class="active"><a href="../../Templates/FileManager/FileManager.html">Administrador de archivos</a></li>
             </nav>
         </aside>
 
         <main class="main-content">
-            <!-- Header Navigation -->
+            <!-- Navegación Superior -->
             <nav class="top-nav file-nav">
                 <ul class="nav-tabs">
-                    <li><a href="#" class="active">Attention Levels Chart <i class="icon-download"></i></a></li>
-                    <li><a href="#">Attention Performance Summary <i class="icon-download"></i></a></li>
-                    <li><a href="#">Exportable Data <i class="icon-download"></i></a></li>
+                    <li><a href="#" class="active">Gráfico de Niveles de Atención <i class="icon-download"></i></a></li>
+                    <li><a href="#">Resumen de Rendimiento de Atención <i class="icon-download"></i></a></li>
+                    <li><a href="#">Datos Exportables <i class="icon-download"></i></a></li>
                 </ul>
             </nav>
 
             <div class="page-content">
                 <div class="page-header">
-                    <h1><i class="icon-file"></i>Page / File Manager</h1>
+                    <h1><i class="icon-file"></i>Página / Administrador de Archivos</h1>
                 </div>
 
-                <!-- Search Bar -->
+                <!-- Barra de Búsqueda -->
                 <div class="file-search-bar">
                     <div class="search-filters">
                         <select class="filter-select">
-                            <option>Study Name</option>
+                            <option>Nombre del Estudio</option>
                         </select>
                         <select class="filter-select">
-                            <option>Description</option>
+                            <option>Descripción</option>
                         </select>
                         <select class="filter-select">
-                            <option>Study Objectives</option>
+                            <option>Objetivos del Estudio</option>
                         </select>
                         <select class="filter-select">
-                            <option>Study Duration</option>
+                            <option>Duración del Estudio</option>
                         </select>
                         <div class="search-input-group">
-                            <input type="text" placeholder="Search files..." class="search-input">
+                            <input type="text" placeholder="Buscar archivos..." class="search-input">
                             <button class="search-btn"><i class="icon-search"></i></button>
                         </div>
                     </div>
                     <div class="file-actions">
-                        <button class="action-btn">Assign Groups</button>
-                        <button class="action-btn">Segmentation</button>
-                        <button class="action-btn">Group Editing</button>
+                        <button class="action-btn">Asignar Grupos</button>
+                        <button class="action-btn">Segmentación</button>
+                        <button class="action-btn">Edición de Grupos</button>
                     </div>
                 </div>
 
-                <!-- File Explorer -->
+                <!-- Explorador de Archivos -->
                 <div class="file-explorer">
-                    <!-- Toolbar -->
+                    <!-- Barra de Herramientas -->
                     <div class="file-toolbar">
                         <div class="file-view-options">
                             <button class="view-btn active" data-view="grid"><i class="icon-grid"></i></button>
                             <button class="view-btn" data-view="list"><i class="icon-list"></i></button>
                         </div>
                         <div class="file-operations">
-                            <button class="operation-btn"><i class="icon-upload"></i> Upload</button>
-                            <button class="operation-btn"><i class="icon-folder"></i> New Folder</button>
+                            <button class="operation-btn"><i class="icon-upload"></i> Subir</button>
+                            <button class="operation-btn"><i class="icon-folder"></i> Nueva Carpeta</button>
                         </div>
                     </div>
 
-                    <!-- File Container -->
+                    <!-- Contenedor de Archivos -->
                     <div class="file-container">
                         <!-- Ejemplo de estructura de archivos -->
                         <div class="file-item">
                             <div class="file-icon"><i class="icon-folder"></i></div>
                             <div class="file-details">
-                                <div class="file-name">Project Documents</div>
-                                <div class="file-meta">Last modified: 2024-01-20</div>
+                                <div class="file-name">Documentos del Proyecto</div>
+                                <div class="file-meta">Última modificación: 2024-01-20</div>
                             </div>
                         </div>
                         <!-- Más elementos de archivo aquí -->
                     </div>
 
-                    <!-- Pagination -->
+                    <!-- Paginación -->
                     <div class="file-pagination">
                         <button class="page-btn"><i class="icon-prev"></i></button>
-                        <span class="page-info">Page 1 of 5</span>
+                        <span class="page-info">Página 1 de 5</span>
                         <button class="page-btn"><i class="icon-next"></i></button>
                     </div>
                 </div>
@@ -116,10 +112,10 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/Frontend/Script/global/app.js"></script>
-    <script src="/Frontend/Script/global/init.js"></script>
-    <script src="/Frontend/Script/layouts/sidebar.js"></script>
-    <script src="/Frontend/Script/layouts/header.js"></script>
-    <script src="/Frontend/Script/pages/fileManager.js"></script>
+    <script src="../../Script/global/app.js"></script>
+    <script src="../../Script/global/init.js"></script>
+    <script src="../../Script/layouts/sidebar.js"></script>
+    <script src="../../Script/layouts/header.js"></script>
+    <script src="../../Script/pages/fileManager.js"></script>
 </body>
 </html>
