@@ -1,4 +1,3 @@
-import json
 import zmq
 import time
 import threading
@@ -7,35 +6,73 @@ import sys
 import os
 from contextlib import contextmanager
 
-from mne_lsl.stream import StreamLSL as Stream
-from pyqtgraph.examples.console_exception_inspection import thread
-
-
-# from EyeGaze import make_prediction
-
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from mne_lsl.stream import StreamLSL as Stream
+from IO.FileWriting.CoordinateWriter import CoordinateWriter
+
 from EyeGaze import create_new_eye_gaze
-from Backend.WritingRutines import write_gaze_traing_data
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
-from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
+from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready, rename_40_channels
 from IO.FileWriting.GazeWriter import GazeWriter
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 
 class BackendServer:
     def __init__(self, port="5556"):
+        # Server setup
+        self.aura_training_thread = None
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PAIR)
         self.socket.bind(f"tcp://*:{port}")
+
+        # Training points coordinates
         self.current_x_coordinate = 0
         self.current_y_coordinate = 0
+
         self.running = False
+        self.fitting_eye_gaze = False
         self.eye_gaze_running = False
+
+        self.emotion_handler = None
         self.eye_gaze = None
-        self.gaze_writer = GazeWriter('testing', 'gaze_data.csv')
+        self.stream = None
+        self.regressor = None
+
+        # Threads for the data collection
+        self.aura_thread = None
+        self.emotion_thread = None
+        self.regressor_thread = None
+        channels_names = rename_40_channels()
+        channels_names = ['timestamp'] + [channels_names[str(i)] for i in range(40)]
+        # Writers for the training and reference data
+
+        # Gaze
+        self.gaze_writer_training = GazeWriter('training', 'training_gaze.csv')
+        self.gaze_writer_training.create_new_file()
+
+        # Aura
+        self.aura_writer_training = AuraDataWriter('training', 'training_aura.csv', channels_names)
+        self.aura_writer_training.create_new_file()
+
+        # Writers for the actual output data
+
+        # Coordinate
+        self.gaze_writer = CoordinateWriter('testing', 'testing_gaze.csv')
         self.gaze_writer.create_new_file()
+
+        # Emotion
+        self.emotion_writer = EmotionPredictedWriter('testing', 'testing_emotions.csv')
+        self.emotion_writer.create_new_file()
+
+        # Aura
+        self.aura_writer = AuraDataWriter('testing', 'testing_aura.csv', channels_names)
+        self.aura_writer.create_new_file()
+
+        # Status for the data collection loops
         self.data_collection_active = False
+        self.training_data_collection_active = False
         self.threads = []
 
         # Set up signal handlers
@@ -106,12 +143,13 @@ class BackendServer:
             "start_eye_gaze": self.handle_eye_gaze,
             "calibrate_eye_tracking": self.start_et_calibration,
             "start_testing": self.start_testing,
+            "stop_testing": self.handle_stop_testing,
+            "start_regressor": self.handle_regressor,
+            "connect_aura": self.handle_aura_signal,
+            "start_emotions": self.handle_emotion,
             "start_recording_training_data": self.handle_training_data,
-            "stop_recording_training_data": self.handle_stop_recording,
+            "stop_recording_training_data": self.handle_stop_recording_traing_data,
             "set_coordinates": self.handle_coordinates,
-            # "start_regressor": self.handle_regressor,
-            # "handle_aura_signal": self.handle_aura_signal,
-            # "handle_emotion": self.handle_emotion,
             "stop": self.handle_stop
         }
         print(message)
@@ -121,27 +159,47 @@ class BackendServer:
         else:
             return {"error": f"Unknown command: {command}"}
 
+    # Message Handling Functions
+
     def handle_eye_gaze(self):
+
         def eye_gaze_task():
             self.eye_gaze = create_new_eye_gaze()
-            self.eye_gaze_running = True
             print("Eye gaze tracking started")
+            self.eye_gaze_running = True
 
-        local_thread = threading.Thread(target=eye_gaze_task)
-        local_thread.start()
-        return {"status": "success", "message": "Eye gaze tracking started"}
+
+        if not self.fitting_eye_gaze:
+            self.fitting_eye_gaze = True
+            local_thread = threading.Thread(target=eye_gaze_task)
+            local_thread.start()
+            return {"status": "success", "message": "Eye gaze tracking started"}
+        else:
+            return {"status": "error", "message": "Eye gaze tracking already started"}
 
     def start_et_calibration(self):
         if self.eye_gaze_running:
-            print("Starting Calibration")
+            if self.stream is not None:
+                aura_thread = threading.Thread(
+                    target=self._aura_data_collection_loop,
+                    args=('training',)
+                )
+                aura_thread.start()
             return {"status": "start-calibration", "message": "Eye gaze tracking started"}
         else:
-            print("Eye gaze tracking not started")
             return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def start_testing(self):
-        print("Starting testing")
-        return {"status": "success", "message": "Eye gaze tracking started"}
+        if not self.data_collection_active:
+            self.data_collection_active = True
+            if self.aura_thread is not None:
+                self.aura_thread.start()
+            if self.emotion_thread is not None:
+                self.emotion_thread.start()
+
+            return {"status": "success", "message": "Eye gaze tracking started"}
+        else:
+            return {"status": "error", "message": "Testing already started"}
 
     def handle_stop(self):
         print("Stopping server...")
@@ -149,7 +207,7 @@ class BackendServer:
         return {"status": "success", "message": "Server stopped"}
 
     def handle_training_data(self):
-        self.data_collection_active = True
+        self.training_data_collection_active = True
         def training_data_task():
             while True:
                 # Make prediction and write to file
@@ -163,9 +221,9 @@ class BackendServer:
                     data.append(self.current_x_coordinate)
                     data.append(self.current_y_coordinate)
                     # data = gaze_vector[0] + gaze_vector[1] + [self.current_x_coordinate, self.current_y_coordinate]
-                    self.gaze_writer.write(data)
-                if self.data_collection_active is False:
-                    self.gaze_writer.close_file()
+                    self.gaze_writer_training.write(data)
+                if self.training_data_collection_active is False:
+                    self.gaze_writer_training.close_file()
                     break
 
         if self.eye_gaze_running:
@@ -190,24 +248,24 @@ class BackendServer:
 
     def handle_regressor(self):
         # Start your regressor
+
         return {"status": "success", "message": "Regressor started"}
 
-    def handle_aura_signal(self, stream_id, buffer_size_multiplier, output_path='.', file_name='aura_data.csv'):
+    def handle_aura_signal(self, stream_id='AURA_Power', buffer_size_multiplier=1):
         try:
-            stream = Stream(bufsize=buffer_size_multiplier, source_id=stream_id)
-            stream.connect(processing_flags='all')
-            rename_aura_channels(stream)
-            channels = ['timestamp'] + stream.info['ch_names']
-
-            data_writer = AuraDataWriter(output_path, file_name, channels)
-            data_writer.create_new_file()
-
+            self.stream = Stream(bufsize=buffer_size_multiplier, source_id=stream_id)
+            self.stream.connect(processing_flags='all')
+            rename_aura_channels(self.stream)
             # Start data collection in a separate thread
-            thread = threading.Thread(
-                target=self._data_collection_loop,
-                args=(stream, data_writer)
+            self.aura_thread = threading.Thread(
+                target=self._aura_data_collection_loop,
+                args=('testing',)
             )
-            thread.start()
+            
+            self.aura_training_thread = threading.Thread(
+                target=self._aura_data_collection_loop,
+                args=('training',)
+            )
 
             return {"status": "success", "message": "Aura signal handling started"}
         except Exception as e:
@@ -215,42 +273,60 @@ class BackendServer:
 
     def handle_emotion(self, output_path='.', file_name='emotions.csv'):
         try:
-            emotion_handler = EmotionRecognizer('opencv')
-            emotion_writer = EmotionPredictedWriter(output_path, file_name)
-            emotion_writer.create_new_file()
+            self.emotion_handler = EmotionRecognizer('opencv')
 
             # Start emotion recognition in a separate thread
-            thread = threading.Thread(
-                target=self._emotion_collection_loop,
-                args=(emotion_handler, emotion_writer)
+            self.emotion_thread = threading.Thread(
+                target=self._emotion_collection_loop
             )
-            thread.start()
 
             return {"status": "success", "message": "Emotion recognition started"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def _data_collection_loop(self, stream, data_writer):
-        while self.data_collection_active:
-            if is_stream_ready(stream):
-                data, ts = stream.get_data()
-                data_writer.write_data(ts, data)
+    def handle_stop_testing(self):
+        self.data_collection_active = False
+        return {"status": "success", "message": "Testing stopped"}
+
+    def handle_stop_recording_traing_data(self):
+        self.training_data_collection_active = False
+        return {"status": "success", "message": "Training data recording stopped"}
+
+    # End of Message Handling Functions
+
+    # Internal data collection loops
+    def _aura_data_collection_loop(self, type):
+        while True:
+            if is_stream_ready(self.stream):
+                data, ts = self.stream.get_data()
+                if type == 'training':
+                    self.aura_writer_training.write_data(ts, data)
+                else:
+                    self.aura_writer.write_data(ts, data)
+
             time.sleep(0.001)  # Small sleep to prevent CPU overuse
 
-        data_writer.close_file()
-        stream.disconnect()
+            if type == 'training' and self.training_data_collection_active is False:
+                self.aura_writer_training.close_file()
+                break
+            elif type == 'testing' and self.data_collection_active is False:
+                self.aura_writer.close_file()
+                break
+        # stream.disconnect()
 
-    def _emotion_collection_loop(self, emotion_handler, emotion_writer):
-        while self.data_collection_active:
-            emotion = emotion_handler.recognize_emotion()
+    def _emotion_collection_loop(self):
+        while True:
+            emotion = self.emotion_handler.recognize_emotion()
             if emotion is not None:
                 emotion = emotion[0]['dominant_emotion']
             else:
                 emotion = 'Undefined'
-            emotion_writer.write_data(time.time(), emotion)
-            time.sleep(0.1)  # Adjust sleep time based on your needs
+            self.emotion_writer.write_data(time.time(), emotion)
+            time.sleep(0.01)  # Adjust sleep time based on your needs
+            if not self.data_collection_active:
+                break
 
-        emotion_writer.close_file()
+        self.emotion_writer.close_file()
 
 
 if __name__ == "__main__":
