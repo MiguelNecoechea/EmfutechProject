@@ -11,6 +11,11 @@ class EyeTrackingCalibration {
         this.startTesting = document.getElementById('startTesting');
         this.endTesting = document.getElementById('endTesting');
 
+        this.startRegressor = document.getElementById('startRegressor');
+        this.connectAura = document.getElementById('connectAura');
+        this.startEmotions = document.getElementById('startEmotions');
+
+
         if (!this.startGaze || !this.calibrateTracking || !this.startTesting || !this.endTesting) {
             throw new Error('One or more button elements not found.');
         }
@@ -29,7 +34,11 @@ class EyeTrackingCalibration {
         this.startGaze.addEventListener('click', () => this.sendCommandToBackend('start_eye_gaze'));
         this.calibrateTracking.addEventListener('click', () => this.sendCommandToBackend('calibrate_eye_tracking'));
         this.startTesting.addEventListener('click', () => this.sendCommandToBackend('start_testing'));
-        this.endTesting.addEventListener('click', () => this.sendCommandToBackend('stop'));
+        this.endTesting.addEventListener('click', () => this.sendCommandToBackend('stop_testing'));
+        this.startRegressor.addEventListener('click', () => this.sendCommandToBackend('start_regressor'));
+        this.connectAura.addEventListener('click', () => this.sendCommandToBackend('connect_aura'));
+        this.startEmotions.addEventListener('click', () => this.sendCommandToBackend('start_emotions'));
+
 
         window.addEventListener('resize', () => {
             if (this.resizeTimeout) {
