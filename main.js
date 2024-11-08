@@ -1,198 +1,211 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const fs = require('fs').promises;
 const { spawn } = require('child_process');
-const eel = require('eel-electron');
-require('@electron/remote/main').initialize();
+const zmq = require('zeromq');
 
-let pythonProcess = null;
-let mainWindow = null;
-let screenRecorderProcess = null;
+class ApplicationManager {
+    constructor() {
+        this.pythonProcess = null;
+        this.mainWindow = null;
+        this.socket = null;
+        this.isShuttingDown = false;
+        this.setupEventHandlers();
+    }
 
-function startPythonServer() {
-    console.log('Starting Python server...');
-    const pythonPath = process.platform === 'win32' ? '.\\venv\\Scripts\\python.exe' : './venv/bin/python';
-    
-    pythonProcess = spawn(pythonPath, ['Backend/EyesTracking/calibrateEyeGaze.py'], {
-        stdio: 'pipe',
-        env: { 
-            ...process.env, 
-            PYTHONPATH: path.join(__dirname),
-            PYTHONUNBUFFERED: '1'
+    setupEventHandlers() {
+        app.whenReady().then(() => this.onAppReady());
+        app.on('window-all-closed', () => this.onWindowAllClosed());
+        app.on('before-quit', async (event) => {
+            event.preventDefault();
+            await this.cleanup();
+            app.exit(0);
+        });
+        app.on('activate', () => this.onActivate());
+
+        // Handle uncaught exceptions
+        process.on('uncaughtException', async (error) => {
+            console.error('Uncaught Exception:', error);
+            await this.cleanup();
+            app.exit(1);
+        });
+    }
+
+    async onAppReady() {
+        try {
+            await this.startPythonBackend();
+            await this.createWindow();
+            await this.setupZMQSocket();
+            this.setupIPCHandlers();
+        } catch (error) {
+            console.error('Error during app initialization:', error);
+            await this.cleanup();
+            app.exit(1);
         }
-    });
+    }
 
-    pythonProcess.stdout.on('data', (data) => {
-        console.log(`Python stdout: ${data.toString()}`);
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-        console.error(`Python stderr: ${data.toString()}`);
-    });
-
-    pythonProcess.on('error', (err) => {
-        console.error('Error starting Python server:', err);
-    });
-
-    pythonProcess.on('close', (code) => {
-        console.log(`Python server exited with code ${code}`);
-    });
-}
-
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            enableRemoteModule: true,
-            preload: path.join(__dirname, 'Frontend', 'Script', 'global', 'preload.js')
-        }
-    });
-
-    require('@electron/remote/main').enable(mainWindow.webContents);
-
-    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-        callback({
-            responseHeaders: {
-                ...details.responseHeaders,
-                'Content-Security-Policy': [
-                    "default-src 'self' 'unsafe-inline' 'unsafe-eval'",
-                    "connect-src 'self' http://localhost:8000",
-                    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-                ].join('; ')
+    async createWindow() {
+        this.mainWindow = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
             }
         });
-    });
 
-    // Iniciar con index.html en lugar de la página de calibración
-    mainWindow.loadFile('index.html');
+        this.mainWindow.on('closed', () => {
+            this.mainWindow = null;
+        });
 
-    // Monitorear errores de carga
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-        console.error('Failed to load:', errorCode, errorDescription);
-    });
-
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.webContents.openDevTools();
+        await this.mainWindow.loadFile('Frontend/index.html');
+        this.mainWindow.webContents.openDevTools();
+        // if (process.env.NODE_ENV === 'development') {
+        //     this.mainWindow.webContents.openDevTools();
+        // }
     }
-}
 
-// IPC handlers
-ipcMain.handle('load-page', async (event, pagePath) => {
-    try {
-        const fullPath = path.join(__dirname, 'Frontend', 'Templates', pagePath);
-        console.log('Loading page:', fullPath);
-        
-        // Verificar que el archivo existe antes de cargarlo
-        await fs.access(fullPath);
-        
-        await mainWindow.loadFile(fullPath);
-        return { success: true };
-    } catch (error) {
-        console.error('Error loading page:', error);
-        return { success: false, error: error.message };
+    async startPythonBackend() {
+        const scriptPath = path.join(__dirname, 'Backend', 'BackendServer.py');
+        console.log('Starting Python backend:', scriptPath);
+
+        this.pythonProcess = spawn('python', [scriptPath], {
+            stdio: 'inherit',
+            detached: false // Ensure the process is terminated with the parent
+        });
+
+        return new Promise((resolve, reject) => {
+            this.pythonProcess.on('error', (err) => {
+                console.error('Failed to start Python backend:', err);
+                reject(err);
+            });
+
+            this.pythonProcess.on('spawn', () => {
+                // Wait for the process to fully start
+                setTimeout(resolve, 2000);
+            });
+
+            // Handle Python process exit
+            this.pythonProcess.on('exit', (code, signal) => {
+                console.log(`Python backend exited with code ${code} and signal ${signal}`);
+                this.pythonProcess = null;
+            });
+        });
     }
-});
 
-ipcMain.handle('calibration-complete', async () => {
-    try {
-        if (mainWindow) {
-            const dashboardPath = path.join(__dirname, 'Frontend', 'Templates', 'Dashboard', 'dashboard.html');
-            await mainWindow.loadFile(dashboardPath);
+    async setupZMQSocket() {
+        if (this.socket) {
+            await this.socket.close();
         }
-        return { success: true };
-    } catch (error) {
-        console.error('Error completing calibration:', error);
-        return { success: false, error: error.message };
-    }
-});
 
-ipcMain.handle('start-calibration', async () => {
-    console.log('Starting calibration...');
-    return { success: true };
-});
+        this.socket = new zmq.Pair();
+        await this.socket.connect("tcp://localhost:5556");
 
-ipcMain.handle('start-recording', async () => {
-    console.log('Starting recording...');
-    try {
-        // Implementar lógica de inicio de grabación
-        return { success: true };
-    } catch (error) {
-        console.error('Error starting recording:', error);
-        return { success: false, error: error.message };
+        // Handle incoming messages
+        this.startMessageLoop();
     }
-});
 
-ipcMain.handle('stop-recording', async () => {
-    console.log('Stopping recording...');
-    try {
-        // Implementar lógica de detención de grabación
-        return { success: true };
-    } catch (error) {
-        console.error('Error stopping recording:', error);
-        return { success: false, error: error.message };
-    }
-});
+    async startMessageLoop() {
+        try {
+            for await (const [msg] of this.socket) {
+                if (this.isShuttingDown) break;
 
-// Manejador para abrir ventana de calibración
-ipcMain.on('open-calibration-window', () => {
-    console.log('Request to open calibration window received');
-    if (mainWindow) {
-        const calibrationPath = path.join(__dirname, 'Frontend', 'Templates', 'EyesTracking', 'index.html');
-        mainWindow.loadFile(calibrationPath)
-            .catch(error => console.error('Error loading calibration window:', error));
+                const response = JSON.parse(msg.toString());
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('python-message', response);
+                }
+            }
+        } catch (error) {
+            if (!this.isShuttingDown) {
+                console.error('ZMQ message loop error:', error);
+            }
+        }
     }
-});
 
-function cleanupProcesses() {
-    if (pythonProcess) {
-        pythonProcess.kill();
-        pythonProcess = null;
+    setupIPCHandlers() {
+        ipcMain.handle('python-command', async (event, command, params) => {
+            try {
+                await this.sendToPython(command, params);
+                return { status: 'success' };
+            } catch (error) {
+                console.error('Error sending command to Python:', error);
+                return { status: 'error', message: error.toString() };
+            }
+        });
     }
-    if (screenRecorderProcess) {
-        screenRecorderProcess.kill();
-        screenRecorderProcess = null;
+
+    async sendToPython(command, params = {}) {
+        if (!this.socket || this.isShuttingDown) return;
+
+        const message = { command, params };
+        await this.socket.send(JSON.stringify(message));
+    }
+
+    async cleanup() {
+        if (this.isShuttingDown) return;
+
+        this.isShuttingDown = true;
+        console.log('Starting cleanup...');
+
+        // Send stop command to Python backend
+        if (this.socket) {
+            try {
+                await this.sendToPython('stop');
+                await this.socket.close();
+                console.log('ZMQ socket closed');
+            } catch (error) {
+                console.error('Error closing ZMQ socket:', error);
+            }
+            this.socket = null;
+        }
+
+        // Terminate Python process
+        if (this.pythonProcess) {
+            try {
+                this.pythonProcess.kill('SIGTERM');
+                // Wait for process to terminate
+                await new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        if (this.pythonProcess) {
+                            this.pythonProcess.kill('SIGKILL');
+                        }
+                        resolve();
+                    }, 5000);
+
+                    this.pythonProcess.on('exit', () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    });
+                });
+                console.log('Python process terminated');
+            } catch (error) {
+                console.error('Error terminating Python process:', error);
+            }
+            this.pythonProcess = null;
+        }
+
+        // Close main window
+        if (this.mainWindow) {
+            this.mainWindow.destroy();
+            this.mainWindow = null;
+        }
+
+        console.log('Cleanup completed');
+    }
+
+    async onWindowAllClosed() {
+        await this.cleanup();
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    }
+
+    onActivate() {
+        if (!this.mainWindow) {
+            this.createWindow();
+        }
     }
 }
 
 // Initialize the application
-app.whenReady().then(() => {
-    try {
-        startPythonServer();
-        createWindow();
-    } catch (error) {
-        console.error('Error initializing application:', error);
-        app.quit();
-    }
-});
-
-app.on('window-all-closed', () => {
-    cleanupProcesses();
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
-
-app.on('before-quit', () => {
-    cleanupProcesses();
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-    cleanupProcesses();
-    app.quit();
-});
-
-process.on('unhandledRejection', (error) => {
-    console.error('Unhandled Rejection:', error);
-    cleanupProcesses();
-    app.quit();
-});
+const appManager = new ApplicationManager();

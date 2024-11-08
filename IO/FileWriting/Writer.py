@@ -43,4 +43,3 @@ class Writer:
         if self._is_writer_opened:
             self._csv_file.close()
             self._is_writer_opened = False
-

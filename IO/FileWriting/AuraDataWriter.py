@@ -6,7 +6,7 @@ from IO.FileWriting.Writer import Writer
 class AuraDataWriter(Writer):
     def __init__(self, output_path, file_name, initial_line):
         """
-        Creates a writer object for the specified for handling 8 channel aura signals.
+        Creates a writer object for the specified for handling aura signals.
         :param output_path: the folder where the data is going to be written.
         :param file_name: the name of the file to be written.
         """
