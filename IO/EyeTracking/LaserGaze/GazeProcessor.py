@@ -113,16 +113,33 @@ class GazeProcessor:
             self.__right_detector.update(right_eye_iris_points_in_model_space, timestamp_ms)
 
             left_gaze_vector, right_gaze_vector = None, None
-
+            left_proj_point, right_proj_point = None, None
+            left_pupil, right_pupil = None, None
             if self.__left_detector.center_detected:
                 left_eyeball_center = at.to_m1(self.__left_detector.eye_center)
                 left_pupil = lms_s[LEFT_PUPIL]
                 left_gaze_vector = left_pupil - left_eyeball_center
+                left_proj_point = left_pupil + left_gaze_vector * 5.0
 
             if self.__right_detector.center_detected:
                 right_eyeball_center = at.to_m1(self.__right_detector.eye_center)
                 right_pupil = lms_s[RIGHT_PUPIL]
                 right_gaze_vector = right_pupil - right_eyeball_center
+                right_proj_point = right_pupil + right_gaze_vector * 5.0
+
+            if self.__vis_options:
+                if self.__left_detector.center_detected and self.__right_detector.center_detected:
+                    if left_proj_point is not None and right_proj_point is not None and left_pupil is not None and right_pupil is not None:
+                        p1 = relative(left_pupil[:2], frame.shape)
+                        p2 = relative(left_proj_point[:2], frame.shape)
+                        frame = cv2.line(frame, p1, p2, self.__vis_options.color, self.__vis_options.line_thickness)
+                        p1 = relative(right_pupil[:2], frame.shape)
+                        p2 = relative(right_proj_point[:2], frame.shape)
+                        frame = cv2.line(frame, p1, p2, self.__vis_options.color, self.__vis_options.line_thickness)
+                else:
+                    text_location = (10, frame.shape[0] - 10)
+                    cv2.putText(frame, "Calibration...", text_location, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                self.__vis_options.color, 2)
 
             return left_gaze_vector, right_gaze_vector, frame
         return None, None, frame
