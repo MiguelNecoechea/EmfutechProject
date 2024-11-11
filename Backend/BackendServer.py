@@ -20,6 +20,8 @@ from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready, rename_40_channels
 from IO.FileWriting.GazeWriter import GazeWriter
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
+from IO.PointerTracking.PointerTracker import CursorTracker
+from IO.FileWriting.PointerWriter import PointerWriter
 
 class BackendServer:
     def __init__(self, port="5556"):
@@ -36,20 +38,23 @@ class BackendServer:
         self.running = False
         self.fitting_eye_gaze = False
         self.eye_gaze_running = False
+        self.pointer_tracking_active = False
 
         self.emotion_handler = None
         self.eye_gaze = None
         self.stream = None
         self.regressor = None
+        self.pointer_tracker = None
 
         # Threads for the data collection
         self.aura_thread = None
         self.emotion_thread = None
         self.regressor_thread = None
+
         channels_names = rename_40_channels()
         channels_names = ['timestamp'] + [channels_names[str(i)] for i in range(40)]
-        # Writers for the training and reference data
 
+        # Writers for the training and reference data
         # Gaze
         self.gaze_writer_training = GazeWriter('training', 'training_gaze.csv')
         self.gaze_writer_training.create_new_file()
@@ -71,6 +76,11 @@ class BackendServer:
         # Aura
         self.aura_writer = AuraDataWriter('testing', 'testing_aura.csv', channels_names)
         self.aura_writer.create_new_file()
+
+        # Pointer 
+        self.pointer_writer = PointerWriter('testing', 'testing_pointer.csv')
+        self.pointer_writer.create_new_file()
+
 
         # Status for the data collection loops
         self.data_collection_active = False
@@ -152,6 +162,7 @@ class BackendServer:
             "start_recording_training_data": self.handle_training_data,
             "stop_recording_training_data": self.handle_stop_recording_traing_data,
             "set_coordinates": self.handle_coordinates,
+            "start_pointer_tracking": self.handle_pointer_tracking,
             "stop": self.handle_stop
         }
         print(message)
@@ -201,6 +212,8 @@ class BackendServer:
                 self.emotion_thread.start()
             if self.regressor_thread is not None:
                 self.regressor_thread.start()
+            if self.pointer_tracker is not None:
+                self.pointer_tracker.is_tracking = True
 
             return {"status": "success", "message": "Eye gaze tracking started"}
         else:
@@ -255,8 +268,30 @@ class BackendServer:
         # Start your regressor
         self.regressor = PositionRegressor('training/training_gaze.csv')
         self.regressor.train_create_model()
+
+        # Define internal coordinate regressor loop
+        def _coordinate_regressor_loop():
+            while True:
+                gaze_vector = self.eye_gaze.get_gaze_vector()
+                left_eye, right_eye = gaze_vector
+                if left_eye is not None and right_eye is not None:
+                    gaze_input = [[
+                        *left_eye,   # x, y, z coordinates for left eye
+                        *right_eye   # x, y, z coordinates for right eye
+                    ]]
+
+                    predicted_coords = self.regressor.make_prediction(gaze_input)
+                    x, y = predicted_coords[0]  # Extract x,y from nested array
+                    
+                    self._coordinate_writer.write([x, y])
+
+                # Check if we should stop collecting data
+                if not self.data_collection_active:
+                    break
+
+        self._coordinate_writer.close_file()    
         self.regressor_thread = threading.Thread(
-            target=self._coordinate_regressor_loop
+            target=_coordinate_regressor_loop
         )
 
         return {"status": "success", "message": "Regressor started"}
@@ -267,13 +302,31 @@ class BackendServer:
             self.stream.connect(processing_flags='all')
             rename_aura_channels(self.stream)
             # Start data collection in a separate thread
+            def _aura_data_collection_loop(type):
+                while True:
+                    if is_stream_ready(self.stream):
+                        data, ts = self.stream.get_data()
+                        if type == 'training':
+                            self.aura_writer_training.write_data(ts, data)
+                        else:
+                            self.aura_writer.write_data(ts, data)
+
+                        time.sleep(0.001)  # Small sleep to prevent CPU overuse
+
+                        if type == 'training' and self.training_data_collection_active is False:
+                            self.aura_writer_training.close_file()
+                            break
+                        elif type == 'testing' and self.data_collection_active is False:
+                            self.aura_writer.close_file()
+                            break
+
             self.aura_thread = threading.Thread(
-                target=self._aura_data_collection_loop,
+                target=_aura_data_collection_loop,
                 args=('testing',)
             )
             
             self.aura_training_thread = threading.Thread(
-                target=self._aura_data_collection_loop,
+                target=_aura_data_collection_loop,
                 args=('training',)
             )
 
@@ -285,10 +338,17 @@ class BackendServer:
         try:
             self.emotion_handler = EmotionRecognizer('opencv')
 
-            # Start emotion recognition in a separate thread
-            self.emotion_thread = threading.Thread(
-                target=self._emotion_collection_loop
-            )
+            def _emotion_collection_loop():
+                while True:
+                    if self.emotion_handler:
+                        emotion = self.emotion_handler.get_emotion()
+                        self.emotion_writer.write_data(emotion)
+                    time.sleep(0.001)  # Small sleep to prevent CPU overuse
+                    if not self.data_collection_active:
+                        break
+                self.emotion_writer.close_file()
+
+            self.emotion_thread = threading.Thread(target=_emotion_collection_loop)
 
             return {"status": "success", "message": "Emotion recognition started"}
         except Exception as e:
@@ -296,61 +356,29 @@ class BackendServer:
 
     def handle_stop_testing(self):
         self.data_collection_active = False
+
+        if self.pointer_tracker is not None:
+            self.pointer_tracker.stop_tracking()
+            self.pointer_tracker.is_tracking = False
+            self.pointer_tracker.clear_coordinates()
+            self.pointer_writer.close_file()
         return {"status": "success", "message": "Testing stopped"}
 
     def handle_stop_recording_traing_data(self):
         self.training_data_collection_active = False
         return {"status": "success", "message": "Training data recording stopped"}
 
+
+    def handle_pointer_tracking(self):
+        if not self.pointer_tracking_active:
+            # Initialize tracker with the writer
+            self.pointer_tracker = CursorTracker(writer=self.pointer_writer)
+
+            return {"status": "success", "message": "Pointer tracking started"}
+        else:
+            return {"status": "error", "message": "Pointer tracking already active"}
+
     # End of Message Handling Functions
-
-    # Internal data collection loops
-    def _aura_data_collection_loop(self, type):
-        while True:
-            if is_stream_ready(self.stream):
-                data, ts = self.stream.get_data()
-                if type == 'training':
-                    self.aura_writer_training.write_data(ts, data)
-                else:
-                    self.aura_writer.write_data(ts, data)
-
-            time.sleep(0.001)  # Small sleep to prevent CPU overuse
-
-            if type == 'training' and self.training_data_collection_active is False:
-                self.aura_writer_training.close_file()
-                break
-            elif type == 'testing' and self.data_collection_active is False:
-                self.aura_writer.close_file()
-                break
-        # stream.disconnect()
-
-    def _emotion_collection_loop(self):
-        while True:
-            emotion = self.emotion_handler.recognize_emotion()
-            if emotion is not None:
-                emotion = emotion[0]['dominant_emotion']
-            else:
-                emotion = 'Undefined'
-            self.emotion_writer.write_data(time.time(), emotion)
-            time.sleep(0.01)  # Adjust sleep time based on your needs
-            if not self.data_collection_active:
-                break
-
-        self.emotion_writer.close_file()
-
-    def _coordinate_regressor_loop(self):
-        while True:
-            gaze_vector = self.eye_gaze.get_gaze_vector()
-            if gaze_vector[0] is not None and gaze_vector[1] is not None:
-                gaze_vector_list = [[gaze_vector[0][0], gaze_vector[0][1], gaze_vector[0][2], gaze_vector[1][0], gaze_vector[1][1], gaze_vector[1][2]]]
-                data = self.regressor.make_prediction(gaze_vector_list)
-                data = [data[0][0], data[0][1]]
-                self._coordinate_writer.write(data)
-            if not self.data_collection_active:
-                break
-
-        self._coordinate_writer.close_file()
-
 
 if __name__ == "__main__":
     server = BackendServer()

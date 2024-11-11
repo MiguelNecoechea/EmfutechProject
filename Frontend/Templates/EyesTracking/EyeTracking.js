@@ -14,6 +14,8 @@ class EyeTrackingCalibration {
         this.startRegressor = document.getElementById('startRegressor');
         this.connectAura = document.getElementById('connectAura');
         this.startEmotions = document.getElementById('startEmotions');
+        this.startPointerTracking = document.getElementById('startPointerTracking');
+
 
 
         if (!this.startGaze || !this.calibrateTracking || !this.startTesting || !this.endTesting) {
@@ -38,7 +40,7 @@ class EyeTrackingCalibration {
         this.startRegressor.addEventListener('click', () => this.sendCommandToBackend('start_regressor'));
         this.connectAura.addEventListener('click', () => this.sendCommandToBackend('connect_aura'));
         this.startEmotions.addEventListener('click', () => this.sendCommandToBackend('start_emotions'));
-
+        this.startPointerTracking.addEventListener('click', () => this.sendCommandToBackend('start_pointer_tracking'));
 
         window.addEventListener('resize', () => {
             if (this.resizeTimeout) {
