@@ -66,7 +66,7 @@ class ApplicationManager {
     }
 
     async startPythonBackend() {
-        const scriptPath = path.join(__dirname, 'Backend', 'BackendServer.py');
+        const scriptPath = path.join('main.py');
         console.log('Starting Python backend:', scriptPath);
 
         this.pythonProcess = spawn('python', [scriptPath], {
