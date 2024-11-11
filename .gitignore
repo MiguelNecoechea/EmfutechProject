@@ -1,18 +1,17 @@
-
-# Dependencias de Node
+# Node dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Archivos y carpetas de compilación de Electron
+# Electron build files and folders
 dist/
 out/
 build/
 release/
 
-# Archivos de empaquetado de Electron
+# Electron packaging files
 *.asar
 *.dmg
 *.exe
@@ -20,62 +19,69 @@ release/
 *.deb
 *.rpm
 
-# Configuración del sistema operativo y editores
+# Operating system and editor configuration
 .DS_Store        # macOS
 Thumbs.db        # Windows
-.idea/           # Configuración de IntelliJ IDEA
-.vscode/         # Configuración de Visual Studio Code
+.idea/           # IntelliJ IDEA configuration
+.vscode/         # Visual Studio Code configuration
 *.suo            # Visual Studio
 *.ntvs*          # Visual Studio Node.js Tools
 *.njsproj        # Visual Studio
 *.vcxproj        # Visual Studio C++
-*.swp            # Archivos temporales de Vim
-*.sublime*       # Configuración de Sublime Text
+*.swp            # Vim temporary files
+*.sublime*       # Sublime Text configuration
 Lib/
 
-# Archivos de entorno (si tienes información sensible)
+# Environment files (if you have sensitive information)
 .env
 .env.local
 .env.*.local
 Neuromarketing/
 
-# Archivos de caché y logs
+# Cache and log files
 .cache/
 logs/
 *.log
 
-# Caché de empaquetado
+# Package cache
 cache/
 tmp/
 temp/
 
-# Archivos de empaquetado de GitHub Actions (si usas GitHub Actions para despliegue)
+# GitHub Actions packaging files (if using GitHub Actions for deployment)
 *.bak
 *.tmp
 
-# Archivos de Python
-__pycache__/    # Carpeta de caché de Python
-__pycache__     # Carpeta de caché de Python
+# Python files
+__pycache__/    # Python cache folder
+__pycache__     # Python cache folder
 *.pyc           
-**/__pycache__/  # Carpeta de caché de Python
-*.py[cod]        # Archivos compilados de Python
-*.so             # Archivos de biblioteca compartida
-*.pyd            # Archivos de biblioteca compartida en Windows
-.venv/           # Entorno virtual Python (si usa virtualenv o venv)
-env/             # Entorno virtual Python (nombres comunes)
-*.egg            # Distribución de paquete Python
+**/__pycache__/  # Python cache folder
+*.py[cod]        # Python compiled files
+*.so             # Shared library files
+*.pyd            # Windows shared library files
+.venv/           # Python virtual environment (if using virtualenv or venv)
+env/             # Python virtual environment (common names)
+*.egg            # Python package distribution
 *.egg-info/
 *.eggs/
-Pipfile          # Archivo de dependencias de Python (Pipenv)
-Pipfile.lock     # Bloqueo de dependencias de Python (Pipenv)
-poetry.lock      # Bloqueo de dependencias de Python (Poetry)
-poetry.toml      # Configuración de Poetry
-.env             # Variables de entorno
+Pipfile          # Python dependency file (Pipenv)
+Pipfile.lock     # Python dependency lock (Pipenv)
+poetry.lock      # Python dependency lock (Poetry)
+poetry.toml      # Poetry configuration
+.env             # Environment variables
 
-# Archivos de caché y logs
+# Cache and log files
 .cache/
 logs/
 *.log
 
-# Archivos de empaquetado de GitHub Actions (si usas GitHub Actions para despliegue)
+# GitHub Actions packaging files (if using GitHub Actions for deployment)
 *.bak
+
+# Python files
+.ipynb_checkpoints/
+
+# Testing and training folders
+testing/
+training/
