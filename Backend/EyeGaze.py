@@ -1,44 +1,28 @@
 """
 EyeGaze.py
 
-This module handles the calibration and recording of eye gaze data using the GazeProcessor and GazeWriter classes.
-It exposes several functions to the main web interface using the Eel library.
+This module provides functionality for eye gaze tracking and calibration. It creates and manages a GazeProcessor instance
+that interfaces with eye tracking hardware to obtain gaze vector data.
+
+The module is designed to be resilient, with automatic retry logic if the initial eye tracking connection fails.
 
 Dependencies:
 - sys
 - os
 - time
-- threading
-- eel
-- GazeWriter from IO.FileWriting
-- GazeProcessor from IO.EyeTracking.LaserGaze
-
-Global Variables:
-- _gaze_processor: Instance of GazeProcessor used for processing gaze data.
-- _data_writer: Instance of GazeWriter used for writing gaze data to a file.
-- _current_x_coordinate: Current x-coordinate of the calibration point.
-- _current_y_coordinate: Current y-coordinate of the calibration point.
-- _recording_data: Boolean flag to control the recording of gaze data.
+- IO.EyeTracking.LaserGaze.GazeProcessor
 
 Functions:
-- set_coordinates(x, y): Receives and stores the current calibration point coordinates.
-- start_eye_gaze(): Starts the eye gaze tracking process.
-- stop_eye_gaze(): Stops the eye gaze tracking process.
-- start_recording(): Starts recording the gaze data in a separate thread.
-- stop_recording(): Stops recording the gaze data and closes the data file.
-- record_gaze_data(): Continuously records gaze data while _recording_data is True.
-- write_gaze_data(): Writes the current gaze data and calibration point to the data file.
-- main(): Initializes the Eel server and starts the web interface.
+- create_new_eye_gaze(): Creates and initializes a GazeProcessor instance, retrying until valid gaze data is obtained.
+  Returns a working GazeProcessor object.
 
 Usage:
-Run this script to start the Eye Tracking server and expose the functions to the web interface.
+This module is typically used as part of a larger eye tracking system, where the GazeProcessor instance is used to
+obtain real-time gaze vector data for further processing or analysis.
 """
 import sys
 import os
 import time
-
-# Add the parent directory of 'IO' to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 
