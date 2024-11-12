@@ -10,7 +10,7 @@ class PointerWriter(Writer):
         """
         super().__init__(file_path, file_name, ['x', 'y'])
 
-    def write(self, x, y):
+    def write(self, timestamp, x, y):
         """
         Writes the pointer coordinates to the file. The data must consist of two elements: x and y coordinates.
         
@@ -24,5 +24,5 @@ class PointerWriter(Writer):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError("Both x and y coordinates must be numeric values.")
 
-        self._csv_writer.writerow([x, y])
+        self._csv_writer.writerow([timestamp] + [x, y])
         self._csv_file.flush()
