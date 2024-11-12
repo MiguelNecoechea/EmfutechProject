@@ -47,6 +47,7 @@ class BackendServer:
         # Training points coordinates for calibration
         self.current_x_coordinate = 0
         self.current_y_coordinate = 0
+
         # Flags for the server status.
         self.running = False
 
@@ -62,11 +63,19 @@ class BackendServer:
         self.regressor = None
         self.pointer_tracker = None
 
+        # Boolean flags for deciding the experiments to run (Still building this out)
+        self.run_aura = False
+        self.run_emotion = False
+        self.run_gaze = False
+        self.run_pointer = False
+        self.run_screen_recording = False
+
         # Threads for the data collection
         self.aura_thread = None
         self.emotion_thread = None
         self.regressor_thread = None
         self.start_time = None
+        self.screen_recording_thread = None
 
         # Path and file names for the data
         # TODO: Make this dynamic so add the frontend code to set the path and filename
@@ -225,26 +234,44 @@ class BackendServer:
                         self.aura_writer = AuraDataWriter(self.path, f'{self.filename}_aura.csv', channels_names)
                         self.aura_writer.create_new_file()
                         
-                        if self.aura_thread and not self.aura_thread.is_alive():
+                        if self.aura_thread is None or not self.aura_thread.is_alive():
+                            self.aura_thread = threading.Thread(
+                                target=self._aura_data_collection_loop,
+                                args=('testing',),
+                                daemon=True
+                            )
                             self.aura_thread.start()
+                            self.threads.append(self.aura_thread)
                     except Exception as e:
                         print(f"Error starting Aura thread: {str(e)}")
                         raise
                 
                 # Emotion
-                if self.emotion_thread is not None and self.emotion_handler is not None:
+                if self.emotion_handler is not None:
                     self.emotion_writer = EmotionPredictedWriter(self.path, f'{self.filename}_emotions.csv')
                     self.emotion_writer.create_new_file()
-                    if not self.emotion_thread.is_alive():
-                        self.emotion_thread.start()
                     
+                    if self.emotion_thread is None or not self.emotion_thread.is_alive():
+                        self.emotion_thread = threading.Thread(
+                            target=self._emotion_collection_loop,
+                            daemon=True
+                        )
+                        self.emotion_thread.start()
+                        self.threads.append(self.emotion_thread)
+                
                 # Coordinate/Gaze
-                if self.regressor_thread is not None and self.regressor is not None:
+                if self.regressor is not None:
                     self._coordinate_writer = CoordinateWriter(self.path, f'{self.filename}_gaze.csv')
                     self._coordinate_writer.create_new_file()
-                    if not self.regressor_thread.is_alive():
-                        self.regressor_thread.start()
                     
+                    if self.regressor_thread is None or not self.regressor_thread.is_alive():
+                        self.regressor_thread = threading.Thread(
+                            target=self._coordinate_regressor_loop,
+                            daemon=True
+                        )
+                        self.regressor_thread.start()
+                        self.threads.append(self.regressor_thread)
+                
                 # Pointer
                 if self.pointer_tracker is not None:
                     self.pointer_writer = PointerWriter(self.path, f'{self.filename}_pointer_data.csv')
@@ -359,39 +386,9 @@ class BackendServer:
             self.stream.connect(processing_flags='all')
             rename_aura_channels(self.stream)
 
-            def _aura_data_collection_loop(type):
-                try:
-                    if type == 'training':
-                        channels_names = ['timestamp'] + self.stream.info['ch_names']
-                        aura_writer_training = AuraDataWriter('training', 'training_aura.csv', channels_names)
-                        aura_writer_training.create_new_file()
-                    
-                    while True:
-                        if is_stream_ready(self.stream):
-                            data, ts = self.stream.get_data()
-                            if type == 'training':
-                                aura_writer_training.write_data(ts, data)
-                            else:
-                                processed_ts = [round(t - self.start_time, 3) for t in ts]
-                                self.aura_writer.write_data(processed_ts, data)
-
-                            time.sleep(0.001)
-
-                            if type == 'training' and self.training_data_collection_active is False:
-                                aura_writer_training.close_file()
-                                break
-                            elif type == 'testing' and self.data_collection_active is False:
-                                if hasattr(self, 'aura_writer') and self.aura_writer:
-                                    self.aura_writer.close_file()
-                                break
-                            
-                except Exception as e:
-                    print(f"Error in aura collection loop: {str(e)}")
-                    raise
-
             # Create thread without starting it
             self.aura_thread = threading.Thread(
-                target=_aura_data_collection_loop,
+                target=self._aura_data_collection_loop,
                 args=('testing',)
             )
 
@@ -440,7 +437,25 @@ class BackendServer:
             self.pointer_tracker.stop_tracking()
             self.pointer_tracker.is_tracking = False
             self.pointer_tracker.clear_coordinates()
-            self.pointer_writer.close_file()
+            if self.pointer_writer:
+                self.pointer_writer.close_file()
+            self.pointer_writer = None  # Clear reference
+        
+        # Join and clear all threads
+        for thread in self.threads:
+            if thread.is_alive():
+                thread.join(timeout=1.0)
+        
+        # Clear the threads list
+        self.threads = []
+        
+        # Reset thread references
+        self.aura_thread = None
+        self.emotion_thread = None
+        self.regressor_thread = None
+        self.screen_recording_thread = None
+        # Add other threads if necessary
+
         return {"status": "success", "message": "Testing stopped"}
 
     def handle_stop_recording_traing_data(self):
@@ -459,3 +474,41 @@ class BackendServer:
             return {"status": "error", "message": "Pointer tracking already active"}
 
     # End of Message Handling Functions
+
+
+    def _aura_data_collection_loop(self, type):
+        """
+        Collect Aura data and write to file.
+        The mode of operation is determined by the type argument. Is importat to handle
+        this internally to avoid user error.
+        Args:
+            type (str): 'training' or 'testing'
+        """
+        try:
+            if type == 'training':
+                channels_names = ['timestamp'] + self.stream.info['ch_names']
+                aura_writer_training = AuraDataWriter('training', 'training_aura.csv', channels_names)
+                aura_writer_training.create_new_file()
+            
+            while True:
+                if is_stream_ready(self.stream):
+                    data, ts = self.stream.get_data()
+                    if type == 'training':
+                        aura_writer_training.write_data(ts, data)
+                    else:
+                        processed_ts = [round(t - self.start_time, 3) for t in ts]
+                        self.aura_writer.write_data(processed_ts, data)
+
+                time.sleep(0.001)
+
+                if type == 'training' and not self.training_data_collection_active:
+                    aura_writer_training.close_file()
+                    break
+                elif type == 'testing' and not self.data_collection_active:
+                    if self.aura_writer:
+                        self.aura_writer.close_file()
+                    break
+                    
+        except Exception as e:
+            print(f"Error in aura collection loop: {str(e)}")
+            raise
