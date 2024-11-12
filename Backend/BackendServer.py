@@ -351,31 +351,11 @@ class BackendServer:
         self.regressor = PositionRegressor('training/training_gaze.csv')
         self.regressor.train_create_model()
 
-        def _coordinate_regressor_loop():
-            while True:
-                gaze_vector = self.eye_gaze.get_gaze_vector()
-                left_eye = gaze_vector[0]
-                right_eye = gaze_vector[1]
-                if left_eye is not None and right_eye is not None:
-                    gaze_input = [[
-                        *left_eye,   # x, y, z coordinates for left eye
-                        *right_eye   # x, y, z coordinates for right eye
-                    ]]
 
-                    predicted_coords = self.regressor.make_prediction(gaze_input)
-                    x, y = predicted_coords[0]  # Extract x,y from nested array
-                    x = int(x)
-                    y = int(y)
-                    print(f"Predicted coordinates: {x}, {y}")
-                    timestamp = round(time.time() - self.start_time, 3)
-                    self._coordinate_writer.write(timestamp, [x, y])
-
-                if not self.data_collection_active:
-                    break
 
         self._coordinate_writer.close_file()    
         self.regressor_thread = threading.Thread(
-            target=_coordinate_regressor_loop
+            target=self._coordinate_regressor_loop
         )
 
         return {"status": "success", "message": "Regressor started"}
@@ -410,20 +390,7 @@ class BackendServer:
         """
         try:
             self.emotion_handler = EmotionRecognizer('opencv')
-
-            def _emotion_collection_loop():
-                while True:
-                    if self.emotion_handler:
-                        emotion = self.emotion_handler.recognize_emotion()
-                        emotion = emotion[0]['dominant_emotion']
-                        timestamp = round(time.time() - self.start_time, 3)
-                        self.emotion_writer.write_data(timestamp, emotion)
-                    time.sleep(0.001)  # Small sleep to prevent CPU overuse
-                    if not self.data_collection_active:
-                        break
-                self.emotion_writer.close_file()
-            
-            self.emotion_thread = threading.Thread(target=_emotion_collection_loop)
+            self.emotion_thread = threading.Thread(target=self._emotion_collection_loop)
 
             return {"status": "success", "message": "Emotion recognition started"}
         except Exception as e:
@@ -512,3 +479,55 @@ class BackendServer:
         except Exception as e:
             print(f"Error in aura collection loop: {str(e)}")
             raise
+
+    def _emotion_collection_loop(self):
+        """
+        Continuously collect and write emotion data in a loop.
+        
+        Uses the emotion_handler to recognize emotions and writes the dominant emotion
+        along with a timestamp to the emotion_writer. Runs until data_collection_active
+        is set to False.
+        """
+        while True:
+            if self.emotion_handler:
+                emotion = self.emotion_handler.recognize_emotion()
+                if emotion is not None:
+                    emotion = emotion[0]['dominant_emotion']
+                    timestamp = round(time.time() - self.start_time, 3)
+                    self.emotion_writer.write_data(timestamp, emotion)
+            time.sleep(0.001)  # Small sleep to prevent CPU overuse
+            if not self.data_collection_active:
+                break
+        self.emotion_writer.close_file()
+
+    def _coordinate_regressor_loop(self):
+        """
+        Continuously collect eye gaze data and predict screen coordinates in a loop.
+        
+        Gets gaze vectors for both eyes from the eye tracker, uses the regressor to
+        predict x,y screen coordinates, and writes the predictions with timestamps
+        to the coordinate writer. Runs until data_collection_active is set to False.
+        
+        The gaze input consists of x,y,z coordinates for both left and right eyes.
+        Predictions are rounded to integer screen coordinates before writing.
+        """
+        while True:
+            gaze_vector = self.eye_gaze.get_gaze_vector()
+            left_eye = gaze_vector[0]
+            right_eye = gaze_vector[1]
+            if left_eye is not None and right_eye is not None:
+                gaze_input = [[
+                    *left_eye,   # x, y, z coordinates for left eye
+                    *right_eye   # x, y, z coordinates for right eye
+                ]]
+
+                predicted_coords = self.regressor.make_prediction(gaze_input)
+                x, y = predicted_coords[0]  # Extract x,y from nested array
+                x = int(x)
+                y = int(y)
+                print(f"Predicted coordinates: {x}, {y}")
+                timestamp = round(time.time() - self.start_time, 3)
+                self._coordinate_writer.write(timestamp, [x, y])
+
+            if not self.data_collection_active:
+                break
