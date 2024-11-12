@@ -53,7 +53,7 @@ def rename_40_channels():
     mapping = {}
     for wave in waves:
         for channel in channels:
-            mapping[str(current_position)] = wave +'_' + channel
+            mapping[str(current_position)] = wave + '_' + channel
             current_position += 1
     return mapping
 
