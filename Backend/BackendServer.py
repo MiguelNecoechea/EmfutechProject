@@ -7,8 +7,6 @@ import os
 from contextlib import contextmanager
 
 
-# Add the parent directory to the Python path
-
 from mne_lsl.stream import StreamLSL as Stream
 
 from IO.FileWriting.CoordinateWriter import CoordinateWriter
@@ -25,7 +23,21 @@ from IO.PointerTracking.PointerTracker import CursorTracker
 from IO.FileWriting.PointerWriter import PointerWriter
 
 class BackendServer:
+    """
+    Backend server that handles all data collection and processing for eye tracking, emotions, 
+    EEG signals and pointer tracking.
+
+    The server uses ZMQ for communication with the frontend and manages multiple threads for
+    different data collection tasks.
+    """
+
     def __init__(self, port="5556"):
+        """
+        Initialize the backend server with all necessary components.
+
+        Args:
+            port (str): Port number for ZMQ communication. Defaults to "5556".
+        """
         # Server setup
         self.aura_training_thread = None
         self.context = zmq.Context()
@@ -82,7 +94,6 @@ class BackendServer:
         self.pointer_writer = PointerWriter('testing', 'testing_pointer.csv')
         self.pointer_writer.create_new_file()
 
-
         # Status for the data collection loops
         self.data_collection_active = False
         self.training_data_collection_active = False
@@ -92,8 +103,8 @@ class BackendServer:
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
 
-    # Server Handling Functions
     def start(self):
+        """Start the backend server and begin processing messages."""
         self.running = True
         print("Backend server started...")
         while self.running:
@@ -113,7 +124,7 @@ class BackendServer:
                     pass
 
     def cleanup(self):
-        """Clean up resources before shutting down"""
+        """Clean up resources before shutting down the server."""
         self.running = False
         self.data_collection_active = False
 
@@ -129,16 +140,19 @@ class BackendServer:
             self.context.term()
 
     def signal_handler(self, signum, frame):
+        """Handle system signals for graceful shutdown."""
         print("Signal received, cleaning up...")
         self.cleanup()
         sys.exit(0)
 
-    # Server Handling Functions End
-
-    # Thread Management Functions
     @contextmanager
     def thread_tracking(self, thread):
-        """Context manager to track active threads"""
+        """
+        Context manager to track active threads.
+        
+        Args:
+            thread: Thread object to track
+        """
         self.threads.append(thread)
         try:
             yield thread
@@ -146,9 +160,16 @@ class BackendServer:
             if thread in self.threads:
                 self.threads.remove(thread)
 
-    # Thread Management Functions End
-
     def handle_message(self, message):
+        """
+        Process incoming messages and route them to appropriate handlers.
+        
+        Args:
+            message (dict): Message containing command and parameters
+            
+        Returns:
+            dict: Response from the handler
+        """
         command = message.get("command")
         params = message.get("params", {})
 
@@ -173,15 +194,12 @@ class BackendServer:
         else:
             return {"error": f"Unknown command: {command}"}
 
-    # Message Handling Functions
-
     def handle_eye_gaze(self):
-
+        """Initialize and start eye gaze tracking."""
         def eye_gaze_task():
             self.eye_gaze = create_new_eye_gaze()
             print("Eye gaze tracking started")
             self.eye_gaze_running = True
-
 
         if not self.fitting_eye_gaze:
             self.fitting_eye_gaze = True
@@ -192,6 +210,7 @@ class BackendServer:
             return {"status": "error", "message": "Eye gaze tracking already started"}
 
     def start_et_calibration(self):
+        """Start eye tracking calibration process."""
         if self.eye_gaze_running:
             if self.stream is not None:
                 aura_thread = threading.Thread(
@@ -204,6 +223,7 @@ class BackendServer:
             return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def start_testing(self):
+        """Start all active data collection threads."""
         if not self.data_collection_active:
             self.data_collection_active = True
 
@@ -221,11 +241,13 @@ class BackendServer:
             return {"status": "error", "message": "Testing already started"}
 
     def handle_stop(self):
+        """Stop the server and clean up resources."""
         print("Stopping server...")
         self.cleanup()
         return {"status": "success", "message": "Server stopped"}
 
     def handle_training_data(self):
+        """Start collecting training data for eye gaze tracking."""
         self.training_data_collection_active = True
         def training_data_task():
             while True:
@@ -239,7 +261,6 @@ class BackendServer:
                         data.append(i)
                     data.append(self.current_x_coordinate)
                     data.append(self.current_y_coordinate)
-                    # data = gaze_vector[0] + gaze_vector[1] + [self.current_x_coordinate, self.current_y_coordinate]
                     self.gaze_writer_training.write(data)
                 if self.training_data_collection_active is False:
                     self.gaze_writer_training.close_file()
@@ -255,22 +276,28 @@ class BackendServer:
             return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def handle_stop_recording(self):
+        """Stop all data recording."""
         self.data_collection_active = False
         return {"status": "success", "message": "Recording stopped"}
 
     def handle_coordinates(self, x, y):
-        # Handle the coordinates update
+        """
+        Update current coordinates.
+        
+        Args:
+            x (int): X coordinate
+            y (int): Y coordinate
+        """
         print(f"Coordinates updated: {x}, {y}")
         self.current_x_coordinate = x
         self.current_y_coordinate = y
         return {"status": "success", "coordinates": [x, y]}
 
     def handle_regressor(self):
-        # Start your regressor
+        """Initialize and start the position regressor."""
         self.regressor = PositionRegressor('training/training_gaze.csv')
         self.regressor.train_create_model()
 
-        # Define internal coordinate regressor loop
         def _coordinate_regressor_loop():
             while True:
                 gaze_vector = self.eye_gaze.get_gaze_vector()
@@ -289,7 +316,6 @@ class BackendServer:
                     print(f"Predicted coordinates: {x}, {y}")
                     self._coordinate_writer.write([x, y])
 
-                # Check if we should stop collecting data
                 if not self.data_collection_active:
                     break
 
@@ -301,11 +327,18 @@ class BackendServer:
         return {"status": "success", "message": "Regressor started"}
 
     def handle_aura_signal(self, stream_id='AURA_Power', buffer_size_multiplier=1):
+        """
+        Initialize and start AURA signal handling.
+        
+        Args:
+            stream_id (str): ID of the AURA stream
+            buffer_size_multiplier (int): Multiplier for buffer size
+        """
         try:
             self.stream = Stream(bufsize=buffer_size_multiplier, source_id=stream_id)
             self.stream.connect(processing_flags='all')
             rename_aura_channels(self.stream)
-            # Start data collection in a separate thread
+
             def _aura_data_collection_loop(type):
                 while True:
                     if is_stream_ready(self.stream):
@@ -339,13 +372,21 @@ class BackendServer:
             return {"status": "error", "message": str(e)}
 
     def handle_emotion(self, output_path='.', file_name='emotions.csv'):
+        """
+        Initialize and start emotion recognition.
+        
+        Args:
+            output_path (str): Path for output files
+            file_name (str): Name of the emotion data file
+        """
         try:
             self.emotion_handler = EmotionRecognizer('opencv')
 
             def _emotion_collection_loop():
                 while True:
                     if self.emotion_handler:
-                        emotion = self.emotion_handler.get_emotion()
+                        emotion = self.emotion_handler.recognize_emotion()
+                        emotion = emotion[0]['dominant_emotion']
                         self.emotion_writer.write_data(emotion)
                     time.sleep(0.001)  # Small sleep to prevent CPU overuse
                     if not self.data_collection_active:
@@ -359,6 +400,7 @@ class BackendServer:
             return {"status": "error", "message": str(e)}
 
     def handle_stop_testing(self):
+        """Stop all testing and data collection."""
         self.data_collection_active = False
 
         if self.pointer_tracker is not None:
@@ -369,11 +411,12 @@ class BackendServer:
         return {"status": "success", "message": "Testing stopped"}
 
     def handle_stop_recording_traing_data(self):
+        """Stop recording training data."""
         self.training_data_collection_active = False
         return {"status": "success", "message": "Training data recording stopped"}
 
-
     def handle_pointer_tracking(self):
+        """Initialize and start pointer tracking."""
         if not self.pointer_tracking_active:
             # Initialize tracker with the writer
             self.pointer_tracker = CursorTracker(writer=self.pointer_writer)
