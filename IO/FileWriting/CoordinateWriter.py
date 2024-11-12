@@ -9,7 +9,7 @@ class CoordinateWriter(Writer):
         """
         super().__init__(file_path, file_name, ['x', 'y'])
 
-    def write(self, data):
+    def write(self, timestamp, data):
         """
         Writes the gaze data to the file. The data must be a list of 8 elements, where the first 6 elements are the gaze
         vectors of the left and right eyes, and the last 2 elements are the x and y coordinates of the gaze.
@@ -20,5 +20,5 @@ class CoordinateWriter(Writer):
 
         if len(data) != 2:
             raise ValueError("The data must be a list of 2 elements.")
-        self._csv_writer.writerow(data)
+        self._csv_writer.writerow([timestamp] + data)
         self._csv_file.flush()
