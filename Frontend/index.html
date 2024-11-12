@@ -3,62 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>AURA Marketing Alpha</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        #calibrationArea {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .button-container {
-            display: block;
-            flex-direction: column;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .button-container button {
-            padding: 10px 20px;
-        }
-
-        .calibration-point {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #000;
-            border-radius: 50%;
-            transition: all 1s ease-in-out;
-            box-shadow: 0 0 10px rgba(0,255,255,0.8);
-        }
-
-        .calibration-point::after {
-            content: '';
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: red;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-    </style>
+    <link rel="stylesheet" href="styles/styles.css">
 </head>
 <body>
     <div id="calibrationArea">
