@@ -274,6 +274,7 @@ class BackendServer:
                 
                 # Pointer
                 if self.pointer_tracker is not None:
+                    self.pointer_tracker.start_time = self.start_time
                     self.pointer_writer = PointerWriter(self.path, f'{self.filename}_pointer_data.csv')
                     self.pointer_writer.create_new_file()
                     self.pointer_tracker.is_tracking = True
@@ -434,6 +435,9 @@ class BackendServer:
         """Initialize and start pointer tracking."""
         if not self.pointer_tracking_active:
             # Initialize tracker with the writer
+            if self.pointer_writer is None:
+                self.pointer_writer = PointerWriter(self.path, f'{self.filename}_pointer_data.csv')
+                self.pointer_writer.create_new_file()
             self.pointer_tracker = CursorTracker(writer=self.pointer_writer)
 
             return {"status": "success", "message": "Pointer tracking started"}
@@ -525,7 +529,6 @@ class BackendServer:
                 x, y = predicted_coords[0]  # Extract x,y from nested array
                 x = int(x)
                 y = int(y)
-                print(f"Predicted coordinates: {x}, {y}")
                 timestamp = round(time.time() - self.start_time, 3)
                 self._coordinate_writer.write(timestamp, [x, y])
 
