@@ -17,7 +17,7 @@ from IO.FileWriting.GazeWriter import GazeWriter
 from Backend.EyeGaze import create_new_eye_gaze
 from Backend.EyeCoordinateRegressor import PositionRegressor
 
-from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready, rename_40_channels
+from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 from IO.PointerTracking.PointerTracker import CursorTracker
 from IO.FileWriting.PointerWriter import PointerWriter
@@ -80,6 +80,7 @@ class BackendServer:
         # Path and file names for the data
         # TODO: Make this dynamic so add the frontend code to set the path and filename
         self.path = 'testing'
+        self.training_path = 'training'
         self.filename = 'testing'
 
         # Aura stream id
@@ -199,6 +200,9 @@ class BackendServer:
             'start_eye_gaze': self.start_eye_gaze,
             'start': self.start_testing,
             'stop': self.handle_stop_testing,
+            'start_recording_training_data': self.handle_training_data,
+            'stop_recording_training_data': self.handle_stop_recording_traing_data,
+            'set_coordinates': self.handle_coordinates
         }
         handler = handlers.get(command)
         if handler:
@@ -212,6 +216,8 @@ class BackendServer:
             self.eye_gaze = create_new_eye_gaze()
             print("Eye gaze tracking started")
             self.eye_gaze_running = True
+            self.fitting_eye_gaze = False
+            self.socket.send_json({"status": "success", "message": "start-calibration"})
 
         if not self.fitting_eye_gaze and self.run_gaze:
             self.fitting_eye_gaze = True
@@ -220,19 +226,6 @@ class BackendServer:
             return {"status": "success", "message": "Eye gaze tracking started"}
         else:
             return {"status": "error", "message": "Eye gaze is already started or cannot be started"}
-
-    def start_et_calibration(self):
-        """Start eye tracking calibration process."""
-        if self.eye_gaze_running:
-            if self.stream is not None:
-                aura_thread = threading.Thread(
-                    target=self._aura_data_collection_loop,
-                    args=('training',)
-                )
-                aura_thread.start()
-            return {"status": "start-calibration", "message": "Eye gaze tracking started"}
-        else:
-            return {"status": "error", "message": "Eye gaze tracking not started"}
 
     def start_testing(self):
         """Start all active data collection threads."""
@@ -319,8 +312,15 @@ class BackendServer:
     def handle_training_data(self):
         """Start collecting training data for eye gaze tracking."""
         # Create local writer for gaze data
-        gaze_writer = GazeWriter('training', 'training_gaze.csv')
+        gaze_writer = GazeWriter(self.training_path, 'training_gaze.csv')
         gaze_writer.create_new_file()
+        aura_training_thread = None
+        if self.run_aura:
+            self.start_aura()
+            aura_training_thread = threading.Thread(
+                target=self._aura_data_collection_loop,
+                args=('training',)
+            )
         
         def training_data_task():
             training_active = True
@@ -346,6 +346,9 @@ class BackendServer:
             self.training_data_collection_active = True
             local_thread = threading.Thread(target=training_data_task)
             local_thread.start()
+            if aura_training_thread:
+                aura_training_thread.start()
+
             return {"status": "success", "message": "Training data recording started"}
         else:
             print("Eye gaze tracking not started")
@@ -419,7 +422,6 @@ class BackendServer:
         elif signal == 'screen':
             self.run_screen = bool_status
         
-        # debug TODO: remove
         return {"status": "success", "message": f"Signal {signal} updated to {status}"}
 
     # End of Message Handling Functions
@@ -437,7 +439,8 @@ class BackendServer:
 
     def start_regressor(self):
         """Initialize and start the position regressor."""
-        self.regressor = PositionRegressor('training/training_gaze.csv')
+        path = os.path.join(self.training_path, 'training_gaze.csv')
+        self.regressor = PositionRegressor(path)
         self.regressor.train_create_model()
 
         self._coordinate_writer.close_file()    
@@ -511,7 +514,7 @@ class BackendServer:
         try:
             if type == 'training':
                 channels_names = ['timestamp'] + self.stream.info['ch_names']
-                aura_writer_training = AuraDataWriter('training', 'training_aura.csv', channels_names)
+                aura_writer_training = AuraDataWriter(self.training_path, 'training_aura.csv', channels_names)
                 aura_writer_training.create_new_file()
             
             while True:
