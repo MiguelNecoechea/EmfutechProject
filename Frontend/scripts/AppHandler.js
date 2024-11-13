@@ -14,24 +14,12 @@ class AppHandler {
     }
 
     setupButtons() {
-        // this.buttons = document.getElementById('button-container');
-        // this.startGaze = document.getElementById('startGaze');
-        // this.calibrateTracking = document.getElementById('calibrateTracking');
-        // this.startTesting = document.getElementById('startTesting');
-        // this.endTesting = document.getElementById('endTesting');
-        // this.startRegressor = document.getElementById('startRegressor');
-        // this.connectAura = document.getElementById('connectAura');
-        // this.startEmotions = document.getElementById('startEmotions');
-        // this.startPointerTracking = document.getElementById('startPointerTracking');
         this.startGaze = document.getElementById('start-gaze');
         this.start = document.getElementById('start');
         this.stop = document.getElementById('stop');
         this.report = document.getElementById('report');
         this.selectFolder = document.getElementById('selectFolder');
 
-        // if (!this.startGaze || !this.calibrateTracking || !this.startTesting || !this.endTesting) {
-        //     throw new Error('One or more button elements not found.');
-        // }
     }
 
     setupCheckboxes() {
@@ -61,9 +49,9 @@ class AppHandler {
     setupIPCListeners() {
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
-            if (response.status === 'start-calibration') {
+            if (response.status === 'success' && response.message === 'start-calibration') {
                 console.log("Starting calibration");
-                this.openCalibrationWindow();
+                window.electronAPI.openCalibrationWindow();
             }
         });
     }
