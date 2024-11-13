@@ -7,6 +7,7 @@ class ApplicationManager {
     constructor() {
         this.pythonProcess = null;
         this.mainWindow = null;
+        this.calibrationWindow = null;
         this.socket = null;
         this.isShuttingDown = false;
         this.setupEventHandlers();
@@ -27,6 +28,11 @@ class ApplicationManager {
             console.error('Uncaught Exception:', error);
             await this.cleanup();
             app.exit(1);
+        });
+
+        // Listen for calibration window requests
+        ipcMain.on('open-calibration-window', () => {
+            this.createCalibrationWindow();
         });
     }
 
@@ -60,9 +66,32 @@ class ApplicationManager {
 
         await this.mainWindow.loadFile('Frontend/index.html');
         this.mainWindow.webContents.openDevTools();
-        // if (process.env.NODE_ENV === 'development') {
-        //     this.mainWindow.webContents.openDevTools();
-        // }
+    }
+
+    async createCalibrationWindow() {
+        if (this.calibrationWindow) {
+            this.calibrationWindow.focus();
+            return;
+        }
+
+        this.calibrationWindow = new BrowserWindow({
+            fullscreen: true,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+
+        this.calibrationWindow.loadFile('Frontend/calibration.html');
+
+        this.calibrationWindow.once('ready-to-show', () => {
+            this.calibrationWindow.show();
+        });
+
+        this.calibrationWindow.on('closed', () => {
+            this.calibrationWindow = null;
+        });
     }
 
     async startPythonBackend() {
@@ -188,6 +217,12 @@ class ApplicationManager {
         if (this.mainWindow) {
             this.mainWindow.destroy();
             this.mainWindow = null;
+        }
+
+        // Close calibration window if open
+        if (this.calibrationWindow) {
+            this.calibrationWindow.destroy();
+            this.calibrationWindow = null;
         }
 
         console.log('Cleanup completed');

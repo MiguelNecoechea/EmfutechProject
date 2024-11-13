@@ -1,11 +1,11 @@
 class EyeTrackingCalibration {
     constructor() {
         this.calibrationArea = document.getElementById('calibrationArea');
-        if (!this.calibrationArea) {
-            throw new Error('Element with ID "calibrationArea" not found.');
+        this.pointsContainer = document.getElementById('calibration-points-container');
+        if (!this.calibrationArea || !this.pointsContainer) {
+            throw new Error('Calibration elements not found.');
         }
 
-        this.buttons = document.getElementById('button-container');
         this.points = [];
         this.currentX = 0;
         this.currentY = 0;
@@ -43,13 +43,15 @@ class EyeTrackingCalibration {
         try {
             await window.electronAPI.sendPythonCommand('start_recording_training_data');
 
-            this.buttons.style.display = 'none';
-            await document.documentElement.requestFullscreen();
+            // Launch calibration UI in fullscreen (already handled by window settings)
+            // await document.documentElement.requestFullscreen(); // Optional: Remove if window is already fullscreen
             setTimeout(() => {
                 const calibrationPoints = this.generateCalibrationPoints();
                 this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
                 this.showNextPoint();
             }, 1000);
+
+            this.isCalibrating = true;
         } catch (error) {
             console.error('Error initializing calibration:', error);
             this.handleError(error);
@@ -72,7 +74,6 @@ class EyeTrackingCalibration {
             { x: width - padding, y: height - padding }
         ];
     }
-
 
     updatePointPositions() {
         const newPositions = this.generateCalibrationPoints();
@@ -99,12 +100,12 @@ class EyeTrackingCalibration {
 
     async showNextPoint() {
         if (this.currentPointIndex > 0) {
-            this.points[this.currentPointIndex - 1].style.display = 'none';
+            this.points[this.currentPointIndex - 1].classList.remove('active');
         }
 
         if (this.currentPointIndex < this.points.length) {
             const currentPoint = this.points[this.currentPointIndex];
-            currentPoint.style.display = 'block';
+            currentPoint.classList.add('active');
             this.currentX = parseInt(currentPoint.dataset.x);
             this.currentY = parseInt(currentPoint.dataset.y);
             console.log(this.currentX, this.currentY);
@@ -123,7 +124,7 @@ class EyeTrackingCalibration {
                 this.handleError(error);
             }
         } else {
-            this.buttons.style.display = 'block';
+            // Calibration completed
             await this.finishCalibration();
         }
     }
@@ -133,20 +134,21 @@ class EyeTrackingCalibration {
         point.className = 'calibration-point';
         point.style.left = `${x}px`;
         point.style.top = `${y}px`;
-        point.style.display = 'none';
         point.dataset.x = x;
         point.dataset.y = y;
-        this.calibrationArea.appendChild(point);
+        this.pointsContainer.appendChild(point);
         return point;
     }
 
     async finishCalibration() {
         try {
-            this.isCalibrating = false;  // Set this first to prevent race conditions
+            this.isCalibrating = false;
             await window.electronAPI.sendPythonCommand('stop_recording_training_data');
             if (document.fullscreenElement) {
                 await document.exitFullscreen();
             }
+            // Optionally, close the calibration window
+            window.close();
         } catch (error) {
             console.error('Error finishing calibration:', error);
         } finally {
@@ -166,8 +168,6 @@ class EyeTrackingCalibration {
         this.reset();
         alert('An error occurred during calibration. Please try again.');
     }
-
-
 }
 
-export default EyeTrackingCalibration; 
+export { EyeTrackingCalibration }; 

@@ -1,9 +1,8 @@
-import EyeTrackingCalibration from './EyeTrackingCalibration.js';
+import { EyeTrackingCalibration } from './EyeTrackingCalibration.js';
 
 class AppHandler {
     constructor() {
         this.setupButtons();
-        this.calibration = new EyeTrackingCalibration();
         this.setupEventListeners();
         this.setupIPCListeners();
 
@@ -31,7 +30,7 @@ class AppHandler {
 
     setupEventListeners() {
         this.startGaze.addEventListener('click', () => this.sendCommandToBackend('start_eye_gaze'));
-        this.calibrateTracking.addEventListener('click', () => this.sendCommandToBackend('calibrate_eye_tracking'));
+        this.calibrateTracking.addEventListener('click', () => this.openCalibrationWindow());
         this.startTesting.addEventListener('click', () => this.sendCommandToBackend('start_testing'));
         this.endTesting.addEventListener('click', () => this.sendCommandToBackend('stop_testing'));
         this.startRegressor.addEventListener('click', () => this.sendCommandToBackend('start_regressor'));
@@ -45,7 +44,7 @@ class AppHandler {
             console.log('Received from Python:', response);
             if (response.status === 'start-calibration') {
                 console.log("Starting calibration");
-                this.calibration.initializeCalibration();
+                this.openCalibrationWindow();
             }
         });
     }
@@ -53,20 +52,21 @@ class AppHandler {
     async sendCommandToBackend(command) {
         try {
             const response = await window.electronAPI.sendPythonCommand(command);
+            // Handle response if needed
         } catch (error) {
             console.error(`Error sending ${command} to backend:`, error);
         }
     }
 
+    openCalibrationWindow() {
+        // Send IPC message to main process to open calibration window
+        window.electronAPI.openCalibrationWindow();
+    }
+
     async cleanup() {
-        if (this.calibration.isCalibrating) {
-            try {
-                await window.electronAPI.sendPythonCommand('stop_recording_training_data');
-                await window.electronAPI.sendPythonCommand('stop');
-            } catch (error) {
-                console.error('Error during cleanup:', error);
-            }
-        }
+        // Depending on your application logic,
+        // ensure that calibration is only handled within the calibration window.
+        // If necessary, implement additional cleanup here.
     }
 }
 
