@@ -68,7 +68,7 @@ class BackendServer:
         self.run_emotion = False
         self.run_gaze = False
         self.run_pointer = False
-        self.run_screen_recording = False
+        self.run_screen = False
 
         # Threads for the data collection
         self.aura_thread = None
@@ -194,42 +194,32 @@ class BackendServer:
         """
         command = message.get("command")
         params = message.get("params", {})
-
         handlers = {
-            "start_eye_gaze": self.handle_eye_gaze,
-            "calibrate_eye_tracking": self.start_et_calibration,
-            "start_testing": self.start_testing,
-            "stop_testing": self.handle_stop_testing,
-            "start_regressor": self.handle_regressor,
-            "connect_aura": self.handle_aura_signal,
-            "start_emotions": self.handle_emotion,
-            "start_recording_training_data": self.handle_training_data,
-            "stop_recording_training_data": self.handle_stop_recording_traing_data,
-            "set_coordinates": self.handle_coordinates,
-            "start_pointer_tracking": self.handle_pointer_tracking,
-            "stop": self.handle_stop
+            'update_signal_status': self.handle_update_signal_status,
+            'start_eye_gaze': self.start_eye_gaze,
+            'start': self.start_testing,
+            'stop': self.handle_stop_testing,
         }
-        print(message)
         handler = handlers.get(command)
         if handler:
             return handler(**params)
         else:
             return {"error": f"Unknown command: {command}"}
 
-    def handle_eye_gaze(self):
+    def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
         def eye_gaze_task():
             self.eye_gaze = create_new_eye_gaze()
             print("Eye gaze tracking started")
             self.eye_gaze_running = True
 
-        if not self.fitting_eye_gaze:
+        if not self.fitting_eye_gaze and self.run_gaze:
             self.fitting_eye_gaze = True
             local_thread = threading.Thread(target=eye_gaze_task)
             local_thread.start()
             return {"status": "success", "message": "Eye gaze tracking started"}
         else:
-            return {"status": "error", "message": "Eye gaze tracking already started"}
+            return {"status": "error", "message": "Eye gaze is already started or cannot be started"}
 
     def start_et_calibration(self):
         """Start eye tracking calibration process."""
@@ -250,9 +240,10 @@ class BackendServer:
             if not self.data_collection_active:
                 self.start_time = time.time()
                 self.data_collection_active = True
-                
+
                 # AURA
-                if self.stream is not None:
+                if self.run_aura:
+                    self.start_aura()
                     try:
                         channels_names = ['timestamp'] + list(self.stream.info['ch_names'])
                         self.aura_writer = AuraDataWriter(self.path, f'{self.filename}_aura.csv', channels_names)
@@ -264,14 +255,16 @@ class BackendServer:
                                 args=('testing',),
                                 daemon=True
                             )
-                            self.aura_thread.start()
-                            self.threads.append(self.aura_thread)
+                        self.aura_thread.start()
+                        self.threads.append(self.aura_thread)
+
                     except Exception as e:
                         print(f"Error starting Aura thread: {str(e)}")
                         raise
                 
                 # Emotion
-                if self.emotion_handler is not None:
+                if self.run_emotion:
+                    self.start_emotion_detection()
                     self.emotion_writer = EmotionPredictedWriter(self.path, f'{self.filename}_emotions.csv')
                     self.emotion_writer.create_new_file()
                     
@@ -280,11 +273,13 @@ class BackendServer:
                             target=self._emotion_collection_loop,
                             daemon=True
                         )
-                        self.emotion_thread.start()
-                        self.threads.append(self.emotion_thread)
+                    self.emotion_thread.start()
+                    self.threads.append(self.emotion_thread)                    
                 
                 # Coordinate/Gaze
-                if self.regressor is not None:
+                # TODO: Finish this implementation
+                if self.run_gaze:
+                    self.start_regressor()
                     self._coordinate_writer = CoordinateWriter(self.path, f'{self.filename}_gaze.csv')
                     self._coordinate_writer.create_new_file()
                     
@@ -293,14 +288,15 @@ class BackendServer:
                             target=self._coordinate_regressor_loop,
                             daemon=True
                         )
-                        self.regressor_thread.start()
-                        self.threads.append(self.regressor_thread)
+                    self.regressor_thread.start()
+                    self.threads.append(self.regressor_thread)
                 
                 # Pointer
-                if self.pointer_tracker is not None:
-                    self.pointer_tracker.start_time = self.start_time
+                if self.run_pointer:
                     self.pointer_writer = PointerWriter(self.path, f'{self.filename}_pointer_data.csv')
                     self.pointer_writer.create_new_file()
+                    self.start_pointer_tracking()
+                    self.pointer_tracker.start_time = self.start_time
                     self.pointer_tracker.is_tracking = True
 
                 return {"status": "success", "message": "Testing started successfully"}
@@ -317,6 +313,8 @@ class BackendServer:
         print("Stopping server...")
         self.cleanup()
         return {"status": "success", "message": "Server stopped"}
+
+    # End of main start/stop functions
 
     def handle_training_data(self):
         """Start collecting training data for eye gaze tracking."""
@@ -357,69 +355,6 @@ class BackendServer:
         """Stop all data recording."""
         self.data_collection_active = False
         return {"status": "success", "message": "Recording stopped"}
-
-    def handle_coordinates(self, x, y):
-        """
-        Update current coordinates.
-        
-        Args:
-            x (int): X coordinate
-            y (int): Y coordinate
-        """
-        print(f"Coordinates updated: {x}, {y}")
-        self.current_x_coordinate = x
-        self.current_y_coordinate = y
-        return {"status": "success", "coordinates": [x, y]}
-
-    def handle_regressor(self):
-        """Initialize and start the position regressor."""
-        self.regressor = PositionRegressor('training/training_gaze.csv')
-        self.regressor.train_create_model()
-
-
-
-        self._coordinate_writer.close_file()    
-        self.regressor_thread = threading.Thread(
-            target=self._coordinate_regressor_loop
-        )
-
-        return {"status": "success", "message": "Regressor started"}
-
-    def handle_aura_signal(self, buffer_size_multiplier=1):
-        try:
-            self.stream = Stream(bufsize=buffer_size_multiplier, source_id=self.aura_stream_id)
-            self.stream.connect(processing_flags='all')
-            rename_aura_channels(self.stream)
-
-            # Create thread without starting it
-            self.aura_thread = threading.Thread(
-                target=self._aura_data_collection_loop,
-                args=('testing',)
-            )
-
-            # Add to thread tracking
-            self.threads.append(self.aura_thread)
-
-            return {"status": "success", "message": "Aura signal handling initialized"}
-        except Exception as e:
-            print(f"Error in handle_aura_signal: {str(e)}")
-            return {"status": "error", "message": str(e)}
-
-    def handle_emotion(self, output_path='.', file_name='emotions.csv'):
-        """
-        Initialize and start emotion recognition.
-        
-        Args:
-            output_path (str): Path for output files
-            file_name (str): Name of the emotion data file
-        """
-        try:
-            self.emotion_handler = EmotionRecognizer('opencv')
-            self.emotion_thread = threading.Thread(target=self._emotion_collection_loop)
-
-            return {"status": "success", "message": "Emotion recognition started"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
 
     def handle_stop_testing(self):
         """Stop all testing and data collection."""
@@ -468,23 +403,103 @@ class BackendServer:
         except Exception as e:
             print(f"Error stopping training data recording: {e}")
             return {"status": "error", "message": str(e)}
-
-    def handle_pointer_tracking(self):
-        """Initialize and start pointer tracking."""
-        if not self.pointer_tracking_active:
-            # Initialize tracker with the writer
-            if self.pointer_writer is None:
-                self.pointer_writer = PointerWriter(self.path, f'{self.filename}_pointer_data.csv')
-                self.pointer_writer.create_new_file()
-            self.pointer_tracker = CursorTracker(writer=self.pointer_writer)
-
-            return {"status": "success", "message": "Pointer tracking started"}
-        else:
-            return {"status": "error", "message": "Pointer tracking already active"}
+    
+    def handle_update_signal_status(self, signal, status):
+        """Update the status of a signal."""
+        print(f"Signal {signal} updated to {status}")
+        bool_status = True if status == 'true' else False
+        if signal == 'aura':
+            self.run_aura = bool_status
+        elif signal == 'gaze':
+            self.run_gaze = bool_status
+        elif signal == 'emotion':
+            self.run_emotion = bool_status
+        elif signal == 'pointer':
+            self.run_pointer = bool_status
+        elif signal == 'screen':
+            self.run_screen = bool_status
+        
+        # debug TODO: remove
+        return {"status": "success", "message": f"Signal {signal} updated to {status}"}
 
     # End of Message Handling Functions
 
+    # Signal initialization fucntions
 
+    def start_pointer_tracking(self):
+        """Initialize and start pointer tracking."""
+        if not self.pointer_tracking_active:
+            self.pointer_tracker = CursorTracker(writer=self.pointer_writer)
+            return {"status": "success", "message": "Pointer tracking started"}
+        else:
+            return {"status": "error", "message": "Pointer tracking already active"}
+        
+
+    def start_regressor(self):
+        """Initialize and start the position regressor."""
+        self.regressor = PositionRegressor('training/training_gaze.csv')
+        self.regressor.train_create_model()
+
+        self._coordinate_writer.close_file()    
+        self.regressor_thread = threading.Thread(
+            target=self._coordinate_regressor_loop
+        )
+
+        return {"status": "success", "message": "Regressor started"}
+
+    def start_aura(self, buffer_size_multiplier=1):
+        try:
+            self.stream = Stream(bufsize=buffer_size_multiplier, source_id=self.aura_stream_id)
+            self.stream.connect(processing_flags='all')
+            rename_aura_channels(self.stream)
+
+            # Create thread without starting it
+            self.aura_thread = threading.Thread(
+                target=self._aura_data_collection_loop,
+                args=('testing',)
+            )
+
+            # Add to thread tracking
+            self.threads.append(self.aura_thread)
+
+            return {"status": "success", "message": "Aura signal handling initialized"}
+        except Exception as e:
+            print(f"Error in handle_aura_signal: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    def start_emotion_detection(self):
+        """
+        Initialize and start emotion recognition.
+        
+        Args:
+            output_path (str): Path for output files
+            file_name (str): Name of the emotion data file
+        """
+        try:
+            self.emotion_handler = EmotionRecognizer('opencv')
+            self.emotion_thread = threading.Thread(target=self._emotion_collection_loop)
+
+            return {"status": "success", "message": "Emotion recognition started"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    # Signal collection functions end.
+
+    # Training data collection functions
+    def handle_coordinates(self, x, y):
+        """
+        Update current coordinates.
+        
+        Args:
+            x (int): X coordinate
+            y (int): Y coordinate
+        """
+        print(f"Coordinates updated: {x}, {y}")
+        self.current_x_coordinate = x
+        self.current_y_coordinate = y
+        return {"status": "success", "coordinates": [x, y]}
+    
+    # Signal collection loops
     def _aura_data_collection_loop(self, type):
         """
         Collect Aura data and write to file.
