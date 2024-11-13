@@ -1,4 +1,5 @@
 from pynput import mouse
+import time
 
 class CursorTracker:
     def __init__(self, writer=None):
@@ -12,8 +13,18 @@ class CursorTracker:
         self._listener.start()
         self._click_coordinates = []
         self._writer = writer
-        self._is_tracking = True
+        self._start_time = None
+        self._is_tracking = False
+        
+    @property
+    def start_time(self):
+        """Gets the start time."""
+        return self._start_time
 
+    @start_time.setter 
+    def start_time(self, value):
+        """Sets the start time."""
+        self._start_time = value
     @property
     def is_tracking(self):
         """Gets the current tracking status."""
@@ -52,8 +63,9 @@ class CursorTracker:
         self._click_coordinates.append(coordinates)
         
         # Write to file if writer exists
-        if self._writer:
-            self._writer.write(coordinates[0], coordinates[1])
+        if self._writer and self._start_time is not None:
+            timestamp = time.time() - self._start_time
+            self._writer.write(timestamp, coordinates[0], coordinates[1])
             
         return coordinates
 
