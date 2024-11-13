@@ -123,12 +123,34 @@ class BackendServer:
 
     def cleanup(self):
         """Clean up resources before shutting down the server."""
+        print("Cleaning up resources...")
         self.running = False
         self.data_collection_active = False
+        self.training_data_collection_active = False
+
+        # Stop all data collection first
+        if self.pointer_tracker:
+            self.pointer_tracker.stop_tracking()
+            self.pointer_tracker.is_tracking = False
+
+        # Close all file writers
+        writers = [
+            self.aura_writer,
+            self.emotion_writer,
+            self.gaze_writer,
+            self.pointer_writer
+        ]
+        for writer in writers:
+            if writer:
+                try:
+                    if writer:
+                        writer.close_file()
+                except Exception as e:
+                    print(f"Error closing writer: {e}")
 
         # Wait for all threads to complete
         for thread in self.threads:
-            if thread.is_alive():
+            if thread and thread.is_alive():
                 thread.join(timeout=1.0)
 
         # Clean up ZMQ resources
@@ -136,6 +158,8 @@ class BackendServer:
             self.socket.close()
         if hasattr(self, 'context') and self.context:
             self.context.term()
+
+        print("Cleanup completed")
 
     def signal_handler(self, signum, frame):
         """Handle system signals for graceful shutdown."""
@@ -428,8 +452,22 @@ class BackendServer:
 
     def handle_stop_recording_traing_data(self):
         """Stop recording training data."""
-        self.training_data_collection_active = False
-        return {"status": "success", "message": "Training data recording stopped"}
+        try:
+            self.training_data_collection_active = False
+            
+            # Clean up training-specific resources
+            if hasattr(self, 'aura_training_thread') and self.aura_training_thread:
+                self.aura_training_thread.join(timeout=1.0)
+                self.aura_training_thread = None
+            
+            # Close any open training files
+            if hasattr(self, '_gaze_writer') and self._gaze_writer:
+                self._gaze_writer.close_file()
+            
+            return {"status": "success", "message": "Training data recording stopped"}
+        except Exception as e:
+            print(f"Error stopping training data recording: {e}")
+            return {"status": "error", "message": str(e)}
 
     def handle_pointer_tracking(self):
         """Initialize and start pointer tracking."""
