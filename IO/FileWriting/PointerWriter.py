@@ -8,7 +8,7 @@ class PointerWriter(Writer):
         :param file_path: The path where the file will be saved.
         :param file_name: The name of the file to store the data.
         """
-        super().__init__(file_path, file_name, ['x', 'y'])
+        super().__init__(file_path, file_name, ['timestamp', 'x', 'y'])
 
     def write(self, timestamp, x, y):
         """
