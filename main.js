@@ -10,18 +10,8 @@ class ApplicationManager {
         this.calibrationWindow = null;
         this.socket = null;
         this.isShuttingDown = false;
-        this.config = {
-            zmqPort: 5556,
-            pythonStartupTimeout: 2000,
-            pythonShutdownTimeout: 5000,
-            windowDefaults: {
-                main: {
-                    width: 1200,
-                    height: 800
-                }
-            }
-        };
-        this.messageHandlers = new Map();
+        this.pendingReportResponse = null;
+        this.reportResponseResolver = null;
         this.setupEventHandlers();
     }
 
@@ -57,6 +47,27 @@ class ApplicationManager {
             }
             return null;
         });
+
+        // New special handler for report generation
+        ipcMain.handle('generate-report', async () => {
+            try {
+                // Create a promise that will be resolved when we get the response
+                const responsePromise = new Promise((resolve) => {
+                    this.reportResponseResolver = resolve;
+                });
+
+                // Send the command
+                await this.sendToPython('generate_report');
+
+                // Wait for the response (will be resolved in startMessageLoop)
+                const response = await responsePromise;
+                this.reportResponseResolver = null;
+                return response;
+            } catch (error) {
+                console.error('Error generating report:', error);
+                return { status: 'error', message: error.toString() };
+            }
+        });
     }
 
     async onAppReady() {
@@ -74,8 +85,8 @@ class ApplicationManager {
 
     async createWindow() {
         this.mainWindow = new BrowserWindow({
-            width: this.config.windowDefaults.main.width,
-            height: this.config.windowDefaults.main.height,
+            width: 1200,
+            height: 800,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -168,7 +179,12 @@ class ApplicationManager {
                 if (this.isShuttingDown) break;
 
                 const response = JSON.parse(msg.toString());
-                if (this.mainWindow) {
+                
+                // Check if this is a response to a report generation request
+                if (this.reportResponseResolver) {
+                    this.reportResponseResolver(response);
+                } else if (this.mainWindow) {
+                    // Handle regular messages as before
                     this.mainWindow.webContents.send('python-message', response);
                 }
             }
@@ -180,16 +196,7 @@ class ApplicationManager {
     }
 
     setupIPCHandlers() {
-        // Clear any existing handlers
-        if (this.messageHandlers.size > 0) {
-            for (const [channel, handler] of this.messageHandlers) {
-                ipcMain.removeHandler(channel);
-            }
-            this.messageHandlers.clear();
-        }
-
-        // Register new handlers
-        this.messageHandlers.set('python-command', async (event, command, params) => {
+        ipcMain.handle('python-command', async (event, command, params) => {
             try {
                 await this.sendToPython(command, params);
                 return { status: 'success' };
@@ -198,11 +205,6 @@ class ApplicationManager {
                 return { status: 'error', message: error.toString() };
             }
         });
-
-        // Set up handlers
-        for (const [channel, handler] of this.messageHandlers) {
-            ipcMain.handle(channel, handler);
-        }
     }
 
     async sendToPython(command, params = {}) {
