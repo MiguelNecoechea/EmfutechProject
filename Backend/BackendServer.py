@@ -234,7 +234,8 @@ class BackendServer:
             'set_coordinates': self.update_coordinates,
             'update_output_path': self.update_output_path,
             'update_participant_name': self.update_participant_name,
-            'new_participant': self.handle_new_participant
+            'new_participant': self.handle_new_participant,
+            'generate_report': self.generate_report
         }
         handler = handlers.get(command)
         if handler:
@@ -633,4 +634,24 @@ class BackendServer:
         if self._emotion_handler:
             self._emotion_handler.stop_processing()
         return {"status": STATUS_SUCCESS, "message": "New participant started"}
+    
+    def generate_report(self):
+        """Generate a report for the current participant."""
+        try:
+            # For testing, return a simple message
+            report = "Test report content:\n\n" + \
+                     "1. Data collection completed successfully\n" + \
+                     "2. Sample metrics would appear here\n" + \
+                     "3. Analysis results would be shown here"
+            
+            return {
+                "status": "success",  # Make sure this matches STATUS_SUCCESS constant
+                "message": report
+            }
+        except Exception as e:
+            print(f"Error generating report: {str(e)}")  # Add logging
+            return {
+                "status": "error",    # Make sure this matches STATUS_ERROR constant
+                "message": str(e)
+            }
     
