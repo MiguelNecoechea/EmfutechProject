@@ -10,6 +10,18 @@ class ApplicationManager {
         this.calibrationWindow = null;
         this.socket = null;
         this.isShuttingDown = false;
+        this.config = {
+            zmqPort: 5556,
+            pythonStartupTimeout: 2000,
+            pythonShutdownTimeout: 5000,
+            windowDefaults: {
+                main: {
+                    width: 1200,
+                    height: 800
+                }
+            }
+        };
+        this.messageHandlers = new Map();
         this.setupEventHandlers();
     }
 
@@ -62,8 +74,8 @@ class ApplicationManager {
 
     async createWindow() {
         this.mainWindow = new BrowserWindow({
-            width: 1200,
-            height: 800,
+            width: this.config.windowDefaults.main.width,
+            height: this.config.windowDefaults.main.height,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -109,9 +121,14 @@ class ApplicationManager {
         const scriptPath = path.join('main.py');
         console.log('Starting Python backend:', scriptPath);
 
+        if (!require('fs').existsSync(scriptPath)) {
+            throw new Error(`Python script not found at: ${scriptPath}`);
+        }
+
         this.pythonProcess = spawn('python', [scriptPath], {
             stdio: 'inherit',
-            detached: false // Ensure the process is terminated with the parent
+            detached: false,
+            env: { ...process.env, PYTHONUNBUFFERED: '1' }
         });
 
         return new Promise((resolve, reject) => {
@@ -163,7 +180,16 @@ class ApplicationManager {
     }
 
     setupIPCHandlers() {
-        ipcMain.handle('python-command', async (event, command, params) => {
+        // Clear any existing handlers
+        if (this.messageHandlers.size > 0) {
+            for (const [channel, handler] of this.messageHandlers) {
+                ipcMain.removeHandler(channel);
+            }
+            this.messageHandlers.clear();
+        }
+
+        // Register new handlers
+        this.messageHandlers.set('python-command', async (event, command, params) => {
             try {
                 await this.sendToPython(command, params);
                 return { status: 'success' };
@@ -172,6 +198,11 @@ class ApplicationManager {
                 return { status: 'error', message: error.toString() };
             }
         });
+
+        // Set up handlers
+        for (const [channel, handler] of this.messageHandlers) {
+            ipcMain.handle(channel, handler);
+        }
     }
 
     async sendToPython(command, params = {}) {
