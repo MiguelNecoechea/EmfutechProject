@@ -234,6 +234,7 @@ class AppHandler {
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
                 this.report.disabled = this.DISABLED;
+                this.participantNameInput.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.READY:
@@ -248,6 +249,7 @@ class AppHandler {
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
                 this.report.disabled = this.DISABLED;
+                this.participantNameInput.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED); // Ensure checkboxes are disabled during recording
                 break;
             case STATES.COMPLETED:
