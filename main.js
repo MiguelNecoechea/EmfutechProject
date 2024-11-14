@@ -240,15 +240,53 @@ class ApplicationManager {
     }
 
     async onWindowAllClosed() {
-        await this.cleanup();
-        if (process.platform !== 'darwin') {
+        if (this.isShuttingDown) {
+            // If the app is shutting down, do not restart the Python backend
+            return;
+        }
+
+        if (process.platform === 'darwin') {
+            console.log('All windows closed on macOS. Restarting Python backend...');
+            await this.restartPythonBackend();
+        } else {
+            await this.cleanup();
             app.quit();
         }
     }
 
-    onActivate() {
+    async restartPythonBackend() {
+        if (this.pythonProcess) {
+            try {
+                console.log('Stopping existing Python backend...');
+                this.pythonProcess.kill('SIGTERM');
+                await new Promise((resolve) => {
+                    this.pythonProcess.on('exit', () => {
+                        console.log('Python backend stopped.');
+                        resolve();
+                    });
+                });
+            } catch (error) {
+                console.error('Error terminating Python process:', error);
+            }
+            this.pythonProcess = null;
+        }
+
+        try {
+            console.log('Starting Python backend...');
+            await this.startPythonBackend();
+            console.log('Python backend restarted successfully.');
+        } catch (error) {
+            console.error('Failed to restart Python backend:', error);
+        }
+    }
+
+    async onActivate() {
         if (!this.mainWindow) {
-            this.createWindow();
+            await this.createWindow();
+            // Optionally, restart the Python backend if needed
+            if (!this.pythonProcess) {
+                await this.restartPythonBackend();
+            }
         }
     }
 }
