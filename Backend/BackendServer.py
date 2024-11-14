@@ -23,9 +23,7 @@ from IO.FileWriting.PointerWriter import PointerWriter
 
 # Constants
 DEFAULT_PORT = "5556"
-DEFAULT_PATH = 'testing'
-DEFAULT_TRAINING_PATH = 'training'
-DEFAULT_FILENAME = 'testing'
+DEFAULT_FILENAME = 'unnamed'
 DEFAULT_AURA_STREAM_ID = 'filtered'
 
 # File suffixes
@@ -111,9 +109,7 @@ class BackendServer:
         self._screen_recording_thread = None
 
         # Path and file names for the data
-        # TODO: Make this dynamic so add the frontend code to set the path and filename
-        self._path = DEFAULT_PATH
-        self._training_path = DEFAULT_TRAINING_PATH
+        self._path = None
         self._filename = DEFAULT_FILENAME
 
         # Aura stream id
@@ -235,7 +231,10 @@ class BackendServer:
             'stop': self.stop_data_collection,
             'start_recording_training_data': self.start_training_data_collection,
             'stop_recording_training_data': self.stop_training_data_collection,
-            'set_coordinates': self.update_coordinates
+            'set_coordinates': self.update_coordinates,
+            'update_output_path': self.update_output_path,
+            'update_participant_name': self.update_participant_name,
+            'new_participant': self.handle_new_participant
         }
         handler = handlers.get(command)
         if handler:
@@ -247,7 +246,6 @@ class BackendServer:
         """Initialize and start eye gaze tracking."""
         def eye_gaze_task():
             self._eye_gaze = create_new_eye_gaze()
-            print("Eye gaze tracking started")
             self._eye_gaze_running = True
             self._fitting_eye_gaze = False
             self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
@@ -380,7 +378,6 @@ class BackendServer:
 
             return {"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG}
         else:
-            print("Eye gaze tracking not started")
             return {"status": STATUS_ERROR, "message": "Eye gaze tracking not started"}
 
     def handle_stop_recording(self):
@@ -606,9 +603,34 @@ class BackendServer:
                 x, y = predicted_coords[0]  # Extract x,y from nested array
                 x = int(x)
                 y = int(y)
-                print(f"Predicted coordinates: {x}, {y}")
                 timestamp = round(time.time() - self._start_time, 3)
                 self._gaze_writer.write(timestamp, [x, y])
-
             if not self._data_collection_active:
                 break
+
+    def update_output_path(self, path):
+        self._path = path
+        self._training_path = os.path.join(self._path, TRAINING_MODE)
+        return {"status": STATUS_SUCCESS, "message": "Output path updated"}
+
+    def update_participant_name(self, name):
+        """Update the participant name and update file names accordingly."""
+        try:
+            self._filename = name
+            if self._filename == '':
+                self._filename = DEFAULT_FILENAME
+            return {"status": STATUS_SUCCESS, "message": f"Participant name updated to {name}"}
+        except Exception as e:
+            return {"status": STATUS_ERROR, "message": str(e)}
+    
+    def handle_new_participant(self):
+        """Handle a new participant."""
+        self._filename = DEFAULT_FILENAME
+        self._current_x_coordinate = 0
+        self._current_y_coordinate = 0
+        if self._eye_gaze:
+            self._eye_gaze.stop_processing()
+        if self._emotion_handler:
+            self._emotion_handler.stop_processing()
+        return {"status": STATUS_SUCCESS, "message": "New participant started"}
+    
