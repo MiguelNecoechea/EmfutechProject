@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles/newstyles.css">
+    <link rel="stylesheet" href="styles/styles.css">
     <title>AURA Insight</title>
 </head>
 <body>
@@ -16,11 +16,23 @@
             <div class="tracking-signals">
                 <h3>Tracking Signals</h3>
                 <ul>
-                    <li><input type="checkbox" name="signal-aura">AURA</li>
-                    <li><input type="checkbox" name="signal-eye">Eye Gaze</li>
-                    <li><input type="checkbox" name="signal-emotion">Emotion</li>
-                    <li><input type="checkbox" name="signal-pointer">Pointer</li>
-                    <li><input type="checkbox" name="signal-screen">Screen</li>
+                    <li><label>
+                        <input type="checkbox" name="signal-aura">
+                    </label>AURA</li>
+                    <li><label>
+                        <input type="checkbox" name="signal-eye">
+                    </label>Eye Gaze</li>
+
+                    <li><label>
+                        <input type="checkbox" name="signal-emotion">
+                    </label>Emotion</li>
+
+                    <li><label>
+                        <input type="checkbox" name="signal-pointer">
+                    </label>Pointer</li>
+                    <li><label>
+                        <input type="checkbox" name="signal-screen">
+                    </label>Screen</li>
                 </ul>
             </div>
             <div class="control-buttons">
@@ -35,7 +47,7 @@
         <div class="center-section">
             <div class="main-panel">
                 <h2 class="title">Report</h2>
-                <textarea id="reportArea" readonly></textarea>
+                <label for="reportArea"></label><textarea id="reportArea" readonly></textarea>
             </div>
             <div class="bottom-section">
                 <div class="participant-panel">
@@ -47,7 +59,9 @@
                         </div>
                         <div class="input-group">
                             <label>Name:</label>
-                            <input type="text">
+                            <label>
+                                <input type="text">
+                            </label>
                         </div>
                     </div>
                 </div>
