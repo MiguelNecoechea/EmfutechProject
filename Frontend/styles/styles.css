@@ -125,13 +125,21 @@ body {
 
 #start {
     background-color: transparent;
-    color: #28a745; /* Green color */
+    color: #28a745;
     border: 1px solid #28a745;
 }
 
-#start:hover {
+#start:hover:not(:disabled) {
     background-color: #28a745;
     color: white;
+}
+
+#start:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
 }
 
 #start-gaze {
@@ -139,28 +147,61 @@ body {
     border: 1px solid #2596be;
 }
 
-#start-gaze:hover {
+#start-gaze:hover:not(:disabled) {
     background-color: #2596be;
     color: white;
 }
 
+#start-gaze:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
 #stop {
-    color: #dc3545; 
+    color: #dc3545;
     border: 1px solid #dc3545;
 }
 
-#stop:hover {
+#stop:hover:not(:disabled) {
     background-color: #dc3545;
     color: white;
+}
+
+#stop:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
 }
 
 .action-buttons button {
     color: #0a40a5;
     border: 1px solid #0a40a5;
 }
-.action-buttons button:hover {
+
+.action-buttons button:hover:not(:disabled) {
     background-color: #0a40a5;
     color: white;
+}
+
+.action-buttons button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.folder-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
 }
 
 .start-stop-buttons {
@@ -252,4 +293,45 @@ body {
 #reportArea:focus {
     outline: none;
     border-color: #2596be;
+}
+
+input[type="checkbox"]:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+input[type="checkbox"]:disabled + label {
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+[disabled] {
+    position: relative;
+}
+
+[disabled]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+/* Add a subtle shake animation for when buttons become disabled */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+.control-button:disabled {
+    animation: shake 0.4s ease-in-out;
 }
