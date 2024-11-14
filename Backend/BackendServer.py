@@ -6,7 +6,6 @@ import sys
 import os
 from contextlib import contextmanager
 
-
 from mne_lsl.stream import StreamLSL as Stream
 
 from IO.FileWriting.CoordinateWriter import CoordinateWriter
@@ -22,6 +21,40 @@ from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 from IO.PointerTracking.PointerTracker import CursorTracker
 from IO.FileWriting.PointerWriter import PointerWriter
 
+# Constants
+DEFAULT_PORT = "5556"
+DEFAULT_PATH = 'testing'
+DEFAULT_TRAINING_PATH = 'training'
+DEFAULT_FILENAME = 'testing'
+DEFAULT_AURA_STREAM_ID = 'filtered'
+
+# File suffixes
+AURA_FILE_SUFFIX = '_aura.csv'
+EMOTION_FILE_SUFFIX = '_emotions.csv'
+GAZE_FILE_SUFFIX = '_gaze.csv'
+POINTER_FILE_SUFFIX = '_pointer_data.csv'
+TRAINING_GAZE_FILE = 'training_gaze.csv'
+TRAINING_AURA_FILE = 'training_aura.csv'
+
+# Collection types
+TRAINING_MODE = 'training'
+TESTING_MODE = 'testing'
+
+# Signal types
+SIGNAL_AURA = 'aura'
+SIGNAL_GAZE = 'gaze'
+SIGNAL_EMOTION = 'emotion'
+SIGNAL_POINTER = 'pointer'
+SIGNAL_SCREEN = 'screen'
+
+# Status messages
+STATUS_SUCCESS = "success"
+STATUS_ERROR = "error"
+START_CALIBRATION_MSG = "start-calibration"
+COLLECTION_STARTED_MSG = "collection-started"
+COLLECTION_STOPPED_MSG = "collection-stopped"
+CALIBRATION_COMPLETE_MSG = "calibration-complete"
+
 class BackendServer:
     """
     Backend server that handles all data collection and processing for eye tracking, emotions, 
@@ -31,12 +64,12 @@ class BackendServer:
     different data collection tasks.
     """
 
-    def __init__(self, port="5556"):
+    def __init__(self, port=DEFAULT_PORT):
         """
         Initialize the backend server with all necessary components.
 
         Args:
-            port (str): Port number for ZMQ communication. Defaults to "5556".
+            port (str): Port number for ZMQ communication. Defaults to DEFAULT_PORT.
         """
         # Server setup
         self._aura_training_thread = None
@@ -79,13 +112,13 @@ class BackendServer:
 
         # Path and file names for the data
         # TODO: Make this dynamic so add the frontend code to set the path and filename
-        self._path = 'testing'
-        self._training_path = 'training'
-        self._filename = 'testing'
+        self._path = DEFAULT_PATH
+        self._training_path = DEFAULT_TRAINING_PATH
+        self._filename = DEFAULT_FILENAME
 
         # Aura stream id
         # TODO: Make this dynamic
-        self._aura_stream_id = 'filtered'
+        self._aura_stream_id = DEFAULT_AURA_STREAM_ID
 
         # Data writers
         self._aura_writer = None
@@ -198,17 +231,17 @@ class BackendServer:
         handlers = {
             'update_signal_status': self.handle_update_signal_status,
             'start_eye_gaze': self.start_eye_gaze,
-            'start': self.start_testing,
-            'stop': self.handle_stop_testing,
-            'start_recording_training_data': self.handle_training_data,
-            'stop_recording_training_data': self.stop_recording_training_data,
-            'set_coordinates': self.handle_coordinates
+            'start': self.start_data_collection,
+            'stop': self.stop_data_collection,
+            'start_recording_training_data': self.start_training_data_collection,
+            'stop_recording_training_data': self.stop_training_data_collection,
+            'set_coordinates': self.update_coordinates
         }
         handler = handlers.get(command)
         if handler:
             return handler(**params)
         else:
-            return {"error": f"Unknown command: {command}"}
+            return {"status": STATUS_ERROR, "message": f"Unknown command: {command}"}
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
@@ -217,17 +250,17 @@ class BackendServer:
             print("Eye gaze tracking started")
             self._eye_gaze_running = True
             self._fitting_eye_gaze = False
-            self._socket.send_json({"status": "success", "message": "start-calibration"})
+            self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
 
         if not self._fitting_eye_gaze and self._run_gaze:
             self._fitting_eye_gaze = True
             local_thread = threading.Thread(target=eye_gaze_task)
             local_thread.start()
-            return {"status": "success", "message": "Eye gaze tracking started"}
+            return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
         else:
-            return {"status": "error", "message": "Eye gaze is already started or cannot be started"}
+            return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
 
-    def start_testing(self):
+    def start_data_collection(self):
         """Start all active data collection threads."""
         try:
             if not self._data_collection_active:
@@ -239,13 +272,13 @@ class BackendServer:
                     self.start_aura()
                     try:
                         channels_names = ['timestamp'] + list(self._stream.info['ch_names'])
-                        self._aura_writer = AuraDataWriter(self._path, f'{self._filename}_aura.csv', channels_names)
+                        self._aura_writer = AuraDataWriter(self._path, f'{self._filename}{AURA_FILE_SUFFIX}', channels_names)
                         self._aura_writer.create_new_file()
                         
                         if self._aura_thread is None or not self._aura_thread.is_alive():
                             self._aura_thread = threading.Thread(
                                 target=self._aura_data_collection_loop,
-                                args=('testing',),
+                                args=(TESTING_MODE,),
                                 daemon=True
                             )
                         self._aura_thread.start()
@@ -258,7 +291,7 @@ class BackendServer:
                 # Emotion
                 if self._run_emotion:
                     self.start_emotion_detection()
-                    self._emotion_writer = EmotionPredictedWriter(self._path, f'{self._filename}_emotions.csv')
+                    self._emotion_writer = EmotionPredictedWriter(self._path, f'{self._filename}{EMOTION_FILE_SUFFIX}')
                     self._emotion_writer.create_new_file()
                     
                     if self._emotion_thread is None or not self._emotion_thread.is_alive():
@@ -271,7 +304,7 @@ class BackendServer:
                 
                 # Coordinate/Gaze
                 if self._run_gaze:
-                    self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}_gaze.csv')
+                    self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
                     self._gaze_writer.create_new_file()
                     
                     if self._regressor_thread is None or not self._regressor_thread.is_alive():
@@ -284,40 +317,40 @@ class BackendServer:
                 
                 # Pointer
                 if self._run_pointer:
-                    self._pointer_writer = PointerWriter(self._path, f'{self._filename}_pointer_data.csv')
+                    self._pointer_writer = PointerWriter(self._path, f'{self._filename}{POINTER_FILE_SUFFIX}')
                     self._pointer_writer.create_new_file()
                     self.start_pointer_tracking()
                     self._pointer_tracker.start_time = self._start_time
                     self._pointer_tracker.is_tracking = True
 
-                return {"status": "success", "message": "Testing started successfully"}
+                return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
-                return {"status": "error", "message": "Testing already started"}
+                return {"status": STATUS_ERROR, "message": "Testing already started"}
             
         except Exception as e:
             self._data_collection_active = False
             print(f"Error in start_testing: {str(e)}")
-            return {"status": "error", "message": f"Error starting testing: {str(e)}"}
+            return {"status": STATUS_ERROR, "message": f"Error starting testing: {str(e)}"}
 
     def handle_stop(self):
         """Stop the server and clean up resources."""
         print("Stopping server...")
         self.cleanup()
-        return {"status": "success", "message": "Server stopped"}
+        return {"status": STATUS_SUCCESS, "message": "Server stopped"}
 
     # End of main start/stop functions
 
-    def handle_training_data(self):
+    def start_training_data_collection(self):
         """Start collecting training data for eye gaze tracking."""
         # Create local writer for gaze data
-        gaze_writer = GazeWriter(self._training_path, 'training_gaze.csv')
+        gaze_writer = GazeWriter(self._training_path, TRAINING_GAZE_FILE)
         gaze_writer.create_new_file()
         aura_training_thread = None
         if self._run_aura:
             self.start_aura()
             aura_training_thread = threading.Thread(
                 target=self._aura_data_collection_loop,
-                args=('training',)
+                args=(TRAINING_MODE,)
             )
         
         def training_data_task():
@@ -345,17 +378,17 @@ class BackendServer:
             if aura_training_thread:
                 aura_training_thread.start()
 
-            return {"status": "success", "message": "Training data recording started"}
+            return {"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG}
         else:
             print("Eye gaze tracking not started")
-            return {"status": "error", "message": "Eye gaze tracking not started"}
+            return {"status": STATUS_ERROR, "message": "Eye gaze tracking not started"}
 
     def handle_stop_recording(self):
         """Stop all data recording."""
         self._data_collection_active = False
-        return {"status": "success", "message": "Recording stopped"}
+        return {"status": STATUS_SUCCESS, "message": "Recording stopped"}
 
-    def handle_stop_testing(self):
+    def stop_data_collection(self):
         """Stop all testing and data collection."""
         self._data_collection_active = False
         # self._start_time = None
@@ -382,9 +415,9 @@ class BackendServer:
         self._screen_recording_thread = None
         # Add other threads if necessary
 
-        return {"status": "success", "message": "Testing stopped"}
+        return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
 
-    def stop_recording_training_data(self):
+    def stop_training_data_collection(self):
         """Stop recording training data."""
         try:
             self._training_data_collection_active = False
@@ -395,26 +428,26 @@ class BackendServer:
                 self._aura_training_thread = None
             
             self.start_regressor()
-            return {"status": "success", "message": "Training data recording stopped"}
+            return {"status": STATUS_SUCCESS, "message": CALIBRATION_COMPLETE_MSG}
         except Exception as e:
             print(f"Error stopping training data recording: {e}")
-            return {"status": "error", "message": str(e)}
+            return {"status": STATUS_ERROR, "message": str(e)}
     
-    def handle_update_signal_status(self, signal_type, status):
+    def handle_update_signal_status(self, signal, status):
         """Update the status of a signal."""
         bool_status = True if status == 'true' else False
-        if signal_type == 'aura':
+        if signal == SIGNAL_AURA:
             self._run_aura = bool_status
-        elif signal_type == 'gaze':
+        elif signal == SIGNAL_GAZE:
             self._run_gaze = bool_status
-        elif signal_type == 'emotion':
+        elif signal == SIGNAL_EMOTION:
             self._run_emotion = bool_status
-        elif signal_type == 'pointer':
+        elif signal == SIGNAL_POINTER:
             self._run_pointer = bool_status
-        elif signal_type == 'screen':
+        elif signal == SIGNAL_SCREEN:
             self._run_screen = bool_status
         
-        return {"status": "success", "message": f"Signal {signal_type} updated to {status}"}
+        return {"status": STATUS_SUCCESS, "message": f"Signal {signal} updated to {status}"}
 
     # End of Message Handling Functions
 
@@ -424,14 +457,14 @@ class BackendServer:
         """Initialize and start pointer tracking."""
         if not self._pointer_tracking_active:
             self._pointer_tracker = CursorTracker(writer=self._pointer_writer)
-            return {"status": "success", "message": "Pointer tracking started"}
+            return {"status": STATUS_SUCCESS, "message": "Pointer tracking started"}
         else:
-            return {"status": "error", "message": "Pointer tracking already active"}
+            return {"status": STATUS_ERROR, "message": "Pointer tracking already active"}
         
 
     def start_regressor(self):
         """Initialize and start the position regressor."""
-        path = os.path.join(self._training_path, 'training_gaze.csv')
+        path = os.path.join(self._training_path, TRAINING_GAZE_FILE)
         self._regressor = PositionRegressor(path)
         self._regressor.train_create_model()
 
@@ -439,7 +472,7 @@ class BackendServer:
             target=self._coordinate_regressor_loop
         )
 
-        return {"status": "success", "message": "Regressor started"}
+        return {"status": STATUS_SUCCESS, "message": "Regressor started"}
 
     def start_aura(self, buffer_size_multiplier=1):
         try:
@@ -450,16 +483,16 @@ class BackendServer:
             # Create thread without starting it
             self._aura_thread = threading.Thread(
                 target=self._aura_data_collection_loop,
-                args=('testing',)
+                args=(TESTING_MODE,)
             )
 
             # Add to thread tracking
             self._threads.append(self._aura_thread)
 
-            return {"status": "success", "message": "Aura signal handling initialized"}
+            return {"status": STATUS_SUCCESS, "message": "Aura signal handling initialized"}
         except Exception as e:
             print(f"Error in handle_aura_signal: {str(e)}")
-            return {"status": "error", "message": str(e)}
+            return {"status": STATUS_ERROR, "message": str(e)}
 
     def start_emotion_detection(self):
         """
@@ -469,14 +502,14 @@ class BackendServer:
             self._emotion_handler = EmotionRecognizer('opencv')
             self._emotion_thread = threading.Thread(target=self._emotion_collection_loop)
 
-            return {"status": "success", "message": "Emotion recognition started"}
+            return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"status": STATUS_ERROR, "message": str(e)}
     
     # Signal collection functions end.
 
     # Training data collection functions
-    def handle_coordinates(self, x, y):
+    def update_coordinates(self, x, y):
         """
         Update current coordinates.
         
@@ -486,7 +519,7 @@ class BackendServer:
         """
         self._current_x_coordinate = x
         self._current_y_coordinate = y
-        return {"status": "success", "coordinates": [x, y]}
+        return {"status": STATUS_SUCCESS, "coordinates": [x, y]}
     
     # Signal collection loops
     def _aura_data_collection_loop(self, collection_type):
@@ -499,15 +532,15 @@ class BackendServer:
         """
         try:
             aura_writer_training = None
-            if collection_type == 'training':
+            if collection_type == TRAINING_MODE:
                 channels_names = ['timestamp'] + self._stream.info['ch_names']
-                aura_writer_training = AuraDataWriter(self._training_path, 'training_aura.csv', channels_names)
+                aura_writer_training = AuraDataWriter(self._training_path, TRAINING_AURA_FILE, channels_names)
                 aura_writer_training.create_new_file()
             
             while True:
                 if is_stream_ready(self._stream):
                     data, ts = self._stream.get_data()
-                    if collection_type == 'training':
+                    if collection_type == TRAINING_MODE:
                         if aura_writer_training:
                             aura_writer_training.write_data(ts, data)
                     else:
@@ -516,10 +549,10 @@ class BackendServer:
 
                 time.sleep(0.001)
 
-                if collection_type == 'training' and not self._training_data_collection_active:
+                if collection_type == TRAINING_MODE and not self._training_data_collection_active:
                     aura_writer_training.close_file()
                     break
-                elif collection_type == 'testing' and not self._data_collection_active:
+                elif collection_type == TESTING_MODE and not self._data_collection_active:
                     if self._aura_writer:
                         self._aura_writer.close_file()
                     break
