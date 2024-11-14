@@ -30,7 +30,8 @@ const COMMANDS = {
     UPDATE_SIGNAL: 'update_signal_status',
     UPDATE_NAME: 'update_participant_name',
     UPDATE_PATH: 'update_output_path',
-    NEW_PARTICIPANT: 'new_participant'
+    NEW_PARTICIPANT: 'new_participant',
+    GENERATE_REPORT: 'generate_report'
 };
 
 // Response messages
@@ -68,10 +69,11 @@ class AppHandler {
         this.startGaze = document.getElementById('start-gaze');
         this.start = document.getElementById('start');
         this.stop = document.getElementById('stop');
-        this.report = document.getElementById('report');
         this.selectFolder = document.getElementById('selectFolder');
         this.participantNameInput = document.getElementById('participant-name');
         this.newParticipant = document.getElementById('new-participant');
+        this.generateReport = document.getElementById('generate-report'); 
+        this.reportArea = document.getElementById('report-area');
     }
 
     setupCheckboxes() {
@@ -96,6 +98,7 @@ class AppHandler {
         this.stop.addEventListener('click', () => this.sendCommandToBackend(COMMANDS.STOP));
         this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
         this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
+        this.generateReport.addEventListener('click', () => this.handleGenerateReport());  // Add this line
 
         // Checkbox event listeners
         this.signalAura.addEventListener('change', () => this.updateSignalStatus(SIGNALS.AURA, this.signalAura.checked));
@@ -172,7 +175,6 @@ class AppHandler {
             const response = await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_NAME, {
                 name: name
             });
-            console.log('Name update response:', response);
         } catch (error) {
             console.error('Error updating participant name:', error);
         }
@@ -219,13 +221,12 @@ class AppHandler {
     updateButtonStates(state) {
         // Store current state for reference 
         this.currentState = state;
-
         switch (state) {
             case STATES.INITIAL:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
@@ -233,38 +234,34 @@ class AppHandler {
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.DISABLED;
+                this.newParticipant.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.READY:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.ENABLED;
                 this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.ENABLED;
+                this.participantNameInput.disabled = this.DISABLED;
+                this.newParticipant.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.RECORDING:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.DISABLED;
+                this.newParticipant.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED); // Ensure checkboxes are disabled during recording
-                break;
-            case STATES.COMPLETED:
-                this.startGaze.disabled = this.DISABLED;
-                this.start.disabled = this.ENABLED;
-                this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.ENABLED;
-                this.participantNameInput.disabled = this.ENABLED;
-                this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.CALIBRATE:
                 this.startGaze.disabled = this.ENABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
@@ -272,7 +269,7 @@ class AppHandler {
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.report.disabled = this.DISABLED;
+                this.generateReport.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             default:
@@ -334,11 +331,40 @@ class AppHandler {
 
             // Update button states
             this.updateButtonStates(STATES.DISABLED);
-            this.report.disabled = this.DISABLED;
+            this.generateReport.disabled = this.DISABLED;
 
             await window.electronAPI.sendPythonCommand(COMMANDS.NEW_PARTICIPANT);
         } catch (error) {
             console.error('Error handling new participant:', error);
+        }
+    }
+
+    async handleGenerateReport() {
+        try {
+            this.showOverlay();
+            // Use the new special channel for report generation
+            const response = await window.electronAPI.generateReport();
+            console.log("Report Response:", response);
+            
+            if (response && response.status === 'success') {
+                if (this.reportArea) {
+                    this.reportArea.value = response.message || "No report data received";
+                } else {
+                    console.error('Report area textarea not found');
+                }
+            } else {
+                console.error('Error generating report:', response);
+                if (this.reportArea) {
+                    this.reportArea.value = 'Error generating report: ' + (response ? response.message : 'Unknown error');
+                }
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            if (this.reportArea) {
+                this.reportArea.value = 'Error generating report: ' + error.message;
+            }
+        } finally {
+            this.hideOverlay();
         }
     }
 }
@@ -346,3 +372,4 @@ class AppHandler {
 document.addEventListener('DOMContentLoaded', () => {
     new AppHandler();
 });
+
