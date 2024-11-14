@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
@@ -33,6 +33,17 @@ class ApplicationManager {
         // Listen for calibration window requests
         ipcMain.on('open-calibration-window', () => {
             this.createCalibrationWindow();
+        });
+
+        ipcMain.handle('open-directory', async () => {
+            const result = await dialog.showOpenDialog({
+                properties: ['openDirectory']
+            });
+            
+            if (!result.canceled) {
+                return result.filePaths[0];
+            }
+            return null;
         });
     }
 

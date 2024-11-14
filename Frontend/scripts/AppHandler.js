@@ -8,7 +8,8 @@ const STATES = {
     CALIBRATING: 'calibrating', 
     READY: 'ready',
     RECORDING: 'recording',
-    COMPLETED: 'completed'
+    COMPLETED: 'completed',
+    SELECTING_FOLDER: 'selecting_folder'
 };
 
 // Signal types
@@ -52,6 +53,8 @@ class AppHandler {
         window.addEventListener('beforeunload', () => {
             this.cleanup();
         });
+
+        this.overlay = document.getElementById('overlay');
     }
 
     setupButtons() {
@@ -161,14 +164,19 @@ class AppHandler {
 
     async selectOutputFolder() {
         try {
-            const result = await window.electronAPI.selectDirectory();
+            this.showOverlay();
+            this.updateButtonStates(STATES.SELECTING_FOLDER);
+            const result = await window.electronAPI.openDirectory();
             if (result) {
-                await this.sendCommandToBackend(COMMANDS.UPDATE_PATH, {
+                await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_PATH, {
                     path: result
                 });
             }
         } catch (error) {
             console.error('Error selecting output folder:', error);
+        } finally {
+            this.hideOverlay();
+            this.checkSignalStates();
         }
     }
 
@@ -202,8 +210,8 @@ class AppHandler {
                 this.start.disabled = DISABLED;
                 this.stop.disabled = DISABLED;
                 this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-
+                this.selectFolder.disabled = ENABLED;
+                this.enableDisableCheckboxes(ENABLED);
                 break;
             case STATES.CALIBRATING:
                 // During eye gaze calibration
@@ -212,7 +220,7 @@ class AppHandler {
                 this.stop.disabled = DISABLED;
                 this.report.disabled = DISABLED;
                 this.selectFolder.disabled = DISABLED;
-                // this.enableDisableCheckboxes(DISABLED);
+                this.enableDisableCheckboxes(DISABLED);
                 break;
             case STATES.READY:
                 // Ready state after calibration or no calibration needed
@@ -248,6 +256,16 @@ class AppHandler {
                 this.stop.disabled = DISABLED;
                 this.report.disabled = DISABLED;
                 this.selectFolder.disabled = DISABLED;
+                this.enableDisableCheckboxes(DISABLED);
+                break;
+            case STATES.SELECTING_FOLDER:
+                // Disable all controls while selecting folder
+                this.startGaze.disabled = DISABLED;
+                this.start.disabled = DISABLED;
+                this.stop.disabled = DISABLED;
+                this.report.disabled = DISABLED;
+                this.selectFolder.disabled = DISABLED;
+                this.enableDisableCheckboxes(DISABLED);
                 break;
             default:
                 // Handle any other states
@@ -275,6 +293,14 @@ class AppHandler {
         } else if (!anySignalActive) {
             this.updateButtonStates(STATES.INITIAL);
         }
+    }
+
+    showOverlay() {
+        this.overlay.classList.add('active');
+    }
+
+    hideOverlay() {
+        this.overlay.classList.remove('active');
     }
 }
 

@@ -7,72 +7,75 @@
     <title>AURA Insight</title>
 </head>
 <body>
-    <div class="container">
-        <div class="left-panel">
-            <h1 class="title">AURA Insight</h1>
-            <div class="logo">
-                <img src="images/Mirai.jpeg" alt="Mirai Logo">
-            </div>
-            <div class="tracking-signals">
-                <h3>Tracking Signals</h3>
-                <ul>
-                    <li><label>
-                        <input type="checkbox" name="signal-aura">
-                    </label>AURA</li>
-                    <li><label>
-                        <input type="checkbox" name="signal-eye">
-                    </label>Eye Gaze</li>
-
-                    <li><label>
-                        <input type="checkbox" name="signal-emotion">
-                    </label>Emotion</li>
-
-                    <li><label>
-                        <input type="checkbox" name="signal-pointer">
-                    </label>Pointer</li>
-                    <li><label>
-                        <input type="checkbox" name="signal-screen">
-                    </label>Screen</li>
-                </ul>
-            </div>
-            <div class="control-buttons">
-                <button class="control-button" id="start-gaze">Start Gaze</button>
-                <div class="start-stop-buttons">
-                    <button class="control-button" id="start">Start</button>
-                    <button class="control-button" id="stop">Stop</button>
+    <div class="app-container">
+        <div id="overlay" class="overlay"></div>
+        <div class="container">
+            <div class="left-panel">
+                <h1 class="title">AURA Insight</h1>
+                <div class="logo">
+                    <img src="images/Mirai.jpeg" alt="Mirai Logo">
                 </div>
-            </div>
-        </div>
-        
-        <div class="center-section">
-            <div class="main-panel">
-                <h2 class="title">Report</h2>
-                <label for="reportArea"></label><textarea id="reportArea" readonly></textarea>
-            </div>
-            <div class="bottom-section">
-                <div class="participant-panel">
-                    <h3>Participant</h3>
-                    <div class="participant-inputs">
-                        <div class="input-group">
-                            <label>Folder:</label>
-                            <button class="folder-button" id="selectFolder">Select Folder</button>
-                        </div>
-                        <div class="input-group">
-                            <label>Name:</label>
-                            <label>
-                                <input type="text">
-                            </label>
-                        </div>
+                <div class="tracking-signals">
+                    <h3>Tracking Signals</h3>
+                    <ul>
+                        <li><label>
+                            <input type="checkbox" name="signal-aura">
+                        </label>AURA</li>
+                        <li><label>
+                            <input type="checkbox" name="signal-eye">
+                        </label>Eye Gaze</li>
+
+                        <li><label>
+                            <input type="checkbox" name="signal-emotion">
+                        </label>Emotion</li>
+
+                        <li><label>
+                            <input type="checkbox" name="signal-pointer">
+                        </label>Pointer</li>
+                        <li><label>
+                            <input type="checkbox" name="signal-screen">
+                        </label>Screen</li>
+                    </ul>
+                </div>
+                <div class="control-buttons">
+                    <button class="control-button" id="start-gaze">Start Gaze</button>
+                    <div class="start-stop-buttons">
+                        <button class="control-button" id="start">Start</button>
+                        <button class="control-button" id="stop">Stop</button>
                     </div>
                 </div>
-                <div class="action-buttons">
-                    <button class="control-button" id="report">Generate Report</button>
-                    <button class="control-button" id="new-participant">New Participant</button>
+            </div>
+            
+            <div class="center-section">
+                <div class="main-panel">
+                    <h2 class="title">Report</h2>
+                    <label for="reportArea"></label><textarea id="reportArea" readonly></textarea>
+                </div>
+                <div class="bottom-section">
+                    <div class="participant-panel">
+                        <h3>Participant</h3>
+                        <div class="participant-inputs">
+                            <div class="input-group">
+                                <label>Folder:</label>
+                                <button class="folder-button" id="selectFolder">Select Folder</button>
+                            </div>
+                            <div class="input-group">
+                                <label>Name:</label>
+                                <label>
+                                    <input type="text">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="control-button" id="report">Generate Report</button>
+                        <button class="control-button" id="new-participant">New Participant</button>
+                    </div>
                 </div>
             </div>
-        </div>
 
+        </div>
+        <script type="module" src="scripts/AppHandler.js"></script>
     </div>
-    <script type="module" src="scripts/AppHandler.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld(
             ipcRenderer.invoke('python-command', command, params),
         onPythonMessage: (callback) =>
             ipcRenderer.on('python-message', (event, data) => callback(data)),
-        openCalibrationWindow: () => ipcRenderer.send('open-calibration-window')
+        openCalibrationWindow: () => ipcRenderer.send('open-calibration-window'),
+        openDirectory: () => ipcRenderer.invoke('open-directory')
     }
 );
