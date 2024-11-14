@@ -64,7 +64,7 @@ class ApplicationManager {
             this.mainWindow = null;
         });
 
-        await this.mainWindow.loadFile('Frontend/newindex.html');
+        await this.mainWindow.loadFile('Frontend/index.html');
         this.mainWindow.webContents.openDevTools();
     }
 
