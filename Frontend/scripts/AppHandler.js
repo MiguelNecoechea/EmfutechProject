@@ -9,7 +9,8 @@ const STATES = {
     READY: 'ready',
     RECORDING: 'recording',
     COMPLETED: 'completed',
-    SELECTING_FOLDER: 'selecting_folder'
+    SELECTING_FOLDER: 'selecting_folder',
+    DISABLED: 'disabled'
 };
 
 // Signal types
@@ -28,7 +29,8 @@ const COMMANDS = {
     STOP: 'stop',
     UPDATE_SIGNAL: 'update_signal_status',
     UPDATE_NAME: 'update_participant_name',
-    UPDATE_PATH: 'update_output_path'
+    UPDATE_PATH: 'update_output_path',
+    NEW_PARTICIPANT: 'new_participant'
 };
 
 // Response messages
@@ -39,6 +41,9 @@ const MESSAGES = {
 
 class AppHandler {
     constructor() {
+        this.ENABLED = false;
+        this.DISABLED = true;
+        
         this.setupButtons();
         this.setupCheckboxes();
         this.setupEventListeners();
@@ -50,6 +55,8 @@ class AppHandler {
         this.checkSignalStates();
 
         // Add window close handler
+        this.updateButtonStates(STATES.DISABLED);
+
         window.addEventListener('beforeunload', () => {
             this.cleanup();
         });
@@ -63,9 +70,8 @@ class AppHandler {
         this.stop = document.getElementById('stop');
         this.report = document.getElementById('report');
         this.selectFolder = document.getElementById('selectFolder');
-
-        // Initialize button states
-        this.updateButtonStates(STATES.INITIAL);
+        this.participantNameInput = document.getElementById('participant-name');
+        this.newParticipant = document.getElementById('new-participant');
     }
 
     setupCheckboxes() {
@@ -89,6 +95,7 @@ class AppHandler {
         this.start.addEventListener('click', () => this.sendCommandToBackend(COMMANDS.START));
         this.stop.addEventListener('click', () => this.sendCommandToBackend(COMMANDS.STOP));
         this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
+        this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
 
         // Checkbox event listeners
         this.signalAura.addEventListener('change', () => this.updateSignalStatus(SIGNALS.AURA, this.signalAura.checked));
@@ -96,6 +103,14 @@ class AppHandler {
         this.signalEmotion.addEventListener('change', () => this.updateSignalStatus(SIGNALS.EMOTION, this.signalEmotion.checked));
         this.signalPointer.addEventListener('change', () => this.updateSignalStatus(SIGNALS.POINTER, this.signalPointer.checked));
         this.signalScreen.addEventListener('change', () => this.updateSignalStatus(SIGNALS.SCREEN, this.signalScreen.checked));
+
+        // Add debounced participant name update
+        const participantNameInput = document.getElementById('participant-name');
+        if (participantNameInput) {
+            participantNameInput.addEventListener('input', this.debounce(async (event) => {
+                await this.updateParticipantName(event.target.value);
+            }, 500)); // Wait 500ms after typing stops before sending update
+        }
     }
 
     setupIPCListeners() {
@@ -154,9 +169,10 @@ class AppHandler {
 
     async updateParticipantName(name) {
         try {
-            await this.sendCommandToBackend(COMMANDS.UPDATE_NAME, {
+            const response = await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_NAME, {
                 name: name
             });
+            console.log('Name update response:', response);
         } catch (error) {
             console.error('Error updating participant name:', error);
         }
@@ -165,12 +181,15 @@ class AppHandler {
     async selectOutputFolder() {
         try {
             this.showOverlay();
-            this.updateButtonStates(STATES.SELECTING_FOLDER);
+            this.updateButtonStates(STATES.DISABLED);
             const result = await window.electronAPI.openDirectory();
             if (result) {
                 await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_PATH, {
                     path: result
                 });
+                this.updateButtonStates(STATES.INITIAL);
+                this.selectFolder.textContent = result;
+                this.selectFolder.disabled = true;
             }
         } catch (error) {
             console.error('Error selecting output folder:', error);
@@ -200,76 +219,63 @@ class AppHandler {
     updateButtonStates(state) {
         // Store current state for reference 
         this.currentState = state;
-        let ENABLED = false;
-        let DISABLED = true;
 
         switch (state) {
             case STATES.INITIAL:
-                // Initial state at launching the app
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = DISABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = ENABLED;
-                this.enableDisableCheckboxes(ENABLED);
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.DISABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.DISABLED;
+                this.participantNameInput.disabled = this.ENABLED;
+                this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.CALIBRATING:
-                // During eye gaze calibration
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = DISABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-                this.enableDisableCheckboxes(DISABLED);
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.DISABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.DISABLED;
+                this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.READY:
-                // Ready state after calibration or no calibration needed
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = ENABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-                this.enableDisableCheckboxes(ENABLED);
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.ENABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.DISABLED;
+                this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.RECORDING:
-                // During recording
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = DISABLED;
-                this.stop.disabled = ENABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-                this.enableDisableCheckboxes(DISABLED); // Ensure checkboxes are disabled during recording
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.DISABLED;
+                this.stop.disabled = this.ENABLED;
+                this.report.disabled = this.DISABLED;
+                this.enableDisableCheckboxes(this.DISABLED); // Ensure checkboxes are disabled during recording
                 break;
             case STATES.COMPLETED:
-                // After recording is stopped
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = ENABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = ENABLED;
-                this.selectFolder.disabled = ENABLED;
-                this.enableDisableCheckboxes(ENABLED);
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.ENABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.ENABLED;
+                this.participantNameInput.disabled = this.ENABLED;
+                this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.CALIBRATE:
-                // Calibration state
-                this.startGaze.disabled = ENABLED;
-                this.start.disabled = DISABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-                this.enableDisableCheckboxes(DISABLED);
+                this.startGaze.disabled = this.ENABLED;
+                this.start.disabled = this.DISABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.DISABLED;
+                this.participantNameInput.disabled = this.ENABLED;
+                this.enableDisableCheckboxes(this.ENABLED);
                 break;
-            case STATES.SELECTING_FOLDER:
-                // Disable all controls while selecting folder
-                this.startGaze.disabled = DISABLED;
-                this.start.disabled = DISABLED;
-                this.stop.disabled = DISABLED;
-                this.report.disabled = DISABLED;
-                this.selectFolder.disabled = DISABLED;
-                this.enableDisableCheckboxes(DISABLED);
+            case STATES.DISABLED:
+                this.startGaze.disabled = this.DISABLED;
+                this.start.disabled = this.DISABLED;
+                this.stop.disabled = this.DISABLED;
+                this.report.disabled = this.DISABLED;
+                this.enableDisableCheckboxes(this.DISABLED);
                 break;
             default:
                 // Handle any other states
-                this.enableDisableCheckboxes(ENABLED);
+                this.enableDisableCheckboxes(this.ENABLED);
                 break;
         }
     }
@@ -301,6 +307,37 @@ class AppHandler {
 
     hideOverlay() {
         this.overlay.classList.remove('active');
+    }
+
+    // Add debounce utility method
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    async handleNewParticipant() {
+        try {
+            this.selectFolder.disabled = this.ENABLED;
+            this.selectFolder.textContent = 'Select Folder';
+            this.participantNameInput.value = '';
+            this.participantNameInput.disabled = this.ENABLED;
+            this.calibrationCount = 0;
+
+            // Update button states
+            this.updateButtonStates(STATES.DISABLED);
+            this.report.disabled = this.DISABLED;
+
+            await window.electronAPI.sendPythonCommand(COMMANDS.NEW_PARTICIPANT);
+        } catch (error) {
+            console.error('Error handling new participant:', error);
+        }
     }
 }
 
