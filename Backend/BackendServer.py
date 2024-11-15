@@ -126,10 +126,28 @@ class BackendServer:
         self._data_collection_active = False
         self._training_data_collection_active = False
         self._threads = []
+        self._threads_lock = threading.Lock()  # Added lock for thread-safe operations
 
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
+
+    @contextmanager
+    def thread_tracking(self, thread):
+        """
+        Context manager to track active threads.
+
+        Args:
+            thread: Thread object to track
+        """
+        with self._threads_lock:
+            self._threads.append(thread)
+        try:
+            yield thread
+        finally:
+            with self._threads_lock:
+                if thread in self._threads:
+                    self._threads.remove(thread)
 
     def start(self):
         """Start the backend server and begin processing messages."""
@@ -179,7 +197,9 @@ class BackendServer:
                     print(f"Error closing writer: {e}")
 
         # Wait for all threads to complete
-        for thread in self._threads:
+        with self._threads_lock:
+            threads_copy = self._threads.copy()
+        for thread in threads_copy:
             if thread and thread.is_alive():
                 thread.join(timeout=1.0)
 
@@ -197,28 +217,13 @@ class BackendServer:
         self.cleanup()
         sys.exit(0)
 
-    @contextmanager
-    def thread_tracking(self, thread):
-        """
-        Context manager to track active threads.
-        
-        Args:
-            thread: Thread object to track
-        """
-        self._threads.append(thread)
-        try:
-            yield thread
-        finally:
-            if thread in self._threads:
-                self._threads.remove(thread)
-
     def handle_message(self, message):
         """
         Process incoming messages and route them to appropriate handlers.
-        
+
         Args:
             message (dict): Message containing command and parameters
-            
+
         Returns:
             dict: Response from the handler
         """
@@ -239,21 +244,26 @@ class BackendServer:
         }
         handler = handlers.get(command)
         if handler:
-            return handler(**params)
+            try:
+                return handler(**params)
+            except TypeError:
+                # In case the handler doesn't expect any parameters
+                return handler()
         else:
             return {"status": STATUS_ERROR, "message": f"Unknown command: {command}"}
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
         def eye_gaze_task():
-            self._eye_gaze = create_new_eye_gaze()
-            self._eye_gaze_running = True
-            self._fitting_eye_gaze = False
-            self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+            with self.thread_tracking(threading.current_thread()):
+                self._eye_gaze = create_new_eye_gaze()
+                self._eye_gaze_running = True
+                self._fitting_eye_gaze = False
+                self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
 
         if not self._fitting_eye_gaze and self._run_gaze:
             self._fitting_eye_gaze = True
-            local_thread = threading.Thread(target=eye_gaze_task)
+            local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
             local_thread.start()
             return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
         else:
@@ -268,7 +278,10 @@ class BackendServer:
 
                 # AURA
                 if self._run_aura:
-                    self.start_aura()
+                    aura_response = self.start_aura()
+                    if aura_response["status"] != STATUS_SUCCESS:
+                        raise Exception(aura_response["message"])
+                    
                     try:
                         channels_names = ['timestamp'] + list(self._stream.info['ch_names'])
                         self._aura_writer = AuraDataWriter(self._path, f'{self._filename}{AURA_FILE_SUFFIX}', channels_names)
@@ -280,16 +293,19 @@ class BackendServer:
                                 args=(TESTING_MODE,),
                                 daemon=True
                             )
-                        self._aura_thread.start()
-                        self._threads.append(self._aura_thread)
-
+                            with self.thread_tracking(self._aura_thread):
+                                self._aura_thread.start()
+                    
                     except Exception as e:
                         print(f"Error starting Aura thread: {str(e)}")
                         raise
                 
                 # Emotion
                 if self._run_emotion:
-                    self.start_emotion_detection()
+                    emotion_response = self.start_emotion_detection()
+                    if emotion_response["status"] != STATUS_SUCCESS:
+                        raise Exception(emotion_response["message"])
+                    
                     self._emotion_writer = EmotionPredictedWriter(self._path, f'{self._filename}{EMOTION_FILE_SUFFIX}')
                     self._emotion_writer.create_new_file()
                     
@@ -298,8 +314,8 @@ class BackendServer:
                             target=self._emotion_collection_loop,
                             daemon=True
                         )
-                    self._emotion_thread.start()
-                    self._threads.append(self._emotion_thread)                    
+                        with self.thread_tracking(self._emotion_thread):
+                            self._emotion_thread.start()
                 
                 # Coordinate/Gaze
                 if self._run_gaze:
@@ -311,33 +327,33 @@ class BackendServer:
                             target=self._coordinate_regressor_loop,
                             daemon=True
                         )
-                    self._regressor_thread.start()
-                    self._threads.append(self._regressor_thread)
+                        with self.thread_tracking(self._regressor_thread):
+                            self._regressor_thread.start()
                 
                 # Pointer
                 if self._run_pointer:
                     self._pointer_writer = PointerWriter(self._path, f'{self._filename}{POINTER_FILE_SUFFIX}')
                     self._pointer_writer.create_new_file()
-                    self.start_pointer_tracking()
+                    pointer_response = self.start_pointer_tracking()
+                    if pointer_response["status"] != STATUS_SUCCESS:
+                        raise Exception(pointer_response["message"])
                     self._pointer_tracker.start_time = self._start_time
                     self._pointer_tracker.is_tracking = True
 
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
-                return {"status": STATUS_ERROR, "message": "Testing already started"}
+                return {"status": STATUS_ERROR, "message": "Data collection already started"}
             
         except Exception as e:
             self._data_collection_active = False
-            print(f"Error in start_testing: {str(e)}")
-            return {"status": STATUS_ERROR, "message": f"Error starting testing: {str(e)}"}
+            print(f"Error in start_data_collection: {str(e)}")
+            return {"status": STATUS_ERROR, "message": f"Error starting data collection: {str(e)}"}
 
     def handle_stop(self):
         """Stop the server and clean up resources."""
         print("Stopping server...")
         self.cleanup()
         return {"status": STATUS_SUCCESS, "message": "Server stopped"}
-
-    # End of main start/stop functions
 
     def start_training_data_collection(self):
         """Start collecting training data for eye gaze tracking."""
@@ -346,37 +362,42 @@ class BackendServer:
         gaze_writer.create_new_file()
         aura_training_thread = None
         if self._run_aura:
-            self.start_aura()
-            aura_training_thread = threading.Thread(
-                target=self._aura_data_collection_loop,
-                args=(TRAINING_MODE,)
-            )
-        
+            aura_response = self.start_aura()
+            if aura_response["status"] == STATUS_SUCCESS:
+                aura_training_thread = threading.Thread(
+                    target=self._aura_data_collection_loop,
+                    args=(TRAINING_MODE,),
+                    daemon=True
+                )
+                with self.thread_tracking(aura_training_thread):
+                    aura_training_thread.start()
+            else:
+                print(f"Failed to start Aura for training: {aura_response['message']}")
+
         def training_data_task():
-            while True:
-                # Make prediction and write to file
-                gaze_vector = self._eye_gaze.get_gaze_vector()
-                if self._current_y_coordinate != 0 and self._current_x_coordinate != 0:
-                    data = []
-                    if gaze_vector[0] is not None and gaze_vector[1] is not None:
-                        for i in gaze_vector[0]:
-                            data.append(i)
-                        for i in gaze_vector[1]:
-                            data.append(i)
-                        data.append(self._current_x_coordinate)
-                        data.append(self._current_y_coordinate)
-                        gaze_writer.write(data)
-                if not self._training_data_collection_active:
-                    gaze_writer.close_file()
-                    break
+            with self.thread_tracking(threading.current_thread()):
+                while True:
+                    # Make prediction and write to file
+                    gaze_vector = self._eye_gaze.get_gaze_vector()
+                    if self._current_y_coordinate != 0 and self._current_x_coordinate != 0:
+                        data = []
+                        if gaze_vector[0] is not None and gaze_vector[1] is not None:
+                            for i in gaze_vector[0]:
+                                data.append(i)
+                            for i in gaze_vector[1]:
+                                data.append(i)
+                            data.append(self._current_x_coordinate)
+                            data.append(self._current_y_coordinate)
+                            gaze_writer.write(data)
+                    if not self._training_data_collection_active:
+                        gaze_writer.close_file()
+                        break
 
         if self._eye_gaze_running:
             self._training_data_collection_active = True
-            local_thread = threading.Thread(target=training_data_task)
-            local_thread.start()
-            if aura_training_thread:
-                aura_training_thread.start()
-
+            local_thread = threading.Thread(target=training_data_task, daemon=True)
+            with self.thread_tracking(local_thread):
+                local_thread.start()
             return {"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG}
         else:
             return {"status": STATUS_ERROR, "message": "Eye gaze tracking not started"}
@@ -399,12 +420,15 @@ class BackendServer:
             self._pointer_writer = None  # Clear reference
         
         # Join and clear all threads
-        for thread in self._threads:
+        with self._threads_lock:
+            threads_copy = self._threads.copy()
+        for thread in threads_copy:
             if thread.is_alive():
                 thread.join(timeout=1.0)
         
         # Clear the threads list
-        self._threads = []
+        with self._threads_lock:
+            self._threads = []
         
         # Reset thread references
         self._aura_thread = None
@@ -433,7 +457,7 @@ class BackendServer:
     
     def handle_update_signal_status(self, signal, status):
         """Update the status of a signal."""
-        bool_status = True if status == 'true' else False
+        bool_status = status.lower() == 'true'
         if signal == SIGNAL_AURA:
             self._run_aura = bool_status
         elif signal == SIGNAL_GAZE:
@@ -447,19 +471,17 @@ class BackendServer:
         
         return {"status": STATUS_SUCCESS, "message": f"Signal {signal} updated to {status}"}
 
-    # End of Message Handling Functions
-
     # Signal initialization functions
 
     def start_pointer_tracking(self):
         """Initialize and start pointer tracking."""
         if not self._pointer_tracking_active:
             self._pointer_tracker = CursorTracker(writer=self._pointer_writer)
+            self._pointer_tracking_active = True
             return {"status": STATUS_SUCCESS, "message": "Pointer tracking started"}
         else:
             return {"status": STATUS_ERROR, "message": "Pointer tracking already active"}
         
-
     def start_regressor(self):
         """Initialize and start the position regressor."""
         path = os.path.join(self._training_path, TRAINING_GAZE_FILE)
@@ -467,8 +489,11 @@ class BackendServer:
         self._regressor.train_create_model()
 
         self._regressor_thread = threading.Thread(
-            target=self._coordinate_regressor_loop
+            target=self._coordinate_regressor_loop,
+            daemon=True
         )
+        with self.thread_tracking(self._regressor_thread):
+            self._regressor_thread.start()
 
         return {"status": STATUS_SUCCESS, "message": "Regressor started"}
 
@@ -481,7 +506,8 @@ class BackendServer:
             # Create thread without starting it
             self._aura_thread = threading.Thread(
                 target=self._aura_data_collection_loop,
-                args=(TESTING_MODE,)
+                args=(TESTING_MODE,),
+                daemon=True
             )
 
             # Add to thread tracking
@@ -498,26 +524,13 @@ class BackendServer:
         """
         try:
             self._emotion_handler = EmotionRecognizer('opencv')
-            self._emotion_thread = threading.Thread(target=self._emotion_collection_loop)
+            self._emotion_thread = threading.Thread(target=self._emotion_collection_loop, daemon=True)
+            with self.thread_tracking(self._emotion_thread):
+                self._emotion_thread.start()
 
             return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": str(e)}
-    
-    # Signal collection functions end.
-
-    # Training data collection functions
-    def update_coordinates(self, x, y):
-        """
-        Update current coordinates.
-        
-        Args:
-            x (int): X coordinate
-            y (int): Y coordinate
-        """
-        self._current_x_coordinate = x
-        self._current_y_coordinate = y
-        return {"status": STATUS_SUCCESS, "coordinates": [x, y]}
     
     # Signal collection loops
     def _aura_data_collection_loop(self, collection_type):
@@ -548,7 +561,8 @@ class BackendServer:
                 time.sleep(0.001)
 
                 if collection_type == TRAINING_MODE and not self._training_data_collection_active:
-                    aura_writer_training.close_file()
+                    if aura_writer_training:
+                        aura_writer_training.close_file()
                     break
                 elif collection_type == TESTING_MODE and not self._data_collection_active:
                     if self._aura_writer:
@@ -567,17 +581,19 @@ class BackendServer:
         along with a timestamp to the emotion_writer. Runs until data_collection_active
         is set to False.
         """
-        while True:
-            if self._emotion_handler:
-                emotion = self._emotion_handler.recognize_emotion()
-                if emotion is not None:
-                    emotion = emotion[0]['dominant_emotion']
-                    timestamp = round(time.time() - self._start_time, 3)
-                    self._emotion_writer.write_data(timestamp, emotion)
-            time.sleep(0.001)  # Small sleep to prevent CPU overuse
-            if not self._data_collection_active:
-                break
-        self._emotion_writer.close_file()
+        with self.thread_tracking(threading.current_thread()):
+            while True:
+                if self._emotion_handler:
+                    emotion = self._emotion_handler.recognize_emotion()
+                    if emotion is not None:
+                        emotion = emotion[0]['dominant_emotion']
+                        timestamp = round(time.time() - self._start_time, 3)
+                        self._emotion_writer.write_data(timestamp, emotion)
+                time.sleep(0.001)  # Small sleep to prevent CPU overuse
+                if not self._data_collection_active:
+                    break
+            if self._emotion_writer:
+                self._emotion_writer.close_file()
 
     def _coordinate_regressor_loop(self):
         """
@@ -590,25 +606,38 @@ class BackendServer:
         The gaze input consists of x,y,z coordinates for both left and right eyes.
         Predictions are rounded to integer screen coordinates before writing.
         """
-        while True:
-            gaze_vector = self._eye_gaze.get_gaze_vector()
-            left_eye = gaze_vector[0]
-            right_eye = gaze_vector[1]
-            if left_eye is not None and right_eye is not None:
-                gaze_input = [[
-                    *left_eye,   # x, y, z coordinates for left eye
-                    *right_eye   # x, y, z coordinates for right eye
-                ]]
+        with self.thread_tracking(threading.current_thread()):
+            while True:
+                gaze_vector = self._eye_gaze.get_gaze_vector()
+                left_eye = gaze_vector[0]
+                right_eye = gaze_vector[1]
+                if left_eye is not None and right_eye is not None:
+                    gaze_input = [[
+                        *left_eye,   # x, y, z coordinates for left eye
+                        *right_eye   # x, y, z coordinates for right eye
+                    ]]
 
-                predicted_coords = self._regressor.make_prediction(gaze_input)
-                x, y = predicted_coords[0]  # Extract x,y from nested array
-                x = int(x)
-                y = int(y)
-                timestamp = round(time.time() - self._start_time, 3)
-                self._gaze_writer.write(timestamp, [x, y])
-            if not self._data_collection_active:
-                break
+                    predicted_coords = self._regressor.make_prediction(gaze_input)
+                    x, y = predicted_coords[0]  # Extract x,y from nested array
+                    x = int(x)
+                    y = int(y)
+                    timestamp = round(time.time() - self._start_time, 3)
+                    self._gaze_writer.write(timestamp, [x, y])
+                if not self._data_collection_active:
+                    break
 
+    def update_coordinates(self, x, y):
+        """
+        Update current coordinates.
+
+        Args:
+            x (int): X coordinate
+            y (int): Y coordinate
+        """
+        self._current_x_coordinate = x
+        self._current_y_coordinate = y
+        return {"status": STATUS_SUCCESS, "coordinates": [x, y]}
+    
     def update_output_path(self, path):
         self._path = path
         self._training_path = os.path.join(self._path, TRAINING_MODE)
@@ -645,13 +674,13 @@ class BackendServer:
                      "3. Analysis results would be shown here"
             
             return {
-                "status": "success",  # Make sure this matches STATUS_SUCCESS constant
+                "status": STATUS_SUCCESS,  # Ensure consistency with STATUS_SUCCESS constant
                 "message": report
             }
         except Exception as e:
             print(f"Error generating report: {str(e)}")  # Add logging
             return {
-                "status": "error",    # Make sure this matches STATUS_ERROR constant
+                "status": STATUS_ERROR,    # Ensure consistency with STATUS_ERROR constant
                 "message": str(e)
             }
     
