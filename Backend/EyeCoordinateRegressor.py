@@ -87,6 +87,4 @@ class PositionRegressor:
         data = self._scaler_X.transform(data)
         prediction = self._model.predict(data, verbose=0)
         predicted_original = self._scaler_y.inverse_transform(prediction)
-        print(predicted_original)
-
         return predicted_original

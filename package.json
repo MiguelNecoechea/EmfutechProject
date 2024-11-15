@@ -1,7 +1,8 @@
 {
-    "name": "AURAMarketing",
-    "version": "1.0.0",
-    "description": "Aura Marketing App",
+    "name": "aura-insight",
+    "productName": "AURA Insight",
+    "version": "0.0.1",
+    "description": "Aura Insight App",
     "main": "main.js",
     "webPreferences": {
         "preload": "./preload.js"
@@ -10,7 +11,8 @@
     "scripts": {
         "start": "electron .",
         "dev": "cross-env NODE_ENV=development electron .",
-        "prod": "cross-env NODE_ENV=production electron ."
+        "prod": "cross-env NODE_ENV=production electron .",
+        "build": "electron-builder build"
     },
     "author": "",
     "license": "ISC",
@@ -25,8 +27,8 @@
         "zeromq": "^6.1.2"
     },
     "build": {
-        "appId": "com.eyetracking.app",
-        "productName": "EyeTracking App",
+        "appId": "com.aurainsight.app",
+        "productName": "AURA Insight",
         "directories": {
             "output": "build"
         },
@@ -39,6 +41,10 @@
         "win": {
             "target": "nsis",
             "icon": "Frontend/assets/icons/icon.ico"
+        },
+        "mac": {
+            "target": ["dmg"],
+            "category": "public.app-category.productivity"
         }
     }
 }

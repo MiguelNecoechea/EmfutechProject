@@ -13,7 +13,6 @@ import mediapipe as mp
 import cv2
 import os
 import time
-import numpy as np
 from .landmarks import *
 from .face_model import *
 from .AffineTransformer import AffineTransformer

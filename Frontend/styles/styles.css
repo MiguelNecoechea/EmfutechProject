@@ -1,54 +1,380 @@
 body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: Arial, sans-serif;
     margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+    padding: 20px;
+    background-color: #f5f5f5;
 }
 
-#calibrationArea {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+    height: 100vh;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.left-panel, .center-section, .right-panel {
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.title {
+    
+    margin-top: 0;
+}
+
+.logo {
+    height: 100px;
     display: flex;
     justify-content: center;
     align-items: center;
+    margin: 20px 0;
 }
 
-.button-container {
-    display: block;
+.logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.tracking-signals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    text-align: left;
+}
+
+.tracking-signals ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+.tracking-signals li {
+    margin: 15px 0;
+    padding: 10px;
+    width: 100%;
+    text-align: left;
+}
+
+.center-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 10px;
+    background: white;
+    border-radius: 8px;
+    border: 2px solid #ccc;
+}
+
+.participant-panel {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+    flex: 1;
+}
+
+.participant-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.input-group input {
+    flex-grow: 0;
+    width: 200px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.folder-button {
+    padding: 5px 10px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.folder-button:hover {
+    background: #e0e0e0;
+}
+
+.control-button {
+    background-color: transparent;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px 0;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+#start {
+    background-color: transparent;
+    color: #28a745;
+    border: 1px solid #28a745;
+}
+
+#start:hover:not(:disabled) {
+    background-color: #28a745;
+    color: white;
+}
+
+#start:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+#start-gaze {
+    color: #2596be;
+    border: 1px solid #2596be;
+}
+
+#start-gaze:hover:not(:disabled) {
+    background-color: #2596be;
+    color: white;
+}
+
+#start-gaze:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+#stop {
+    color: #dc3545;
+    border: 1px solid #dc3545;
+}
+
+#stop:hover:not(:disabled) {
+    background-color: #dc3545;
+    color: white;
+}
+
+#stop:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.action-buttons button {
+    color: #0a40a5;
+    border: 1px solid #0a40a5;
+}
+
+.action-buttons button:hover:not(:disabled) {
+    background-color: #0a40a5;
+    color: white;
+}
+
+.action-buttons button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.folder-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.start-stop-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.start-stop-buttons .orange-button {
+    flex: 1;
+}
+
+.control-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.right-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.right-panel h3 {
+    margin-top: 0;
+}
+
+.status-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
+    flex-grow: 1;
+}
+
+.status-list li {
+    margin: 15px 0;
+}
+
+.status-list label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bottom-section {
+    
+    display: flex;
+    justify-content: space-between;
+    border-top: 2px solid #ccc;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.action-buttons {
+    display: flex;
     flex-direction: column;
     gap: 10px;
     justify-content: center;
-    align-items: center;
+    margin-left: 20px;
 }
 
-.button-container button {
-    padding: 10px 20px;
+.action-buttons .orange-button {
+    width: 150px; /* Or your preferred width */
 }
 
-.calibration-point {
+.left-panel {
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+#reportArea {
+    flex-grow: 1;
+    margin: 10px 0;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    resize: none; /* Prevents manual resizing */
+    background-color: #f9f9f9;
+    min-height: 300px; /* Ensures minimum height */
+}
+
+#reportArea:focus {
+    outline: none;
+    border-color: #2596be;
+}
+
+input[type="checkbox"]:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+input[type="checkbox"]:disabled + label {
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+[disabled] {
+    position: relative;
+}
+
+[disabled]:hover::after {
+    content: attr(title);
     position: absolute;
-    width: 20px;
-    height: 20px;
-    background: #000;
-    border-radius: 50%;
-    transition: all 1s ease-in-out;
-    box-shadow: 0 0 10px rgba(0,255,255,0.8);
-}
-
-.calibration-point::after {
-    content: '';
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: red;
-    border-radius: 50%;
-    top: 50%;
+    bottom: 100%;
     left: 50%;
-    transform: translate(-50%, -50%);
-} 
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+/* Add a subtle shake animation for when buttons become disabled */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+.control-button:disabled {
+    animation: shake 0.4s ease-in-out;
+}
+
+.app-container {
+    position: relative;  /* Add this to your main container */
+}
+
+.overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    cursor: wait;
+}
+
+.overlay.active {
+    display: block;
+}
+
+#report-area {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    padding: 10px;
+    box-sizing: border-box;
+    font-family: inherit;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    overflow-y: auto; /* Enables vertical scrolling */
+    background-color: #f9f9f9;
+}
+
+#report-area:focus {
+    outline: none;
+    border-color: #2596be;
+}

@@ -37,3 +37,10 @@ class EmotionRecognizer:
             result = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False,
                                       detector_backend=self.__backend_model)
         return result
+
+    def stop_processing(self):
+        """
+        Releases the webcam from the current experiment.
+        """
+        if self.cap:
+            self.cap.release()

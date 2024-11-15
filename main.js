@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
@@ -7,8 +7,11 @@ class ApplicationManager {
     constructor() {
         this.pythonProcess = null;
         this.mainWindow = null;
+        this.calibrationWindow = null;
         this.socket = null;
         this.isShuttingDown = false;
+        this.pendingReportResponse = null;
+        this.reportResponseResolver = null;
         this.setupEventHandlers();
     }
 
@@ -27,6 +30,43 @@ class ApplicationManager {
             console.error('Uncaught Exception:', error);
             await this.cleanup();
             app.exit(1);
+        });
+
+        // Listen for calibration window requests
+        ipcMain.on('open-calibration-window', () => {
+            this.createCalibrationWindow();
+        });
+
+        ipcMain.handle('open-directory', async () => {
+            const result = await dialog.showOpenDialog({
+                properties: ['openDirectory']
+            });
+            
+            if (!result.canceled) {
+                return result.filePaths[0];
+            }
+            return null;
+        });
+
+        // New special handler for report generation
+        ipcMain.handle('generate-report', async () => {
+            try {
+                // Create a promise that will be resolved when we get the response
+                const responsePromise = new Promise((resolve) => {
+                    this.reportResponseResolver = resolve;
+                });
+
+                // Send the command
+                await this.sendToPython('generate_report');
+
+                // Wait for the response (will be resolved in startMessageLoop)
+                const response = await responsePromise;
+                this.reportResponseResolver = null;
+                return response;
+            } catch (error) {
+                console.error('Error generating report:', error);
+                return { status: 'error', message: error.toString() };
+            }
         });
     }
 
@@ -60,18 +100,46 @@ class ApplicationManager {
 
         await this.mainWindow.loadFile('Frontend/index.html');
         this.mainWindow.webContents.openDevTools();
-        // if (process.env.NODE_ENV === 'development') {
-        //     this.mainWindow.webContents.openDevTools();
-        // }
+    }
+
+    async createCalibrationWindow() {
+        if (this.calibrationWindow) {
+            this.calibrationWindow.focus();
+            return;
+        }
+
+        this.calibrationWindow = new BrowserWindow({
+            fullscreen: true,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+
+        this.calibrationWindow.loadFile('Frontend/calibration.html');
+
+        this.calibrationWindow.once('ready-to-show', () => {
+            this.calibrationWindow.show();
+        });
+
+        this.calibrationWindow.on('closed', () => {
+            this.calibrationWindow = null;
+        });
     }
 
     async startPythonBackend() {
         const scriptPath = path.join('main.py');
         console.log('Starting Python backend:', scriptPath);
 
+        if (!require('fs').existsSync(scriptPath)) {
+            throw new Error(`Python script not found at: ${scriptPath}`);
+        }
+
         this.pythonProcess = spawn('python', [scriptPath], {
             stdio: 'inherit',
-            detached: false // Ensure the process is terminated with the parent
+            detached: false,
+            env: { ...process.env, PYTHONUNBUFFERED: '1' }
         });
 
         return new Promise((resolve, reject) => {
@@ -111,7 +179,12 @@ class ApplicationManager {
                 if (this.isShuttingDown) break;
 
                 const response = JSON.parse(msg.toString());
-                if (this.mainWindow) {
+                
+                // Check if this is a response to a report generation request
+                if (this.reportResponseResolver) {
+                    this.reportResponseResolver(response);
+                } else if (this.mainWindow) {
+                    // Handle regular messages as before
                     this.mainWindow.webContents.send('python-message', response);
                 }
             }
@@ -190,19 +263,63 @@ class ApplicationManager {
             this.mainWindow = null;
         }
 
+        // Close calibration window if open
+        if (this.calibrationWindow) {
+            this.calibrationWindow.destroy();
+            this.calibrationWindow = null;
+        }
+
         console.log('Cleanup completed');
     }
 
     async onWindowAllClosed() {
-        await this.cleanup();
-        if (process.platform !== 'darwin') {
+        if (this.isShuttingDown) {
+            // If the app is shutting down, do not restart the Python backend
+            return;
+        }
+
+        if (process.platform === 'darwin') {
+            console.log('All windows closed on macOS. Restarting Python backend...');
+            await this.restartPythonBackend();
+        } else {
+            await this.cleanup();
             app.quit();
         }
     }
 
-    onActivate() {
+    async restartPythonBackend() {
+        if (this.pythonProcess) {
+            try {
+                console.log('Stopping existing Python backend...');
+                this.pythonProcess.kill('SIGTERM');
+                await new Promise((resolve) => {
+                    this.pythonProcess.on('exit', () => {
+                        console.log('Python backend stopped.');
+                        resolve();
+                    });
+                });
+            } catch (error) {
+                console.error('Error terminating Python process:', error);
+            }
+            this.pythonProcess = null;
+        }
+
+        try {
+            console.log('Starting Python backend...');
+            await this.startPythonBackend();
+            console.log('Python backend restarted successfully.');
+        } catch (error) {
+            console.error('Failed to restart Python backend:', error);
+        }
+    }
+
+    async onActivate() {
         if (!this.mainWindow) {
-            this.createWindow();
+            await this.createWindow();
+            // Optionally, restart the Python backend if needed
+            if (!this.pythonProcess) {
+                await this.restartPythonBackend();
+            }
         }
     }
 }

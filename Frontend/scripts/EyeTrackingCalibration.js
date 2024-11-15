@@ -1,25 +1,9 @@
 class EyeTrackingCalibration {
     constructor() {
         this.calibrationArea = document.getElementById('calibrationArea');
-        if (!this.calibrationArea) {
-            throw new Error('Element with ID "calibrationArea" not found.');
-        }
-
-        this.buttons = document.getElementById('button-container');
-        this.startGaze = document.getElementById('startGaze');
-        this.calibrateTracking = document.getElementById('calibrateTracking');
-        this.startTesting = document.getElementById('startTesting');
-        this.endTesting = document.getElementById('endTesting');
-
-        this.startRegressor = document.getElementById('startRegressor');
-        this.connectAura = document.getElementById('connectAura');
-        this.startEmotions = document.getElementById('startEmotions');
-        this.startPointerTracking = document.getElementById('startPointerTracking');
-
-
-
-        if (!this.startGaze || !this.calibrateTracking || !this.startTesting || !this.endTesting) {
-            throw new Error('One or more button elements not found.');
+        this.pointsContainer = document.getElementById('calibration-points-container');
+        if (!this.calibrationArea || !this.pointsContainer) {
+            throw new Error('Calibration elements not found.');
         }
 
         this.points = [];
@@ -28,20 +12,12 @@ class EyeTrackingCalibration {
         this.currentPointIndex = 0;
         this.isCalibrating = false;
         this.resizeTimeout = null;
+
+        // Add resize and fullscreen listeners
         this.setupEventListeners();
-        this.setupIPCListeners();
     }
 
     setupEventListeners() {
-        this.startGaze.addEventListener('click', () => this.sendCommandToBackend('start_eye_gaze'));
-        this.calibrateTracking.addEventListener('click', () => this.sendCommandToBackend('calibrate_eye_tracking'));
-        this.startTesting.addEventListener('click', () => this.sendCommandToBackend('start_testing'));
-        this.endTesting.addEventListener('click', () => this.sendCommandToBackend('stop_testing'));
-        this.startRegressor.addEventListener('click', () => this.sendCommandToBackend('start_regressor'));
-        this.connectAura.addEventListener('click', () => this.sendCommandToBackend('connect_aura'));
-        this.startEmotions.addEventListener('click', () => this.sendCommandToBackend('start_emotions'));
-        this.startPointerTracking.addEventListener('click', () => this.sendCommandToBackend('start_pointer_tracking'));
-
         window.addEventListener('resize', () => {
             if (this.resizeTimeout) {
                 clearTimeout(this.resizeTimeout);
@@ -63,35 +39,19 @@ class EyeTrackingCalibration {
         });
     }
 
-    setupIPCListeners() {
-        window.electronAPI.onPythonMessage((response) => {
-            console.log('Received from Python:', response);
-            if (response.status === 'start-calibration') {
-                console.log("Starting calibration");
-                this.initializeCalibration();
-            }
-        });
-    }
-
-    async sendCommandToBackend(command) {
-        try {
-            const response = await window.electronAPI.sendPythonCommand(command);
-        } catch (error) {
-            console.error(`Error sending ${command} to backend:`, error);
-        }
-    }
-
     async initializeCalibration() {
         try {
             await window.electronAPI.sendPythonCommand('start_recording_training_data');
 
-            this.buttons.style.display = 'none';
-            await document.documentElement.requestFullscreen();
+            // Launch calibration UI in fullscreen (already handled by window settings)
+            // await document.documentElement.requestFullscreen(); // Optional: Remove if window is already fullscreen
             setTimeout(() => {
                 const calibrationPoints = this.generateCalibrationPoints();
                 this.points = calibrationPoints.map(pos => this.createPoint(pos.x, pos.y));
                 this.showNextPoint();
             }, 1000);
+
+            this.isCalibrating = true;
         } catch (error) {
             console.error('Error initializing calibration:', error);
             this.handleError(error);
@@ -140,12 +100,12 @@ class EyeTrackingCalibration {
 
     async showNextPoint() {
         if (this.currentPointIndex > 0) {
-            this.points[this.currentPointIndex - 1].style.display = 'none';
+            this.points[this.currentPointIndex - 1].classList.remove('active');
         }
 
         if (this.currentPointIndex < this.points.length) {
             const currentPoint = this.points[this.currentPointIndex];
-            currentPoint.style.display = 'block';
+            currentPoint.classList.add('active');
             this.currentX = parseInt(currentPoint.dataset.x);
             this.currentY = parseInt(currentPoint.dataset.y);
             console.log(this.currentX, this.currentY);
@@ -164,7 +124,7 @@ class EyeTrackingCalibration {
                 this.handleError(error);
             }
         } else {
-            this.buttons.style.display = 'block';
+            // Calibration completed
             await this.finishCalibration();
         }
     }
@@ -174,23 +134,24 @@ class EyeTrackingCalibration {
         point.className = 'calibration-point';
         point.style.left = `${x}px`;
         point.style.top = `${y}px`;
-        point.style.display = 'none';
         point.dataset.x = x;
         point.dataset.y = y;
-        this.calibrationArea.appendChild(point);
+        this.pointsContainer.appendChild(point);
         return point;
     }
 
     async finishCalibration() {
         try {
+            this.isCalibrating = false;
             await window.electronAPI.sendPythonCommand('stop_recording_training_data');
             if (document.fullscreenElement) {
                 await document.exitFullscreen();
             }
+            // Optionally, close the calibration window
+            window.close();
         } catch (error) {
             console.error('Error finishing calibration:', error);
         } finally {
-            this.isCalibrating = false;
             this.reset();
         }
     }
@@ -209,6 +170,4 @@ class EyeTrackingCalibration {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    new EyeTrackingCalibration();
-});
+export { EyeTrackingCalibration }; 

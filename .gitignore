@@ -21,7 +21,10 @@ release/
 *.rpm
 
 # Operating System and Editor Files
-.DS_Store        # macOS
+.DS_Store
+**/.DS_Store        # Ignore .DS_Store in all directories
+.DS_Store?          # Ignore .DS_Store with any suffix
+._*                 # Ignore all files starting with ._
 Thumbs.db        # Windows
 .idea/           # IntelliJ IDEA Configuration
 .vscode/         # Visual Studio Code Configuration
