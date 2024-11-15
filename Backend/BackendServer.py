@@ -5,8 +5,12 @@ import signal
 import sys
 import os
 from contextlib import contextmanager
+import hashlib
+from datetime import datetime
 
 from mne_lsl.stream import StreamLSL as Stream
+from DataProcessing.LLMProcessor import DataAnalyzer
+
 
 from IO.FileWriting.CoordinateWriter import CoordinateWriter
 from IO.FileWriting.AuraDataWriter import AuraDataWriter
@@ -25,6 +29,9 @@ from IO.FileWriting.PointerWriter import PointerWriter
 DEFAULT_PORT = "5556"
 DEFAULT_FILENAME = 'unnamed'
 DEFAULT_AURA_STREAM_ID = 'filtered'
+DEFAULT_PARTICIPANT = 'unnamed_participant'
+TRAINING_FOLDER = 'training'
+COLLECTED_FOLDER = 'collected'
 
 # File suffixes
 AURA_FILE_SUFFIX = '_aura.csv'
@@ -492,8 +499,6 @@ class BackendServer:
             target=self._coordinate_regressor_loop,
             daemon=True
         )
-        with self.thread_tracking(self._regressor_thread):
-            self._regressor_thread.start()
 
         return {"status": STATUS_SUCCESS, "message": "Regressor started"}
 
@@ -525,8 +530,6 @@ class BackendServer:
         try:
             self._emotion_handler = EmotionRecognizer('opencv')
             self._emotion_thread = threading.Thread(target=self._emotion_collection_loop, daemon=True)
-            with self.thread_tracking(self._emotion_thread):
-                self._emotion_thread.start()
 
             return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
         except Exception as e:
@@ -639,48 +642,139 @@ class BackendServer:
         return {"status": STATUS_SUCCESS, "coordinates": [x, y]}
     
     def update_output_path(self, path):
-        self._path = path
-        self._training_path = os.path.join(self._path, TRAINING_MODE)
-        return {"status": STATUS_SUCCESS, "message": "Output path updated"}
+        """Update the base output path and create necessary subdirectories."""
+        try:
+            self._base_path = path
+            self._participant_folder = os.path.join(path, self._filename or DEFAULT_PARTICIPANT)
+            self._path = os.path.join(self._participant_folder, COLLECTED_FOLDER)
+            self._training_path = os.path.join(self._participant_folder, TRAINING_FOLDER)
+            
+            # Create directory structure
+            os.makedirs(self._participant_folder, exist_ok=True)
+            os.makedirs(self._path, exist_ok=True)
+            os.makedirs(self._training_path, exist_ok=True)
+            
+            return {"status": STATUS_SUCCESS, "message": "Output path updated"}
+        except Exception as e:
+            return {"status": STATUS_ERROR, "message": str(e)}
 
     def update_participant_name(self, name):
-        """Update the participant name and update file names accordingly."""
+        """Update the participant name and update folder structure accordingly."""
         try:
-            self._filename = name
-            if self._filename == '':
-                self._filename = DEFAULT_FILENAME
+            self._filename = name if name else DEFAULT_PARTICIPANT
+            
+            # Update paths with new participant name
+            if hasattr(self, '_base_path'):
+                self.update_output_path(self._base_path)
+            
             return {"status": STATUS_SUCCESS, "message": f"Participant name updated to {name}"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": str(e)}
     
     def handle_new_participant(self):
-        """Handle a new participant."""
-        self._filename = DEFAULT_FILENAME
-        self._current_x_coordinate = 0
-        self._current_y_coordinate = 0
-        if self._eye_gaze:
-            self._eye_gaze.stop_processing()
-        if self._emotion_handler:
-            self._emotion_handler.stop_processing()
-        return {"status": STATUS_SUCCESS, "message": "New participant started"}
+        """Handle a new participant by resetting name and creating new directories."""
+        try:
+            self._filename = DEFAULT_PARTICIPANT
+            self._current_x_coordinate = 0
+            self._current_y_coordinate = 0
+            
+            # Update paths for new participant
+            if hasattr(self, '_base_path'):
+                self.update_output_path(self._base_path)
+            
+            if self._eye_gaze:
+                self._eye_gaze.stop_processing()
+            if self._emotion_handler:
+                self._emotion_handler.stop_processing()
+            
+            return {"status": STATUS_SUCCESS, "message": "New participant started"}
+        except Exception as e:
+            return {"status": STATUS_ERROR, "message": str(e)}
     
     def generate_report(self):
-        """Generate a report for the current participant."""
-        try:
-            # For testing, return a simple message
-            report = "Test report content:\n\n" + \
-                     "1. Data collection completed successfully\n" + \
-                     "2. Sample metrics would appear here\n" + \
-                     "3. Analysis results would be shown here"
-            
-            return {
-                "status": STATUS_SUCCESS,  # Ensure consistency with STATUS_SUCCESS constant
-                "message": report
-            }
-        except Exception as e:
-            print(f"Error generating report: {str(e)}")  # Add logging
-            return {
-                "status": STATUS_ERROR,    # Ensure consistency with STATUS_ERROR constant
-                "message": str(e)
-            }
+            """
+            Generates a report by uploading data files to the LLMProcessor and querying for analysis.
+            """
+            try:
+                # Initialize DataAnalyzer
+                data_analyzer = DataAnalyzer()
+
+                # Generate and set collection_id
+                collection_id = self._generate_collection_id()
+                data_analyzer.collection_id = collection_id
+
+                # Retrieve data files
+                data_files = self._get_data_files()
+                if not data_files:
+                    return {
+                        "status": STATUS_ERROR,
+                        "message": "No data files available for report generation."
+                    }
+
+                # Upload files and add to collection
+                for file_path in data_files:
+                    file_id = data_analyzer.upload_file(file_path)
+                    data_analyzer.add_file_to_collection(file_id)
+
+                # Query the LLM for report generation
+                query = f"""
+                I am giving you data files from a user study about user attention on screen. The following data channels are available:
+                {f'- EEG data (focusing on BETA waves for brain activity analysis)' if self._run_aura else ''}
+                {f'- Gaze tracking data (screen coordinates where user is looking)' if self._run_gaze else ''}
+                {f'- Mouse pointer data (click coordinates)' if self._run_pointer else ''}
+                {f'- Facial emotion data' if self._run_emotion else ''}
+
+                All files use timestamps in seconds that are synchronized across channels.
+
+                Please generate a comprehensive report analyzing:
+                - Average duration of user attention spans
+                - Speed/patterns of focus movement across the screen
+                - Notable patterns or correlations between available data channels
+                - Key insights about user attention and engagement
+
+                Only analyze the data channels listed above as available. Do not speculate about unavailable data.
+                Provide a complete report without requesting additional information. JUST THE REPORT, NO OTHER TEXT.
+                """
+                llm_response = data_analyzer.query(query)
+
+                return {
+                    "status": STATUS_SUCCESS,
+                    "message": llm_response,
+                }
+
+            except Exception as e:
+                print(f"Error in generate_report: {e}")
+                return {
+                    "status": STATUS_ERROR,
+                    "message": f"Failed to generate report: {str(e)}"
+                }
+    
+    def _get_data_files(self):
+        """
+        Retrieve the list of data files to be uploaded.
+        """
+        suffixes = [
+            AURA_FILE_SUFFIX,
+            EMOTION_FILE_SUFFIX,
+            GAZE_FILE_SUFFIX,
+            POINTER_FILE_SUFFIX
+        ]
+        files = []
+        for suffix in suffixes:
+            file_path = os.path.join(self._path, f"{self._filename}{suffix}")
+            if os.path.exists(file_path):
+                files.append(file_path)
+            else:
+                print(f"Warning: {file_path} does not exist and will be skipped.")
+        return files
+
+    def _generate_collection_id(self):
+        """
+        Generate a unique collection ID based on the current day, path, and participant name.
+        """
+        current_day = datetime.now().strftime("%Y-%m-%d")
+        path_str = self._path or "default_path"
+        name_str = self._filename or "default_name"
+        unique_str = f"{current_day}_{path_str}_{name_str}"
+        return hashlib.sha256(unique_str.encode()).hexdigest()
     
