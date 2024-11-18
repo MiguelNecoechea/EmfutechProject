@@ -692,63 +692,150 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": str(e)}
     
     def generate_report(self):
-            """
-            Generates a report by uploading data files to the LLMProcessor and querying for analysis.
-            """
+        """
+        Generates a report by sending data files to the OpenAI API and querying for analysis.
+        """
+        try:
+            # Initialize DataAnalyzer
+            data_analyzer = DataAnalyzer()
+            data_files = self._get_data_files()
+            if not data_files:
+                return {
+                    "status": STATUS_ERROR,
+                    "message": "No data files available for report generation."
+                }
+
+            # Upload files and handle potential upload errors
             try:
-                # Initialize DataAnalyzer
-                data_analyzer = DataAnalyzer()
-
-                # Generate and set collection_id
-                collection_id = self._generate_collection_id()
-                data_analyzer.collection_id = collection_id
-
-                # Retrieve data files
-                data_files = self._get_data_files()
-                if not data_files:
+                for file_path in data_files:
+                    data_analyzer.upload_file(file_path)
+            except Exception as e:
+                return {
+                    "status": STATUS_ERROR,
+                    "message": f"Failed to upload files to OpenAI: {str(e)}"
+                }
+            
+            # Read and concatenate CSV file contents
+            csv_contents = {}
+            for file_path in data_files:
+                try:
+                    with open(file_path, 'r') as file:
+                        csv_contents[os.path.basename(file_path)] = file.read()
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
                     return {
                         "status": STATUS_ERROR,
-                        "message": "No data files available for report generation."
+                        "message": f"Failed to read {os.path.basename(file_path)}: {str(e)}"
                     }
 
-                # Upload files and add to collection
-                for file_path in data_files:
-                    file_id = data_analyzer.upload_file(file_path)
-                    data_analyzer.add_file_to_collection(file_id)
+            # Construct the prompt with rules and CSV data
+            prompt = f"""
+            <context>
+            You are analyzing data files from a user attention study. Your task is to perform ONLY factual, data-driven analysis based on the actual contents of the provided files.
 
-                # Query the LLM for report generation
-                query = f"""
-                I am giving you data files from a user study about user attention on screen. The following data channels are available:
-                {f'- EEG data (focusing on BETA waves for brain activity analysis)' if self._run_aura else ''}
-                {f'- Gaze tracking data (screen coordinates where user is looking)' if self._run_gaze else ''}
-                {f'- Mouse pointer data (click coordinates)' if self._run_pointer else ''}
-                {f'- Facial emotion data' if self._run_emotion else ''}
+            Available Data Channels:
+            """
+            if self._run_aura:
+                prompt += f"- EEG data (BETA waves) from file: {self._filename}{AURA_FILE_SUFFIX}\n"
+            if self._run_gaze:
+                prompt += f"- Gaze tracking data from file: {self._filename}{GAZE_FILE_SUFFIX}\n"
+            if self._run_pointer:
+                prompt += f"- Mouse pointer data from file: {self._filename}{POINTER_FILE_SUFFIX}\n"
+            if self._run_emotion:
+                prompt += f"- Facial emotion data from file: {self._filename}{EMOTION_FILE_SUFFIX}\n"
 
-                All files use timestamps in seconds that are synchronized across channels.
+            prompt += """
+            CRITICAL ANALYSIS RULES:
+            1. Only analyze data from files that are actually present in the provided content
+            2. Make NO assumptions about data you cannot see
+            3. Every single statement must be backed by specific data points from the files
+            5. For any pattern or trend mentioned, cite the exact data points that demonstrate it
+            6. Express uncertainty clearly when data is incomplete or inconclusive
+            7. NO speculation about user intent or psychological state unless directly measured
+            8. NO references to data channels that are not present in the files
 
-                Please generate a comprehensive report analyzing:
-                - Average duration of user attention spans
-                - Speed/patterns of focus movement across the screen
-                - Notable patterns or correlations between available data channels
-                - Key insights about user attention and engagement
+            REQUIRED DATA VALIDATION:
+            - List the exact files you are analyzing
+            - Report the exact number of data points in each file
+            - Note any gaps or inconsistencies in the data
+            - Specify the time range covered by each data stream
+            """
+            for filename, content in csv_contents.items():
+                prompt += f"### {filename}\n{content}\n\n"
 
-                Only analyze the data channels listed above as available. Do not speculate about unavailable data.
-                Provide a complete report without requesting additional information. JUST THE REPORT, NO OTHER TEXT.
-                """
-                llm_response = data_analyzer.query(query)
+            prompt += """
+            Provide a strictly data-driven report with these sections:
 
+            1. Data Inventory and Quality Assessment:
+            - Exact files analyzed with row counts
+            - Complete timestamp ranges
+            - Data completeness metrics
+            - Sampling rates and consistency
+
+            2. Statistical Analysis Per Channel:
+            - Basic statistics (mean, median, std dev, range)
+            - Distribution analysis with specific values
+            - Temporal patterns supported by timestamps
+            - Anomaly detection with exact data points
+
+            3. Cross-Channel Correlations (only for present channels):
+            - Pearson/Spearman correlation coefficients
+            - Temporal alignment analysis
+            - Synchronized events with timestamps
+            - Statistical significance levels
+
+            4. Evidence-Based Findings:
+            - Only patterns visible in the data
+            - Confidence intervals for all metrics
+            - Limitations of the analysis
+            - Areas where data is insufficient
+
+            FORMAT REQUIREMENTS:
+            - Every finding must reference specific data
+            - Use precise numbers and timestamps
+            - Include confidence levels for all conclusions
+            - Explicitly state when something cannot be determined from the data
+            - Do not ask questions or suggest further analysis
+            """
+
+            # Call OpenAI API via DataAnalyzer
+            try:
+                llm_response = data_analyzer.query(prompt)
+                if not llm_response:
+                    return {
+                        "status": STATUS_ERROR,
+                        "message": "No response received from the AI model."
+                    }
+                
                 return {
                     "status": STATUS_SUCCESS,
                     "message": llm_response,
                 }
-
-            except Exception as e:
-                print(f"Error in generate_report: {e}")
+            except TimeoutError:
                 return {
                     "status": STATUS_ERROR,
-                    "message": f"Failed to generate report: {str(e)}"
+                    "message": "Report generation timed out. Please try again."
                 }
-    
+            except Exception as e:
+                return {
+                    "status": STATUS_ERROR,
+                    "message": f"Error during AI analysis: {str(e)}"
+                }
+
+        except Exception as e:
+            print(f"Error in generate_report: {e}")
+            return {
+                "status": STATUS_ERROR,
+                "message": f"Failed to generate report: {str(e)}"
+            }
+        finally:
+            # Ensure cleanup of resources
+            if data_analyzer:
+                try:
+                    data_analyzer.cleanup_files()
+                except Exception as e:
+                    print(f"Warning: Failed to cleanup files: {e}")
+        
     def _get_data_files(self):
         """
         Retrieve the list of data files to be uploaded.
@@ -768,13 +855,3 @@ class BackendServer:
                 print(f"Warning: {file_path} does not exist and will be skipped.")
         return files
 
-    def _generate_collection_id(self):
-        """
-        Generate a unique collection ID based on the current day, path, and participant name.
-        """
-        current_day = datetime.now().strftime("%Y-%m-%d")
-        path_str = self._path or "default_path"
-        name_str = self._filename or "default_name"
-        unique_str = f"{current_day}_{path_str}_{name_str}"
-        return hashlib.sha256(unique_str.encode()).hexdigest()
-    
