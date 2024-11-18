@@ -9,12 +9,7 @@ Cython==3.0.11
 deepface==0.0.93
 dlib==19.24.6
 dxcam==0.0.5
-Eel==0.17.0
 filelock==3.16.1
-fire==0.7.0
-Flask==3.0.3
-Flask-Cors==5.0.0
-Flask-SocketIO==5.4.1
 fonttools==4.54.1
 future==1.0.0
 gdown==5.2.0
@@ -40,7 +35,6 @@ opencv-python==4.10.0.84
 pandas==2.2.3
 pillow==11.0.0
 pooch==1.8.2
-protobuf==3.20.3
 pyasn1-modules==0.2.8
 pynput==1.7.7
 pyobjc-core==10.3.1
@@ -68,7 +62,6 @@ whichcraft==0.6.1
 wsproto==1.2.0
 zope.event==5.0
 zope.interface==7.1.1
-
 numpy~=1.23.5
 scipy~=1.14.1
 pyzmq~=25.1.2
