@@ -1,6 +1,5 @@
 import { EyeTrackingCalibration } from './EyeTrackingCalibration.js';
 
-
 // Button states
 const STATES = {
     INITIAL: 'initial',
@@ -342,26 +341,26 @@ class AppHandler {
     async handleGenerateReport() {
         try {
             this.showOverlay();
-            // Use the new special channel for report generation
             const response = await window.electronAPI.generateReport();
             console.log("Report Response:", response);
             
             if (response && response.status === 'success') {
                 if (this.reportArea) {
-                    this.reportArea.value = response.message || "No report data received";
+                    this.reportArea.innerHTML = window.marked.parse(response.message || "No report data received");
                 } else {
-                    console.error('Report area textarea not found');
+                    console.error('Report area not found');
                 }
             } else {
                 console.error('Error generating report:', response);
                 if (this.reportArea) {
-                    this.reportArea.value = 'Error generating report: ' + (response ? response.message : 'Unknown error');
+                    this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + 
+                        (response ? response.message : 'Unknown error'));
                 }
             }
         } catch (error) {
             console.error('Error generating report:', error);
             if (this.reportArea) {
-                this.reportArea.value = 'Error generating report: ' + error.message;
+                this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + error.message);
             }
         } finally {
             this.hideOverlay();
