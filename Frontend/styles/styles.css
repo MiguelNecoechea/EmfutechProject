@@ -3,15 +3,19 @@ body {
     margin: 0;
     padding: 20px;
     background-color: #f5f5f5;
+    height: 100vh;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .container {
     display: grid;
     grid-template-columns: 1fr 2fr;
     gap: 20px;
-    height: 100vh;
+    height: calc(100vh - 40px);
     max-width: 1400px;
     margin: 0 auto;
+    overflow: hidden;
 }
 
 .left-panel, .center-section, .right-panel {
@@ -66,6 +70,7 @@ body {
 .center-section {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .main-panel {
@@ -77,6 +82,7 @@ body {
     background: white;
     border-radius: 8px;
     border: 2px solid #ccc;
+    overflow: hidden;
 }
 
 .participant-panel {
@@ -378,3 +384,74 @@ input[type="checkbox"]:disabled + label {
     outline: none;
     border-color: #2596be;
 }
+
+.markdown-body {
+    flex: 1;
+    overflow-y: auto;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    overflow-y: auto;
+    background-color: white;
+    color: #000000;
+    max-height: 500px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.markdown-body:focus {
+    outline: none;
+    border-color: #2596be;
+}
+
+/* Style markdown elements to ensure they're black */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6,
+.markdown-body p,
+.markdown-body li,
+.markdown-body table {
+    color: #000000;
+}
+
+/* Ensure links are visible */
+.markdown-body a {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+/* Ensure the main panel can accommodate the markdown section */
+.main-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Style the scrollbar for better visibility (optional)
+.markdown-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.markdown-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.markdown-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.markdown-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+} */
