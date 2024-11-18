@@ -1,9 +1,8 @@
 from openai import OpenAI
 import os
-import requests
 import csv
-from datetime import datetime
-import time
+import pandas as pd
+
 
 class DataAnalyzer:
     """
@@ -121,3 +120,50 @@ class DataAnalyzer:
         for file_id in self._files_id:
             self.client.files.delete(file_id)
         self._files_id.clear()
+    
+    def preprocess_aura(self, file_path, training_file_path):
+        """Preprocess the AURA file by normalizing beta columns using training data averages."""
+        
+        # Read the main file into pandas DataFrame
+        df = pd.read_csv(file_path, sep=',')
+        
+        print("All columns in main file:")
+        print(df.columns)
+        
+        # Get timestamp column
+        timestamp = df['timestamp']
+        
+        # Filter columns that contain 'beta' (case insensitive)
+        beta_columns = [col for col in df.columns if 'beta' in col.lower()]
+        print("\nBeta columns found:")
+        print(beta_columns)
+        
+        df_beta = df[beta_columns]
+
+        try:
+            # Try to read and process training data if it exists
+            df_training = pd.read_csv(training_file_path, sep=',')
+            
+            beta_columns_training = [col for col in df_training.columns if 'beta' in col.lower()]
+            
+            df_beta_training = df_training[beta_columns_training]
+            
+            # Calculate averages from training data
+            training_averages = df_beta_training.mean()
+            
+            # Divide each column in the actual data by its corresponding training average
+            for col in beta_columns:
+                if col in beta_columns_training:
+                    df_beta[col] = df_beta[col] / training_averages[col]
+            
+            training_exists = True
+        except (FileNotFoundError, pd.errors.EmptyDataError):
+            # If training file doesn't exist or is empty, return unprocessed data
+            training_exists = False
+        
+        # Combine timestamp with processed beta data
+        df_processed = pd.concat([timestamp, df_beta], axis=1)
+
+        # Save processed data back to original file
+        df_processed.to_csv(file_path, sep=',', index=False)
+        return df_beta, training_exists

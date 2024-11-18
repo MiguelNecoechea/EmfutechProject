@@ -5,8 +5,6 @@ import signal
 import sys
 import os
 from contextlib import contextmanager
-import hashlib
-from datetime import datetime
 
 from mne_lsl.stream import StreamLSL as Stream
 from DataProcessing.LLMProcessor import DataAnalyzer
@@ -27,7 +25,6 @@ from IO.FileWriting.PointerWriter import PointerWriter
 
 # Constants
 DEFAULT_PORT = "5556"
-DEFAULT_FILENAME = 'unnamed'
 DEFAULT_AURA_STREAM_ID = 'filtered'
 DEFAULT_PARTICIPANT = 'unnamed_participant'
 TRAINING_FOLDER = 'training'
@@ -117,7 +114,7 @@ class BackendServer:
 
         # Path and file names for the data
         self._path = None
-        self._filename = DEFAULT_FILENAME
+        self._filename = DEFAULT_PARTICIPANT
 
         # Aura stream id
         # TODO: Make this dynamic
@@ -280,6 +277,10 @@ class BackendServer:
         """Start all active data collection threads."""
         try:
             if not self._data_collection_active:
+                # Create directory structure
+                os.makedirs(self._participant_folder, exist_ok=True)
+                os.makedirs(self._path, exist_ok=True)
+                os.makedirs(self._training_path, exist_ok=True)
                 self._start_time = time.time()
                 self._data_collection_active = True
 
@@ -649,11 +650,6 @@ class BackendServer:
             self._path = os.path.join(self._participant_folder, COLLECTED_FOLDER)
             self._training_path = os.path.join(self._participant_folder, TRAINING_FOLDER)
             
-            # Create directory structure
-            os.makedirs(self._participant_folder, exist_ok=True)
-            os.makedirs(self._path, exist_ok=True)
-            os.makedirs(self._training_path, exist_ok=True)
-            
             return {"status": STATUS_SUCCESS, "message": "Output path updated"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": str(e)}
@@ -708,7 +704,11 @@ class BackendServer:
             # Upload files and handle potential upload errors
             try:
                 for file_path in data_files:
-                    data_analyzer.upload_file(file_path)
+                    if AURA_FILE_SUFFIX in file_path:
+                        training_file = os.path.join(os.path.dirname(self._training_path), self._filename + TRAINING_AURA_FILE)
+                        data_analyzer.preprocess_aura(file_path, training_file)
+                    else:
+                        data_analyzer.upload_file(file_path)
             except Exception as e:
                 return {
                     "status": STATUS_ERROR,
