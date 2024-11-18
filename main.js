@@ -86,7 +86,9 @@ class ApplicationManager {
     async createWindow() {
         this.mainWindow = new BrowserWindow({
             width: 1200,
-            height: 800,
+            height: 850,
+            minWidth: 1200,
+            minHeight: 850,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
