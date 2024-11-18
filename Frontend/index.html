@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles/styles.css">
     <title>AURA Insight</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="styles/github-markdown.css">
 </head>
 <body>
     <div class="app-container">
@@ -49,7 +51,7 @@
             <div class="center-section">
                 <div class="main-panel">
                     <h2 class="title">Report</h2>
-                    <label for="reportArea"></label><textarea id="report-area" readonly></textarea>
+                    <div id="report-area" class="markdown-body" contenteditable="false"></div>
                 </div>
                 <div class="bottom-section">
                     <div class="participant-panel">
