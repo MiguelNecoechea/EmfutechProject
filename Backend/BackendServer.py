@@ -149,58 +149,58 @@ class BackendServer:
         signal.signal(signal.SIGINT, self.signal_handler)
 
         # Set up OpenAI key from encrypted storage
-        self._setup_openai_key()
+    #     self._setup_openai_key()
 
-    def _setup_openai_key(self):
-        """Set up OpenAI API key from encrypted storage."""
-        try:
-            # Check if key files exist, if not create them
-            if not os.path.exists(KEY_FILE) or not os.path.exists(ENCRYPTED_API_KEY_FILE):
-                self._initialize_encryption()
+    # def _setup_openai_key(self):
+    #     """Set up OpenAI API key from encrypted storage."""
+    #     try:
+    #         # Check if key files exist, if not create them
+    #         if not os.path.exists(KEY_FILE) or not os.path.exists(ENCRYPTED_API_KEY_FILE):
+    #             self._initialize_encryption()
             
-            # Load the encryption key
-            with open(KEY_FILE, 'rb') as key_file:
-                key = key_file.read()
+    #         # Load the encryption key
+    #         with open(KEY_FILE, 'rb') as key_file:
+    #             key = key_file.read()
             
-            # Create Fernet instance for decryption
-            f = Fernet(key)
+    #         # Create Fernet instance for decryption
+    #         f = Fernet(key)
             
-            # Read and decrypt the API key
-            with open(ENCRYPTED_API_KEY_FILE, 'rb') as api_key_file:
-                encrypted_api_key = api_key_file.read()
-                decrypted_api_key = f.decrypt(encrypted_api_key).decode()
+    #         # Read and decrypt the API key
+    #         with open(ENCRYPTED_API_KEY_FILE, 'rb') as api_key_file:
+    #             encrypted_api_key = api_key_file.read()
+    #             decrypted_api_key = f.decrypt(encrypted_api_key).decode()
             
-            # Set the environment variable
-            os.environ['OPENAI_API_KEY'] = decrypted_api_key
-            self._openai_available = True
-        except Exception as e:
-            print(f"Error setting up OpenAI key: {e}")
-            raise
+    #         # Set the environment variable
+    #         os.environ['OPENAI_API_KEY'] = decrypted_api_key
+    #         self._openai_available = True
+    #     except Exception as e:
+    #         print(f"Error setting up OpenAI key: {e}")
+    #         raise
 
-    def _initialize_encryption(self):
-        """Initialize encryption key and encrypted API key storage."""
-        try:
-            # Generate encryption key
-            key = Fernet.generate_key()
+    # def _initialize_encryption(self):
+    #     """Initialize encryption key and encrypted API key storage."""
+    #     try:
+    #         # Generate encryption key
+    #         key = Fernet.generate_key()
             
-            # Save encryption key
-            with open(KEY_FILE, 'wb') as key_file:
-                key_file.write(key)
+    #         # Save encryption key
+    #         with open(KEY_FILE, 'wb') as key_file:
+    #             key_file.write(key)
             
-            # Create Fernet instance
-            f = Fernet(key)
+    #         # Create Fernet instance
+    #         f = Fernet(key)
             
-            # Get API key from user
-            api_key = input("Please enter your OpenAI API key: ").strip()
+    #         # Get API key from user
+    #         api_key = input("Please enter your OpenAI API key: ").strip()
             
-            # Encrypt and save API key
-            encrypted_api_key = f.encrypt(api_key.encode())
-            with open(ENCRYPTED_API_KEY_FILE, 'wb') as api_key_file:
-                api_key_file.write(encrypted_api_key)
+    #         # Encrypt and save API key
+    #         encrypted_api_key = f.encrypt(api_key.encode())
+    #         with open(ENCRYPTED_API_KEY_FILE, 'wb') as api_key_file:
+    #             api_key_file.write(encrypted_api_key)
             
-        except Exception as e:
-            print(f"Error initializing encryption: {e}")
-            raise
+    #     except Exception as e:
+    #         print(f"Error initializing encryption: {e}")
+    #         raise
 
     @contextmanager
     def thread_tracking(self, thread):
