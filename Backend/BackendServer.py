@@ -5,6 +5,7 @@ import signal
 import sys
 import cv2
 import os
+import queue
 from contextlib import contextmanager
 from cryptography.fernet import Fernet
 import base64
@@ -21,6 +22,7 @@ from IO.FileWriting.GazeWriter import GazeWriter
 from Backend.EyeCoordinateRegressor import PositionRegressor
 
 from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
+from IO.SignalProcessing.AuraTools import resolve_aura
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 from IO.PointerTracking.PointerTracker import CursorTracker
@@ -99,6 +101,9 @@ class BackendServer:
 
         # OpenCV video capture object
         self._camera = None
+        self._last_gaze_frame = None
+        self._last_emotion = None
+        self._viewing_camera = False
 
         # Flags for the data collection sources.
         self._fitting_eye_gaze = False
@@ -131,8 +136,7 @@ class BackendServer:
         self._filename = DEFAULT_PARTICIPANT
 
         # Aura stream id
-        # TODO: Make this dynamic
-        self._aura_stream_id = DEFAULT_AURA_STREAM_ID
+        self._aura_stream_id = None
 
         # Data writers
         self._aura_writer = None
@@ -318,7 +322,9 @@ class BackendServer:
             'update_output_path': self.update_output_path,
             'update_participant_name': self.update_participant_name,
             'new_participant': self.handle_new_participant,
-            'generate_report': self.generate_report
+            'generate_report': self.generate_report,
+            'view_camera': self.view_camera,
+            'stop_camera_view': self.stop_camera_view
         }
         handler = handlers.get(command)
         if handler:
@@ -342,6 +348,10 @@ class BackendServer:
                     if self._camera:
                         frame = self.get_frame()
                         gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                        if gaze_data[2] is not None:
+                            with threading.Lock():
+                                self._last_gaze_frame = gaze_data[2].copy()
+                        
                         if gaze_data[0] is not None and gaze_data[1] is not None:
                             break
                 self._eye_gaze_running = True
@@ -471,6 +481,9 @@ class BackendServer:
                     if self._camera:
                         frame = self.get_frame()
                         gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                        if gaze_vector[2] is not None:
+                            with threading.Lock():
+                                self._last_gaze_frame = gaze_vector[2].copy()
                         if gaze_vector[0] is not None and gaze_vector[1] is not None:
                             data = []
                             for i in gaze_vector[0]:
@@ -522,6 +535,10 @@ class BackendServer:
             self._threads = []
         
         # Reset thread references
+        if self._viewing_camera:
+            self._viewing_camera = False
+            cv2.destroyAllWindows()
+
         self.manage_camera(CLOSE_CAMERA)
         self._aura_thread = None
         self._emotion_thread = None
@@ -589,10 +606,15 @@ class BackendServer:
 
     def start_aura(self, buffer_size_multiplier=1):
         try:
-            self._stream = Stream(bufsize=buffer_size_multiplier, source_id=self._aura_stream_id)
-            self._stream.connect(processing_flags='all')
-            rename_aura_channels(self._stream)
-
+            if self._aura_stream_id is None:
+                try:
+                    self._aura_stream_id = resolve_aura()
+                    self._stream = Stream(bufsize=buffer_size_multiplier, source_id=self._aura_stream_id)
+                    self._stream.connect(processing_flags='all')
+                    rename_aura_channels(self._stream)
+                except ValueError as e:
+                    return {"status": STATUS_ERROR, "message": str(e)}
+                
             # Create thread without starting it
             self._aura_thread = threading.Thread(
                 target=self._aura_data_collection_loop,
@@ -674,6 +696,8 @@ class BackendServer:
                 if self._emotion_handler and self._camera:
                     frame = self.get_frame()
                     emotion = self._emotion_handler.recognize_emotion(frame)
+                    with threading.Lock():
+                        self._last_emotion = emotion
                     if emotion is not None:
                         emotion = emotion[0]['dominant_emotion']
                         timestamp = round(time.time() - self._start_time, 3)
@@ -700,6 +724,9 @@ class BackendServer:
                 if self._camera:
                     frame = self.get_frame()
                     gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                    if gaze_vector[2] is not None:
+                        with threading.Lock():
+                            self._last_gaze_frame = gaze_vector[2].copy()
                     left_eye = gaze_vector[0]
                     right_eye = gaze_vector[1] 
                     if left_eye is not None and right_eye is not None:
@@ -993,3 +1020,59 @@ class BackendServer:
             _, frame = self._camera.read()
             return frame
         return None
+    
+    def view_camera(self):
+        """
+        Capture frames from the camera and stream them to the frontend via ZMQ.
+        """
+        # Make sure camera is open
+        if self._camera is None or not self._camera.isOpened():
+            self.manage_camera(OPEN_CAMERA)
+            
+        def stream_frames():
+            try:
+                print("Starting camera stream...")
+                while self._viewing_camera:
+                    try:
+                        frame = self.get_frame()
+                        if frame is None:
+                            continue
+                        
+                        # Encode frame as JPEG with error handling
+                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        if not ret:
+                            continue
+                        
+                        # Convert to Base64
+                        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+                        
+                        # Prepare and send the message
+                        message = {
+                            'type': 'frame',
+                            'data': jpg_as_text
+                        }
+                        self._socket.send_json(message)
+                        
+                        time.sleep(0.033)  # ~30 FPS
+                    except Exception as e:
+                        print(f"Error processing frame: {e}")
+                        time.sleep(0.1)  # Add delay on error
+                        
+            except Exception as e:
+                print(f"Fatal error in stream_frames: {e}")
+            finally:
+                self._viewing_camera = False
+                print("Camera streaming stopped")
+
+        # Start streaming in a new thread if not already streaming
+        if not self._viewing_camera:
+            self._viewing_camera = True
+            threading.Thread(target=stream_frames, daemon=True).start()
+            return {"status": "success", "message": "Camera streaming started"}
+        else:
+            return {"status": "error", "message": "Camera is already streaming"}
+
+    def stop_camera_view(self):
+        """Stop the camera stream."""
+        self._viewing_camera = False
+        return {"status": "success", "message": "Camera streaming stopped"}
