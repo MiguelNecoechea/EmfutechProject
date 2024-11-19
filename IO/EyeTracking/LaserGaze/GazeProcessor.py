@@ -17,27 +17,25 @@ from .landmarks import *
 from .face_model import *
 from .AffineTransformer import AffineTransformer
 from .EyeballDetector import EyeballDetector
-
+from .VisualizationOptions import VisualizationOptions
 class GazeProcessor:
     """
     Processes video input to detect facial landmarks and estimate gaze vectors using the MediaPipe library.
     Outputs gaze vector estimates asynchronously via a provided callback function.
     """
 
-    def __init__(self, camera_idx=0, visualization_options=None):
+    def __init__(self):
         """
         Initializes the gaze processor with optional camera settings and visualization configurations.
         Args:
         - camera_idx (int): Index of the camera to be used for video capture.
         - visualization_options (object): Options for visual feedback on the video frame.
+        - cap (cv2.VideoCapture): Optional pre-initialized VideoCapture object.
         """
-        self.__camera_idx = camera_idx
-        self.__vis_options = visualization_options
+        self.__vis_options = VisualizationOptions()
         self.__left_detector = EyeballDetector(DEFAULT_LEFT_EYE_CENTER_MODEL)
         self.__right_detector = EyeballDetector(DEFAULT_RIGHT_EYE_CENTER_MODEL)
         self._running = False
-        self.__cap = None
-        self.__landmarker = None
 
         model_path = os.path.join(os.path.dirname(__file__), 'face_landmarker.task')
         BaseOptions = mp.tasks.BaseOptions
@@ -48,6 +46,7 @@ class GazeProcessor:
             base_options=BaseOptions(model_asset_path=model_path),
             running_mode=VisionRunningMode.VIDEO
         )
+        self.__landmarker = self.FaceLandmarker.create_from_options(self.options)
 
     @property
     def is_running(self):
@@ -57,32 +56,13 @@ class GazeProcessor:
         """
         return self._running
 
-    def start(self):
-        """
-        Starts the video processing loop to detect facial landmarks and calculate gaze vectors.
-        Continuously updates the video display and invokes callback with gaze data.
-        """
-        print("Inicializando cámara para Eye Tracking...")
-        self.__cap = cv2.VideoCapture(self.__camera_idx)
-        if not self.__cap.isOpened():
-            print("Error al abrir la cámara. Verifique que la cámara esté conectada y reinicie la aplicación.")
-            return
-        self.__landmarker = self.FaceLandmarker.create_from_options(self.options)
-        self._running = True
-        print("Cámara inicializada correctamente.")
-
-    def get_gaze_vector(self):
+    def get_gaze_vector(self, frame):
         """
         Detects the facial landmarks and estimate gaze vectors using the MediaPipe library and components from the laser
         gaze module.
+        :param frame: The frame to process.
         :return: A tuple of None if the data is being calibrated, otherwise a tuple of vectors containing the gaze info.
         """
-        if not self._running:
-            raise RuntimeError("Gaze processor is not started, start() must be called first.")
-
-        success, frame = self.__cap.read()
-        if not success:
-            return None, None, frame
 
         timestamp_ms = int(time.time() * 1000)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
@@ -147,6 +127,4 @@ class GazeProcessor:
         """
         Releases the webcam from the current experiment.
         """
-        if self.__cap:
-            self.__cap.release()
         self._running = False
