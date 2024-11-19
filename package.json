@@ -3,7 +3,7 @@
     "productName": "AURA Insight",
     "version": "0.0.1",
     "description": "Aura Insight App",
-    "main": "main.js",
+    "main": "Frontend/scripts/main.js",
     "webPreferences": {
         "preload": "./preload.js"
     },
