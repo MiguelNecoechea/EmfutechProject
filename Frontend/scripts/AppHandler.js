@@ -92,15 +92,30 @@ class AppHandler {
 
     setupEventListeners() {
         // Button event listeners
-        this.startGaze.addEventListener('click', () => this.sendCommandToBackend(COMMANDS.START_GAZE));
-        this.start.addEventListener('click', async () => {
+        let hasConfirmed = false;
+        
+        this.startGaze.addEventListener('click', async () => {
             const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
             if (confirmed) {
-                await this.sendCommandToBackend(COMMANDS.START);
-                window.electronAPI.minimize();
+                hasConfirmed = true;
+                await this.sendCommandToBackend(COMMANDS.START_GAZE);
             }
         });
-        this.stop.addEventListener('click', () => this.sendCommandToBackend(COMMANDS.STOP));
+        
+        this.start.addEventListener('click', async () => {
+            if (!hasConfirmed) {
+                const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
+                if (!confirmed) return;
+            }
+            await this.sendCommandToBackend(COMMANDS.START);
+            window.electronAPI.minimize();
+        });
+        
+        this.stop.addEventListener('click', () => {
+            hasConfirmed = false;
+            this.sendCommandToBackend(COMMANDS.STOP);
+        });
+        
         this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
         this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
         this.generateReport.addEventListener('click', () => this.handleGenerateReport());  // Add this line
