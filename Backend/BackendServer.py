@@ -5,6 +5,8 @@ import signal
 import sys
 import os
 from contextlib import contextmanager
+from cryptography.fernet import Fernet
+import base64
 
 from mne_lsl.stream import StreamLSL as Stream
 from DataProcessing.LLMProcessor import DataAnalyzer
@@ -56,6 +58,10 @@ START_CALIBRATION_MSG = "start-calibration"
 COLLECTION_STARTED_MSG = "collection-started"
 COLLECTION_STOPPED_MSG = "collection-stopped"
 CALIBRATION_COMPLETE_MSG = "calibration-complete"
+
+# Encryption constants
+KEY_FILE = '.key'
+ENCRYPTED_API_KEY_FILE = '.openai_key'
 
 class BackendServer:
     """
@@ -129,6 +135,9 @@ class BackendServer:
         # Folders created
         self._folders_created = False
 
+        # OpenAI status
+        self._openai_available = False
+
         # Status for the data collection loops
         self._data_collection_active = False
         self._training_data_collection_active = False
@@ -138,6 +147,60 @@ class BackendServer:
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
+
+        # Set up OpenAI key from encrypted storage
+        self._setup_openai_key()
+
+    def _setup_openai_key(self):
+        """Set up OpenAI API key from encrypted storage."""
+        try:
+            # Check if key files exist, if not create them
+            if not os.path.exists(KEY_FILE) or not os.path.exists(ENCRYPTED_API_KEY_FILE):
+                self._initialize_encryption()
+            
+            # Load the encryption key
+            with open(KEY_FILE, 'rb') as key_file:
+                key = key_file.read()
+            
+            # Create Fernet instance for decryption
+            f = Fernet(key)
+            
+            # Read and decrypt the API key
+            with open(ENCRYPTED_API_KEY_FILE, 'rb') as api_key_file:
+                encrypted_api_key = api_key_file.read()
+                decrypted_api_key = f.decrypt(encrypted_api_key).decode()
+            
+            # Set the environment variable
+            os.environ['OPENAI_API_KEY'] = decrypted_api_key
+            self._openai_available = True
+        except Exception as e:
+            print(f"Error setting up OpenAI key: {e}")
+            raise
+
+    def _initialize_encryption(self):
+        """Initialize encryption key and encrypted API key storage."""
+        try:
+            # Generate encryption key
+            key = Fernet.generate_key()
+            
+            # Save encryption key
+            with open(KEY_FILE, 'wb') as key_file:
+                key_file.write(key)
+            
+            # Create Fernet instance
+            f = Fernet(key)
+            
+            # Get API key from user
+            api_key = input("Please enter your OpenAI API key: ").strip()
+            
+            # Encrypt and save API key
+            encrypted_api_key = f.encrypt(api_key.encode())
+            with open(ENCRYPTED_API_KEY_FILE, 'wb') as api_key_file:
+                api_key_file.write(encrypted_api_key)
+            
+        except Exception as e:
+            print(f"Error initializing encryption: {e}")
+            raise
 
     @contextmanager
     def thread_tracking(self, thread):
@@ -693,9 +756,9 @@ class BackendServer:
         """
         Generates a report by sending data files to the OpenAI API and querying for analysis.
         """
+        data_analyzer = DataAnalyzer()
         try:
             # Initialize DataAnalyzer
-            data_analyzer = DataAnalyzer()
             data_files = self._get_data_files()
             if not data_files:
                 return {
