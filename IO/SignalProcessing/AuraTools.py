@@ -1,4 +1,5 @@
 from mne_lsl.stream import StreamLSL as Stream
+from mne_lsl.lsl import resolve_streams
 def is_stream_ready(stream: Stream) -> bool:
     """
     Check if the streams has enough data to process.
@@ -73,3 +74,14 @@ def delete_channels(stream: Stream, waves: list[str], channels: list[str]):
             for channel in channels:
                 channels_to_dlt.append(wave + '_' + channel)
     stream.drop_channels(channels_to_dlt)
+
+def resolve_aura() -> str:
+    """
+    Resolve the aura stream.
+    :return: The source id of the aura stream that has 40 channels.
+    """
+    av_streams = resolve_streams()
+    for stream in av_streams:
+        if stream.n_channels == 40:
+            return stream.source_id
+    raise ValueError("No aura stream with 40 channels found")
