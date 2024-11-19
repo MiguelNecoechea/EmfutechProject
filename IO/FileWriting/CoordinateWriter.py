@@ -20,5 +20,5 @@ class CoordinateWriter(Writer):
 
         if len(data) != 2:
             raise ValueError("The data must be a list of 2 elements.")
-        self._csv_writer.writerow([timestamp] + data)
+        self._csv_writer.writerow([round(timestamp, 3)] + data)
         self._csv_file.flush()

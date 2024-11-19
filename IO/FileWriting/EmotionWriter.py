@@ -17,7 +17,7 @@ class EmotionPredictedWriter(Writer):
         """
         written = False
         if self._is_writer_opened and timestamp is not None and data is not None:
-            self._csv_writer.writerow([timestamp, data])
+            self._csv_writer.writerow([round(timestamp, 3), data])
             written = True
 
         return written

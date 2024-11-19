@@ -24,5 +24,5 @@ class PointerWriter(Writer):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError("Both x and y coordinates must be numeric values.")
 
-        self._csv_writer.writerow([timestamp] + [x, y])
+        self._csv_writer.writerow([round(timestamp, 3)] + [x, y])
         self._csv_file.flush()

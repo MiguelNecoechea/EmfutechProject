@@ -29,7 +29,8 @@ class AuraDataWriter(Writer):
                                      'Expected input format [timestamp, data]')
             for i in range(len(data)):
                 if self._is_writer_opened:
-                    self._csv_writer.writerow(np.append(timestamp[i], data[i]))
+                    rounded_timestamp = round(timestamp[i], 3)
+                    self._csv_writer.writerow(np.append(rounded_timestamp, data[i]))
             written = True
 
         return written
