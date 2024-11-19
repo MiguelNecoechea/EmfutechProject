@@ -68,6 +68,12 @@ class ApplicationManager {
                 return { status: 'error', message: error.toString() };
             }
         });
+
+        ipcMain.on('minimize-window', () => {
+            if (this.mainWindow) {
+                this.mainWindow.minimize();
+            }
+        });
     }
 
     async onAppReady() {
