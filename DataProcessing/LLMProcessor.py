@@ -127,43 +127,46 @@ class DataAnalyzer:
         # Read the main file into pandas DataFrame
         df = pd.read_csv(file_path, sep=',')
         
-        print("All columns in main file:")
-        print(df.columns)
-        
         # Get timestamp column
         timestamp = df['timestamp']
         
         # Filter columns that contain 'beta' (case insensitive)
         beta_columns = [col for col in df.columns if 'beta' in col.lower()]
-        print("\nBeta columns found:")
-        print(beta_columns)
-        
         df_beta = df[beta_columns]
+
+        # Calculate averages for each 100 rows (approximately 1 second of data)
+        chunk_size = 100
+        chunks = [df_beta[i:i + chunk_size] for i in range(0, len(df_beta), chunk_size)]
+        timestamp_chunks = [timestamp[i:i + chunk_size] for i in range(0, len(timestamp), chunk_size)]
+        
+        # Calculate mean for each chunk
+        df_beta = pd.DataFrame([chunk.mean() for chunk in chunks], columns=beta_columns)
+        timestamp = pd.Series([chunk.mean() for chunk in timestamp_chunks])
 
         try:
             # Try to read and process training data if it exists
             df_training = pd.read_csv(training_file_path, sep=',')
-            
             beta_columns_training = [col for col in df_training.columns if 'beta' in col.lower()]
-            
             df_beta_training = df_training[beta_columns_training]
             
             # Calculate averages from training data
             training_averages = df_beta_training.mean()
             
-            # Divide each column in the actual data by its corresponding training average
+            # Normalize beta columns using training averages
             for col in beta_columns:
                 if col in beta_columns_training:
                     df_beta[col] = df_beta[col] / training_averages[col]
             
+            df_beta = df_beta.round(3)
+            timestamp = timestamp.round(3)
             training_exists = True
+            
         except (FileNotFoundError, pd.errors.EmptyDataError):
-            # If training file doesn't exist or is empty, return unprocessed data
+            # Just process in chunks if no training data exists
+            df_beta = df_beta.round(3)
+            timestamp = timestamp.round(3)
             training_exists = False
         
-        # Combine timestamp with processed beta data
-        df_processed = pd.concat([timestamp, df_beta], axis=1)
-
-        # Save processed data back to original file
-        df_processed.to_csv(file_path, sep=',', index=False)
+        # Save processed data
+        pd.concat([timestamp, df_beta], axis=1).to_csv(file_path, sep=',', index=False)
         return df_beta, training_exists
