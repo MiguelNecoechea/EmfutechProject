@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frame Stream</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+        }
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .error {
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <img id="frame" alt="Frame Stream">
+    <div id="error" class="error" style="display: none;"></div>
+    <script>
+        const frameElement = document.getElementById('frame');
+        const errorElement = document.getElementById('error');
+        
+        window.electronAPI.onFrameData((response) => {
+            try {
+                if (response.type === 'frame' && response.data) {
+                    frameElement.style.display = 'block';
+                    errorElement.style.display = 'none';
+                    frameElement.src = `data:image/jpeg;base64,${response.data}`;
+                }
+            } catch (error) {
+                console.error('Error processing frame:', error);
+                frameElement.style.display = 'none';
+                errorElement.style.display = 'block';
+                errorElement.textContent = 'Error displaying frame';
+            }
+        });
+    </script>
+</body>
+</html> 
