@@ -86,3 +86,19 @@ logs/
 # Testing and Training Data Folders
 testing/
 training/
+
+# Key Files
+.key            # Encryption key file
+.openai_key     # Encrypted API key file
+*.pem          # SSL/TLS key files
+*.key          # General key files
+*.keystore     # Java keystore files
+*.p12          # PKCS#12 key files
+*.pfx          # Personal Exchange Format files
+id_rsa         # SSH private key
+id_dsa         # SSH private key
+*.gpg          # GPG key files
+*.asc          # ASCII-armored GPG key files
+*.crt          # Certificate files
+*.cer          # Certificate files
+*.der          # DER encoded certificate files
