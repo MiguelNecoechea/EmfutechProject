@@ -30,7 +30,8 @@ const COMMANDS = {
     UPDATE_NAME: 'update_participant_name',
     UPDATE_PATH: 'update_output_path',
     NEW_PARTICIPANT: 'new_participant',
-    GENERATE_REPORT: 'generate_report'
+    GENERATE_REPORT: 'generate_report',
+    VIEW_CAMERA: 'view_camera',
 };
 
 // Response messages
@@ -73,6 +74,7 @@ class AppHandler {
         this.newParticipant = document.getElementById('new-participant');
         this.generateReport = document.getElementById('generate-report'); 
         this.reportArea = document.getElementById('report-area');
+        this.viewCamera = document.getElementById('view-camera');
     }
 
     setupCheckboxes() {
@@ -111,14 +113,16 @@ class AppHandler {
             window.electronAPI.minimize();
         });
         
-        this.stop.addEventListener('click', () => {
+        this.stop.addEventListener('click', async () => {
             hasConfirmed = false;
-            this.sendCommandToBackend(COMMANDS.STOP);
+            await this.sendCommandToBackend(COMMANDS.STOP);
+            window.electronAPI.closeFrameStream();
         });
         
         this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
         this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
         this.generateReport.addEventListener('click', () => this.handleGenerateReport());  // Add this line
+        this.viewCamera.addEventListener('click', () => this.handleViewCamera());
 
         // Checkbox event listeners
         this.signalAura.addEventListener('change', () => this.updateSignalStatus(SIGNALS.AURA, this.signalAura.checked));
@@ -385,6 +389,15 @@ class AppHandler {
             }
         } finally {
             this.hideOverlay();
+        }
+    }
+
+    async handleViewCamera() {
+        try {
+            // Use the IPC bridge to open the frame stream window
+            window.electronAPI.viewCamera();
+        } catch (error) {
+            console.error('Error opening camera view:', error);
         }
     }
 }

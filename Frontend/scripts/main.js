@@ -12,6 +12,7 @@ class ApplicationManager {
         this.isShuttingDown = false;
         this.pendingReportResponse = null;
         this.reportResponseResolver = null;
+        this.frameStreamWindow = null;
         this.setupEventHandlers();
     }
 
@@ -74,6 +75,23 @@ class ApplicationManager {
                 this.mainWindow.minimize();
             }
         });
+
+        // Listen for frame stream window requests
+        ipcMain.on('view-camera', async () => {
+            try {
+                await this.createFrameStreamWindow();
+                await this.sendToPython('view_camera');
+            } catch (error) {
+                console.error('Error handling view-camera:', error);
+            }
+        });
+
+        // Add handler for closing frame stream window
+        ipcMain.on('close-frame-stream', () => {
+            if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
+                this.frameStreamWindow.close();
+            }
+        });
     }
 
     async onAppReady() {
@@ -92,9 +110,9 @@ class ApplicationManager {
     async createWindow() {
         this.mainWindow = new BrowserWindow({
             width: 1200,
-            height: 850,
+            height: 900,
             minWidth: 1200,
-            minHeight: 850,
+            minHeight: 900,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -184,16 +202,37 @@ class ApplicationManager {
     async startMessageLoop() {
         try {
             for await (const [msg] of this.socket) {
-                if (this.isShuttingDown) break;
+                if (this.isShuttingDown || !this.socket) break;
 
-                const response = JSON.parse(msg.toString());
-                
-                // Check if this is a response to a report generation request
-                if (this.reportResponseResolver) {
-                    this.reportResponseResolver(response);
-                } else if (this.mainWindow) {
-                    // Handle regular messages as before
-                    this.mainWindow.webContents.send('python-message', response);
+                try {
+                    const response = JSON.parse(msg.toString());
+                    
+                    if (this.reportResponseResolver) {
+                        this.reportResponseResolver(response);
+                        this.reportResponseResolver = null;
+                    } else if (response.type === 'frame' && this.frameStreamWindow) {
+                        try {
+                            if (!this.frameStreamWindow.isDestroyed()) {
+                                this.frameStreamWindow.webContents.send('frame-data', response);
+                            }
+                        } catch (windowError) {
+                            console.error('Error sending frame data:', windowError);
+                            this.frameStreamWindow = null;
+                        }
+                    } else if (this.mainWindow) {
+                        try {
+                            if (!this.mainWindow.isDestroyed()) {
+                                this.mainWindow.webContents.send('python-message', response);
+                            }
+                        } catch (windowError) {
+                            console.error('Error sending message to main window:', windowError);
+                            this.mainWindow = null;
+                        }
+                    }
+                } catch (error) {
+                    if (!this.isShuttingDown) {
+                        console.error('Error processing message:', error);
+                    }
                 }
             }
         } catch (error) {
@@ -228,7 +267,21 @@ class ApplicationManager {
         this.isShuttingDown = true;
         console.log('Starting cleanup...');
 
-        // Send stop command to Python backend
+        // Close frame stream window first
+        if (this.frameStreamWindow) {
+            try {
+                // Send stop camera view before closing socket
+                if (this.socket) {
+                    await this.sendToPython('stop_camera_view');
+                }
+                this.frameStreamWindow.destroy();
+                this.frameStreamWindow = null;
+            } catch (error) {
+                console.error('Error closing frame stream window:', error);
+            }
+        }
+
+        // Send final stop command and close socket
         if (this.socket) {
             try {
                 await this.sendToPython('stop');
@@ -240,11 +293,21 @@ class ApplicationManager {
             this.socket = null;
         }
 
-        // Terminate Python process
+        // Close other windows
+        if (this.calibrationWindow) {
+            this.calibrationWindow.destroy();
+            this.calibrationWindow = null;
+        }
+
+        if (this.mainWindow) {
+            this.mainWindow.destroy();
+            this.mainWindow = null;
+        }
+
+        // Terminate Python process last
         if (this.pythonProcess) {
             try {
                 this.pythonProcess.kill('SIGTERM');
-                // Wait for process to terminate
                 await new Promise((resolve) => {
                     const timeout = setTimeout(() => {
                         if (this.pythonProcess) {
@@ -263,18 +326,6 @@ class ApplicationManager {
                 console.error('Error terminating Python process:', error);
             }
             this.pythonProcess = null;
-        }
-
-        // Close main window
-        if (this.mainWindow) {
-            this.mainWindow.destroy();
-            this.mainWindow = null;
-        }
-
-        // Close calibration window if open
-        if (this.calibrationWindow) {
-            this.calibrationWindow.destroy();
-            this.calibrationWindow = null;
         }
 
         console.log('Cleanup completed');
@@ -329,6 +380,32 @@ class ApplicationManager {
                 await this.restartPythonBackend();
             }
         }
+    }
+
+    async createFrameStreamWindow() {
+        if (this.frameStreamWindow) {
+            this.frameStreamWindow.focus();
+            return;
+        }
+
+        this.frameStreamWindow = new BrowserWindow({
+            width: 800,
+            height: 600,
+            minWidth: 600,
+            minHeight: 400,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+
+        await this.frameStreamWindow.loadFile('Frontend/frameStream.html');
+
+        this.frameStreamWindow.on('closed', async () => {
+            await this.sendToPython('stop_camera_view');
+            this.frameStreamWindow = null;
+        });
     }
 }
 
