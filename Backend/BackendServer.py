@@ -3,6 +3,7 @@ import time
 import threading
 import signal
 import sys
+import cv2
 import os
 from contextlib import contextmanager
 from cryptography.fernet import Fernet
@@ -17,9 +18,9 @@ from IO.FileWriting.AuraDataWriter import AuraDataWriter
 from IO.FileWriting.EmotionWriter import EmotionPredictedWriter
 from IO.FileWriting.GazeWriter import GazeWriter
 
-from Backend.EyeGaze import create_new_eye_gaze
 from Backend.EyeCoordinateRegressor import PositionRegressor
 
+from IO.EyeTracking.LaserGaze.GazeProcessor import GazeProcessor
 from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 from IO.PointerTracking.PointerTracker import CursorTracker
@@ -31,6 +32,7 @@ DEFAULT_AURA_STREAM_ID = 'filtered'
 DEFAULT_PARTICIPANT = 'unnamed_participant'
 TRAINING_FOLDER = 'training'
 COLLECTED_FOLDER = 'collected'
+DEFAULT_CAMERA_INDEX = 0
 
 # File suffixes
 AURA_FILE_SUFFIX = '_aura.csv'
@@ -50,6 +52,9 @@ SIGNAL_GAZE = 'gaze'
 SIGNAL_EMOTION = 'emotion'
 SIGNAL_POINTER = 'pointer'
 SIGNAL_SCREEN = 'screen'
+
+OPEN_CAMERA = 'open'
+CLOSE_CAMERA = 'close'
 
 # Status messages
 STATUS_SUCCESS = "success"
@@ -91,6 +96,9 @@ class BackendServer:
 
         # Flags for the server status.
         self._running = False
+
+        # OpenCV video capture object
+        self._camera = None
 
         # Flags for the data collection sources.
         self._fitting_eye_gaze = False
@@ -324,10 +332,18 @@ class BackendServer:
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
+        self.manage_camera(OPEN_CAMERA)
+        self._create_directories()
+
         def eye_gaze_task():
             with self.thread_tracking(threading.current_thread()):
-                self._create_directories()
-                self._eye_gaze = create_new_eye_gaze()
+                self._eye_gaze = GazeProcessor()
+                while True:
+                    if self._camera:
+                        frame = self.get_frame()
+                        gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                        if gaze_data[0] is not None and gaze_data[1] is not None:
+                            break
                 self._eye_gaze_running = True
                 self._fitting_eye_gaze = False
                 self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
@@ -375,6 +391,7 @@ class BackendServer:
                 
                 # Emotion
                 if self._run_emotion:
+                    self.manage_camera(OPEN_CAMERA)
                     emotion_response = self.start_emotion_detection()
                     if emotion_response["status"] != STATUS_SUCCESS:
                         raise Exception(emotion_response["message"])
@@ -451,10 +468,11 @@ class BackendServer:
             with self.thread_tracking(threading.current_thread()):
                 while True:
                     # Make prediction and write to file
-                    gaze_vector = self._eye_gaze.get_gaze_vector()
-                    if self._current_y_coordinate != 0 and self._current_x_coordinate != 0:
-                        data = []
+                    if self._camera:
+                        frame = self.get_frame()
+                        gaze_vector = self._eye_gaze.get_gaze_vector(frame)
                         if gaze_vector[0] is not None and gaze_vector[1] is not None:
+                            data = []
                             for i in gaze_vector[0]:
                                 data.append(i)
                             for i in gaze_vector[1]:
@@ -504,6 +522,7 @@ class BackendServer:
             self._threads = []
         
         # Reset thread references
+        self.manage_camera(CLOSE_CAMERA)
         self._aura_thread = None
         self._emotion_thread = None
         self._regressor_thread = None
@@ -652,8 +671,9 @@ class BackendServer:
         """
         with self.thread_tracking(threading.current_thread()):
             while True:
-                if self._emotion_handler:
-                    emotion = self._emotion_handler.recognize_emotion()
+                if self._emotion_handler and self._camera:
+                    frame = self.get_frame()
+                    emotion = self._emotion_handler.recognize_emotion(frame)
                     if emotion is not None:
                         emotion = emotion[0]['dominant_emotion']
                         timestamp = round(time.time() - self._start_time, 3)
@@ -677,21 +697,24 @@ class BackendServer:
         """
         with self.thread_tracking(threading.current_thread()):
             while True:
-                gaze_vector = self._eye_gaze.get_gaze_vector()
-                left_eye = gaze_vector[0]
-                right_eye = gaze_vector[1]
-                if left_eye is not None and right_eye is not None:
-                    gaze_input = [[
-                        *left_eye,   # x, y, z coordinates for left eye
-                        *right_eye   # x, y, z coordinates for right eye
-                    ]]
+                if self._camera:
+                    frame = self.get_frame()
+                    gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                    left_eye = gaze_vector[0]
+                    right_eye = gaze_vector[1] 
+                    if left_eye is not None and right_eye is not None:
+                        gaze_input = [[
+                            *left_eye,   # x, y, z coordinates for left eye
+                            *right_eye   # x, y, z coordinates for right eye
+                        ]]
 
-                    predicted_coords = self._regressor.make_prediction(gaze_input)
-                    x, y = predicted_coords[0]  # Extract x,y from nested array
-                    x = int(x)
-                    y = int(y)
-                    timestamp = round(time.time() - self._start_time, 3)
-                    self._gaze_writer.write(timestamp, [x, y])
+                        predicted_coords = self._regressor.make_prediction(gaze_input)
+                        x, y = predicted_coords[0]  # Extract x,y from nested array
+                        x = int(x)
+                        y = int(y)
+                        timestamp = round(time.time() - self._start_time, 3)
+                        self._gaze_writer.write(timestamp, [x, y])
+                        
                 if not self._data_collection_active:
                     break
 
@@ -934,3 +957,39 @@ class BackendServer:
                 print(f"Warning: {file_path} does not exist and will be skipped.")
         return files
 
+    def manage_camera(self, action='open'):
+        """
+        Open or close the camera.
+        
+        Args:
+            action (str): Either 'open' or 'close'. Defaults to 'open'.
+            
+        Returns:
+            dict: Status message indicating success or failure
+        """
+        try:
+            if action == 'open':
+                if self._camera is None or not self._camera.isOpened():
+                    self._camera = cv2.VideoCapture(DEFAULT_CAMERA_INDEX)
+                    if not self._camera.isOpened():
+                        raise Exception("Could not open camera")
+            elif action == 'close':
+                if self._camera is not None:
+                    self._camera.release()
+                    self._camera = None     
+            else:
+                return {"status": STATUS_ERROR, "message": f"Invalid action: {action}"}
+                
+        except Exception as e:
+            if self._camera is not None:
+                self._camera.release()
+                self._camera = None
+
+    def get_frame(self):
+        """
+        Get the current frame from the video capture object.
+        """
+        if self._camera is not None:
+            _, frame = self._camera.read()
+            return frame
+        return None
