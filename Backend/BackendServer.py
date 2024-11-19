@@ -126,6 +126,9 @@ class BackendServer:
         self._gaze_writer = None
         self._pointer_writer = None
 
+        # Folders created
+        self._folders_created = False
+
         # Status for the data collection loops
         self._data_collection_active = False
         self._training_data_collection_active = False
@@ -260,6 +263,7 @@ class BackendServer:
         """Initialize and start eye gaze tracking."""
         def eye_gaze_task():
             with self.thread_tracking(threading.current_thread()):
+                self._create_directories()
                 self._eye_gaze = create_new_eye_gaze()
                 self._eye_gaze_running = True
                 self._fitting_eye_gaze = False
@@ -278,9 +282,7 @@ class BackendServer:
         try:
             if not self._data_collection_active:
                 # Create directory structure
-                os.makedirs(self._participant_folder, exist_ok=True)
-                os.makedirs(self._path, exist_ok=True)
-                os.makedirs(self._training_path, exist_ok=True)
+                self._create_directories()
                 self._start_time = time.time()
                 self._data_collection_active = True
 
@@ -673,7 +675,7 @@ class BackendServer:
             self._filename = DEFAULT_PARTICIPANT
             self._current_x_coordinate = 0
             self._current_y_coordinate = 0
-            
+            self._folders_created = False
             # Update paths for new participant
             if hasattr(self, '_base_path'):
                 self.update_output_path(self._base_path)
@@ -705,7 +707,9 @@ class BackendServer:
             try:
                 for file_path in data_files:
                     if AURA_FILE_SUFFIX in file_path:
-                        training_file = os.path.join(os.path.dirname(self._training_path), self._filename + TRAINING_AURA_FILE)
+                        training_file = os.path.join(os.path.dirname(self._training_path), 'training', f'{self._filename}_{TRAINING_AURA_FILE}')
+                        print(training_file)
+                        print(file_path)
                         data_analyzer.preprocess_aura(file_path, training_file)
                     else:
                         data_analyzer.upload_file(file_path)
@@ -796,6 +800,11 @@ class BackendServer:
             - Include confidence levels for all conclusions
             - Explicitly state when something cannot be determined from the data
             - Do not ask questions or suggest further analysis
+
+            ABOUT THE DATA:
+            The EEG data is normalized using the training data averages. This is done by dividing each beta value by its corresponding training average.
+            The value of reference is 1 anything that is 1 or close to 1 is normal, above 1 is above average and below 1 is below average. All of these of beta waves that consider concentation.
+            The timestamp is rounded to 3 decimal places to reduce the amount of data sent to the LLM. And there migh be small variations of it.
             """
 
             # Call OpenAI API via DataAnalyzer
@@ -835,6 +844,13 @@ class BackendServer:
                     data_analyzer.cleanup_files()
                 except Exception as e:
                     print(f"Warning: Failed to cleanup files: {e}")
+    
+    def _create_directories(self):
+        if not self._folders_created:
+            os.makedirs(self._participant_folder, exist_ok=True)
+            os.makedirs(self._path, exist_ok=True)
+            os.makedirs(self._training_path, exist_ok=True)
+            self._folders_created = True
         
     def _get_data_files(self):
         """
