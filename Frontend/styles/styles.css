@@ -455,3 +455,22 @@ input[type="checkbox"]:disabled + label {
 .markdown-body::-webkit-scrollbar-thumb:hover {
     background: #555;
 } */
+
+#view-camera {
+    color: #17a2b8;
+    border: 1px solid #17a2b8;
+    margin-bottom: 15px;
+}
+
+#view-camera:hover:not(:disabled) {
+    background-color: #17a2b8;
+    color: white;
+}
+
+#view-camera:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
