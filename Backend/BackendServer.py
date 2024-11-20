@@ -805,6 +805,7 @@ class BackendServer:
     def generate_report(self):
         """
         Generates a report by sending data files to the OpenAI API and querying for analysis.
+        Saves the report in markdown format.
         """
         data_analyzer = DataAnalyzer()
         try:
@@ -929,6 +930,15 @@ class BackendServer:
                         "message": "No response received from the AI model."
                     }
                 
+                # Save report as markdown file
+                report_filename = f"{self._filename}_report.md"
+                report_path = os.path.join(self._participant_folder, report_filename)
+                try:
+                    with open(report_path, 'w') as f:
+                        f.write(llm_response)
+                except Exception as e:
+                    print(f"Warning: Failed to save report file: {e}")
+                
                 return {
                     "status": STATUS_SUCCESS,
                     "message": llm_response,
@@ -1034,24 +1044,30 @@ class BackendServer:
                 print("Starting camera stream...")
                 while self._viewing_camera:
                     try:
+                        # Get and process camera frame
                         frame = self.get_frame()
-                        if frame is None:
-                            continue
+                        if frame is not None:
+                            # Encode camera frame
+                            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                            if ret:
+                                # Send camera frame
+                                self._socket.send_json({
+                                    'type': 'frame',
+                                    'data': base64.b64encode(buffer).decode('utf-8')
+                                })
                         
-                        # Encode frame as JPEG with error handling
-                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        if not ret:
-                            continue
-                        
-                        # Convert to Base64
-                        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-                        
-                        # Prepare and send the message
-                        message = {
-                            'type': 'frame',
-                            'data': jpg_as_text
-                        }
-                        self._socket.send_json(message)
+                        # Get and process gaze frame if available
+                        with threading.Lock():
+                            gaze_frame = getattr(self, '_last_gaze_frame', None)
+                            if gaze_frame is not None:
+                                # Encode gaze frame
+                                ret, gaze_buffer = cv2.imencode('.jpg', gaze_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                                if ret:
+                                    # Send gaze frame
+                                    self._socket.send_json({
+                                        'type': 'gaze_frame',
+                                        'data': base64.b64encode(gaze_buffer).decode('utf-8')
+                                    })
                         
                         time.sleep(0.033)  # ~30 FPS
                     except Exception as e:
