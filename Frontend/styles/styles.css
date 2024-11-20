@@ -139,6 +139,7 @@ body {
     background-color: transparent;
     color: #28a745;
     border: 1px solid #28a745;
+    cursor: pointer;
 }
 
 #start:hover:not(:disabled) {
@@ -157,6 +158,7 @@ body {
 #start-gaze {
     color: #2596be;
     border: 1px solid #2596be;
+    cursor: pointer;
 }
 
 #start-gaze:hover:not(:disabled) {
@@ -175,6 +177,7 @@ body {
 #stop {
     color: #dc3545;
     border: 1px solid #dc3545;
+    cursor: pointer;
 }
 
 #stop:hover:not(:disabled) {
@@ -193,6 +196,7 @@ body {
 .action-buttons button {
     color: #0a40a5;
     border: 1px solid #0a40a5;
+    cursor: pointer;
 }
 
 .action-buttons button:hover:not(:disabled) {
@@ -256,6 +260,11 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    cursor: pointer;
+}
+
+input[type="checkbox"] {
+    cursor: pointer;
 }
 
 .bottom-section {
@@ -460,6 +469,7 @@ input[type="checkbox"]:disabled + label {
     color: #17a2b8;
     border: 1px solid #17a2b8;
     margin-bottom: 15px;
+    cursor: pointer;
 }
 
 #view-camera:hover:not(:disabled) {
