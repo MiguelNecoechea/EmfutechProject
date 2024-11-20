@@ -473,11 +473,14 @@ class AppHandler {
                     
                     // Add click handler to select the experiment
                     experimentElement.addEventListener('click', async () => {
-                        this.selectedExperimentId = experiment.createdAt; // Using createdAt as unique ID
+                        this.selectedExperimentId = experiment.createdAt;
                         
                         // Update the study panel
                         document.getElementById('study-name').textContent = experiment.name;
                         document.getElementById('study-length').textContent = `${experiment.length} minutes`;
+                        
+                        // Clear participant details when switching experiments
+                        this.clearParticipantDetails();
                         
                         // Highlight the selected experiment
                         document.querySelectorAll('.experiment-item').forEach(item => {
@@ -520,6 +523,20 @@ class AppHandler {
                             <span title="${participant.folderPath}">📁 ${participant.name}</span>
                         </div>
                     `;
+
+                    // Add click handler for participant selection
+                    participantElement.addEventListener('click', () => {
+                        // Update current participant details in study panel
+                        document.getElementById('current-participant-name').textContent = participant.name;
+                        document.getElementById('current-participant-age').textContent = participant.age;
+
+                        // Highlight selected participant
+                        document.querySelectorAll('.participant-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        participantElement.classList.add('selected');
+                    });
+
                     participantsList.appendChild(participantElement);
                 });
 
@@ -529,6 +546,12 @@ class AppHandler {
         } catch (error) {
             console.error('Error loading participants:', error);
         }
+    }
+
+    // Add method to clear participant details
+    clearParticipantDetails() {
+        document.getElementById('current-participant-name').textContent = 'None';
+        document.getElementById('current-participant-age').textContent = '-';
     }
 }
 
