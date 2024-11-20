@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('update-participant-count', data),
     onParticipantUpdate: (callback) =>
         ipcRenderer.on('participant-update', (_event, data) => callback(data)),
-    openParticipantWindow: () =>
-        ipcRenderer.send('open-participant-window'),
+    openParticipantWindow: (experimentId) =>
+        ipcRenderer.send('open-participant-window', experimentId),
+    getParticipants: (experimentId) =>
+        ipcRenderer.invoke('get-participants', experimentId),
+    onExperimentUpdate: (callback) =>
+        ipcRenderer.on('experiment-update', (_event, data) => callback(data)),
 });

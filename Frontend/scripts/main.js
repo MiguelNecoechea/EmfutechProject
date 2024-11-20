@@ -125,10 +125,26 @@ class ApplicationManager {
                 const dataDir = path.join(__dirname, '..', 'data');
                 const filePath = path.join(dataDir, 'experiments.json');
 
-                // Ensure directory exists
+                // Ensure data directory exists
                 if (!fs.existsSync(dataDir)) {
                     fs.mkdirSync(dataDir, { recursive: true });
                 }
+
+                // Create experiment folder
+                const experimentFolder = path.join(
+                    experimentData.folder,
+                    experimentData.name
+                );
+
+                // Create the experiment folder
+                fs.mkdirSync(experimentFolder, { recursive: true });
+
+                // Update the folder path in experimentData to include the experiment name
+                const experimentWithUpdatedPath = {
+                    ...experimentData,
+                    folder: experimentFolder,
+                    createdAt: new Date().toISOString()
+                };
 
                 // Read existing data
                 let experiments = [];
@@ -138,17 +154,23 @@ class ApplicationManager {
                 }
 
                 // Add new experiment
-                experiments.push({
-                    ...experimentData,
-                    createdAt: new Date().toISOString()
-                });
+                experiments.push(experimentWithUpdatedPath);
 
                 // Write back to file
                 fs.writeFileSync(filePath, JSON.stringify(experiments, null, 2));
                 
-                return { status: 'success' };
+                // After successful save, broadcast update to all windows
+                this.mainWindow.webContents.send('experiment-update');
+                
+                return { 
+                    status: 'success',
+                    folderPath: experimentFolder 
+                };
             } catch (error) {
-                return { status: 'error', message: error.message };
+                return { 
+                    status: 'error', 
+                    message: error.message 
+                };
             }
         });
 
@@ -172,46 +194,98 @@ class ApplicationManager {
 
         ipcMain.handle('save-participant', async (event, participantData) => {
             try {
+                // Get experiment data to access its folder
+                const experiments = JSON.parse(
+                    fs.readFileSync(path.join(__dirname, '..', 'data', 'experiments.json'), 'utf8')
+                );
+                const experiment = experiments.find(e => e.createdAt === participantData.experimentId);
+                
+                if (!experiment) {
+                    throw new Error('Experiment not found');
+                }
+
+                // Create participant folder inside experiment folder
+                const participantFolder = path.join(
+                    experiment.folder,
+                    participantData.name
+                );
+
+                // Create folders recursively
+                fs.mkdirSync(participantFolder, { recursive: true });
+
+                // Save participant data to participants.json
                 const dataDir = path.join(__dirname, '..', 'data');
                 const filePath = path.join(dataDir, 'participants.json');
 
-                // Ensure directory exists
+                // Ensure data directory exists
                 if (!fs.existsSync(dataDir)) {
                     fs.mkdirSync(dataDir, { recursive: true });
                 }
 
-                // Read existing data
+                // Read existing participants
                 let participants = [];
                 if (fs.existsSync(filePath)) {
                     const fileContent = fs.readFileSync(filePath, 'utf8');
                     participants = JSON.parse(fileContent);
                 }
 
-                // Add new participant
-                participants.push({
+                // Add folder path to participant data
+                const participantWithFolder = {
                     ...participantData,
-                    createdAt: new Date().toISOString()
-                });
+                    folderPath: participantFolder
+                };
+
+                // Add new participant
+                participants.push(participantWithFolder);
 
                 // Write back to file
                 fs.writeFileSync(filePath, JSON.stringify(participants, null, 2));
                 
-                return { status: 'success' };
+                return { 
+                    status: 'success',
+                    folderPath: participantFolder
+                };
+            } catch (error) {
+                return { 
+                    status: 'error', 
+                    message: error.message 
+                };
+            }
+        });
+
+        ipcMain.handle('get-participants', async (event, experimentId) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const filePath = path.join(dataDir, 'participants.json');
+
+                if (!fs.existsSync(filePath)) {
+                    return { status: 'success', data: [] };
+                }
+
+                const fileContent = fs.readFileSync(filePath, 'utf8');
+                const allParticipants = JSON.parse(fileContent);
+                
+                // Filter participants by experiment ID
+                const experimentParticipants = allParticipants.filter(
+                    p => p.experimentId === experimentId
+                );
+                
+                return { status: 'success', data: experimentParticipants };
             } catch (error) {
                 return { status: 'error', message: error.message };
             }
         });
 
-        ipcMain.on('update-participant-count', (event, participantData) => {
-            // Send the data to the main window to update the participant count
-            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-                this.mainWindow.webContents.send('participant-update', participantData);
-            }
+        ipcMain.on('update-participant-count', (event, data) => {
+            // Broadcast participant update to all windows
+            this.mainWindow.webContents.send('participant-update', data);
+            // Also trigger an experiment update to refresh the list
+            this.mainWindow.webContents.send('experiment-update');
         });
 
         // Add handler for opening participant window
-        ipcMain.on('open-participant-window', () => {
-            this.createParticipantWindow();
+        ipcMain.on('open-participant-window', (event, experimentId) => {
+            this.createParticipantWindow(experimentId);
         });
     }
 
@@ -546,7 +620,7 @@ class ApplicationManager {
         await experimentWindow.loadFile('Frontend/UI/AddExperimentView.html');
     }
 
-    async createParticipantWindow() {
+    async createParticipantWindow(experimentId) {
         const participantWindow = new BrowserWindow({
             width: 400,
             height: 300,
@@ -560,7 +634,10 @@ class ApplicationManager {
             }
         });
 
-        await participantWindow.loadFile('Frontend/UI/AddParticipantView.html');
+        await participantWindow.loadFile(
+            'Frontend/UI/AddParticipantView.html',
+            { query: { experimentId } }
+        );
     }
 }
 

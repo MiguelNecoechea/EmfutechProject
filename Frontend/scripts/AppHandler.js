@@ -65,6 +65,10 @@ class AppHandler {
 
         this.overlay = document.getElementById('overlay');
         this.isViewingCamera = false;
+
+        // Add this line to load experiments when the app starts
+        this.selectedExperimentId = null;
+        this.loadExperiments();
     }
 
     setupButtons() {
@@ -160,11 +164,15 @@ class AppHandler {
             window.electronAPI.openExperimentWindow();
         });
 
-        // Add participant button handler
+        // Modify add participant button handler
         const addParticipantBtn = document.getElementById('add-participant');
         if (addParticipantBtn) {
             addParticipantBtn.addEventListener('click', () => {
-                window.electronAPI.openParticipantWindow();
+                if (!this.selectedExperimentId) {
+                    alert('Please select an experiment first');
+                    return;
+                }
+                window.electronAPI.openParticipantWindow(this.selectedExperimentId);
             });
         }
 
@@ -204,14 +212,27 @@ class AppHandler {
             document.getElementById('participant-count').textContent = '0'; // Reset participant count for new study
         });
 
-        // Add listener for participant updates
-        window.electronAPI.onParticipantUpdate((participantData) => {
-            // Update participant count in the UI
-            const participantCount = document.getElementById('participant-count');
-            if (participantCount) {
-                const currentCount = parseInt(participantCount.textContent) || 0;
-                participantCount.textContent = (currentCount + 1).toString();
+        // Update the participant update listener to refresh the list
+        window.electronAPI.onParticipantUpdate(async (data) => {
+            if (this.selectedExperimentId === data.experimentId) {
+                // Reload participants list for the current experiment
+                await this.loadParticipants(this.selectedExperimentId);
             }
+        });
+
+        // Add listener for experiment updates
+        window.electronAPI.onExperimentUpdate(async () => {
+            await this.loadExperiments();
+        });
+
+        // Update study panel listener
+        window.electronAPI.onStudyPanelUpdate(async (experimentData) => {
+            document.getElementById('study-name').textContent = experimentData.name;
+            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
+            document.getElementById('participant-count').textContent = '0';
+            
+            // Refresh the experiments list
+            await this.loadExperiments();
         });
     }
 
@@ -427,6 +448,86 @@ class AppHandler {
             window.electronAPI.viewCamera();
         } catch (error) {
             console.error('Error opening camera view:', error);
+        }
+    }
+
+    // Add this new method to load experiments
+    async loadExperiments() {
+        try {
+            const response = await window.electronAPI.getExperiments();
+            if (response.status === 'success') {
+                const experimentsList = document.getElementById('experiments-list');
+                experimentsList.innerHTML = '';
+
+                response.data.forEach(experiment => {
+                    const experimentElement = document.createElement('div');
+                    experimentElement.className = 'experiment-item';
+                    experimentElement.innerHTML = `
+                        <h3>${experiment.name}</h3>
+                        <p>${experiment.description}</p>
+                        <div class="experiment-details">
+                            <span>Length: ${experiment.length} minutes</span>
+                            <span>Created: ${new Date(experiment.createdAt).toLocaleDateString()}</span>
+                        </div>
+                    `;
+                    
+                    // Add click handler to select the experiment
+                    experimentElement.addEventListener('click', async () => {
+                        this.selectedExperimentId = experiment.createdAt; // Using createdAt as unique ID
+                        
+                        // Update the study panel
+                        document.getElementById('study-name').textContent = experiment.name;
+                        document.getElementById('study-length').textContent = `${experiment.length} minutes`;
+                        
+                        // Highlight the selected experiment
+                        document.querySelectorAll('.experiment-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        experimentElement.classList.add('selected');
+
+                        // Load participants for this experiment
+                        await this.loadParticipants(experiment.createdAt);
+                    });
+
+                    experimentsList.appendChild(experimentElement);
+                });
+            } else {
+                console.error('Failed to load experiments:', response.message);
+            }
+        } catch (error) {
+            console.error('Error loading experiments:', error);
+        }
+    }
+
+    async loadParticipants(experimentId) {
+        try {
+            const response = await window.electronAPI.getParticipants(experimentId);
+            const participantsList = document.getElementById('participants-list');
+            participantsList.innerHTML = '';
+
+            if (response.status === 'success') {
+                response.data.forEach(participant => {
+                    const participantElement = document.createElement('div');
+                    participantElement.className = 'participant-item';
+                    participantElement.innerHTML = `
+                        <h4>${participant.name}</h4>
+                        <div class="participant-details">
+                            <span>Age: ${participant.age}</span>
+                            <span>Gender: ${participant.gender}</span>
+                            <span>Added: ${new Date(participant.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div class="participant-folder">
+                            <span title="${participant.folderPath}">📁 ${participant.name}</span>
+                        </div>
+                    `;
+                    participantsList.appendChild(participantElement);
+                });
+
+                // Update participant count
+                document.getElementById('participant-count').textContent = response.data.length.toString();
+            }
+        } catch (error) {
+            console.error('Error loading participants:', error);
         }
     }
 }

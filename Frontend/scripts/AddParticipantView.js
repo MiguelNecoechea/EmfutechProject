@@ -2,6 +2,13 @@ class AddParticipantView {
     constructor() {
         this.setupElements();
         this.setupEventListeners();
+        // Get the experiment ID from the URL or window parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        this.experimentId = urlParams.get('experimentId');
+        if (!this.experimentId) {
+            alert('No experiment selected');
+            window.electronAPI.closeWindow();
+        }
     }
 
     setupElements() {
@@ -34,20 +41,30 @@ class AddParticipantView {
         }
 
         const participantData = {
+            experimentId: this.experimentId,
             name: this.participantName.value,
             age: parseInt(this.participantAge.value),
             gender: this.participantGender.value,
             birthday: this.participantBirthday.value,
-            nationality: this.participantNationality.value
+            createdAt: new Date().toISOString()
         };
 
         try {
             const response = await window.electronAPI.saveParticipant(participantData);
             
             if (response.status === 'success') {
-                // Send the participant data to the main window to update the participant count
-                await window.electronAPI.updateParticipantCount(participantData);
-                // Close the window
+                // Include the folder path in the participant data
+                const participantWithFolder = {
+                    ...participantData,
+                    folderPath: response.folderPath
+                };
+
+                // Send the participant data with experimentId for proper updating
+                await window.electronAPI.updateParticipantCount({
+                    experimentId: this.experimentId,
+                    participant: participantWithFolder
+                });
+                
                 window.electronAPI.closeWindow();
             } else {
                 alert('Failed to save participant: ' + response.message);
