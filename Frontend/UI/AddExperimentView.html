@@ -1,10 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+    <meta charset="UTF-8">
+    <title>Add New Experiment</title>
+    <link rel="stylesheet" href="../styles/styles.css">
+    <link rel="stylesheet" href="../styles/AddExperiment.css">
 </head>
 <body>
-$END$
+    <form id="experimentForm">
+        <h2 class="title">Add New Experiment</h2>
+        <div class="input-group">
+            <label>Study Name:</label>
+            <input type="text" id="experimentName" required placeholder="Enter experiment name">
+        </div>
+
+        <div class="input-group">
+            <label>Description:</label>
+            <textarea id="experimentDescription" rows="3" placeholder="Enter experiment description"></textarea>
+        </div>
+
+        <div class="input-group">
+            <label>Storage Location:</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="experimentFolder" readonly>
+                <button type="button" class="folder-button" id="selectFolder">Select Folder</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Experiment Length (minutes):</label>
+            <input type="number" id="experimentLength" min="1" required>
+        </div>
+
+        <div class="action-buttons">
+            <button type="button" class="control-button" id="cancelBtn">Cancel</button>
+            <button type="submit" class="control-button" id="confirmBtn">Confirm</button>
+        </div>
+    </form>
+    <script src="../scripts/AddExperimentView.js"></script>
 </body>
 </html>

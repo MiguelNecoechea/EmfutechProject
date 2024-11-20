@@ -76,6 +76,10 @@ class ApplicationManager {
             }
         });
 
+        ipcMain.on('open-experiment-window', () => {
+            this.createExperimentWindow();
+        });
+
         // Listen for frame stream window requests
         ipcMain.on('view-camera', async () => {
             try {
@@ -90,6 +94,28 @@ class ApplicationManager {
         ipcMain.on('close-frame-stream', () => {
             if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
                 this.frameStreamWindow.close();
+            }
+        });
+
+        ipcMain.on('create-experiment-window', async () => {
+            await this.createExperimentWindow();
+        });
+
+        ipcMain.on('close-window', (event) => {
+            console.log('Received close-window event');
+            const win = BrowserWindow.fromWebContents(event.sender);
+            if (win) {
+                console.log('Window found, closing...');
+                win.close();
+            } else {
+                console.log('Window not found');
+            }
+        });
+
+        ipcMain.on('update-study-panel', (event, experimentData) => {
+            // Send the data to the main window
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('study-panel-update', experimentData);
             }
         });
     }
@@ -124,7 +150,7 @@ class ApplicationManager {
             this.mainWindow = null;
         });
 
-        await this.mainWindow.loadFile('Frontend/index.html');
+        await this.mainWindow.loadFile('Frontend/UI/index.html');
         this.mainWindow.webContents.openDevTools();
     }
 
@@ -143,7 +169,7 @@ class ApplicationManager {
             }
         });
 
-        this.calibrationWindow.loadFile('Frontend/calibration.html');
+        this.calibrationWindow.loadFile('Frontend/UI/calibration.html');
 
         this.calibrationWindow.once('ready-to-show', () => {
             this.calibrationWindow.show();
@@ -400,12 +426,28 @@ class ApplicationManager {
             }
         });
 
-        await this.frameStreamWindow.loadFile('Frontend/frameStream.html');
+        await this.frameStreamWindow.loadFile('Frontend/UI/frameStream.html');
 
         this.frameStreamWindow.on('closed', async () => {
             await this.sendToPython('stop_camera_view');
             this.frameStreamWindow = null;
         });
+    }
+
+    async createExperimentWindow() {
+        const experimentWindow = new BrowserWindow({
+            width: 600,
+            height: 500,
+            modal: true,
+            parent: this.mainWindow,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+
+        await experimentWindow.loadFile('Frontend/UI/AddExperimentView.html');
     }
 }
 

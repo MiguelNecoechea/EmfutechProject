@@ -71,10 +71,6 @@ class AppHandler {
         this.startGaze = document.getElementById('start-gaze');
         this.start = document.getElementById('start');
         this.stop = document.getElementById('stop');
-        this.selectFolder = document.getElementById('selectFolder');
-        this.participantNameInput = document.getElementById('participant-name');
-        this.newParticipant = document.getElementById('new-participant');
-        this.generateReport = document.getElementById('generate-report'); 
         this.reportArea = document.getElementById('report-area');
         this.viewCamera = document.getElementById('view-camera');
     }
@@ -126,9 +122,6 @@ class AppHandler {
             }
         });
         
-        this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
-        this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
-        this.generateReport.addEventListener('click', () => this.handleGenerateReport());  // Add this line
         this.viewCamera.addEventListener('click', async () => {
             if (!this.isViewingCamera) {
                 await this.handleViewCamera();
@@ -162,6 +155,10 @@ class AppHandler {
                 window.electronAPI.closeFrameStream();
             }
         });
+
+        document.getElementById('new-study').addEventListener('click', () => {
+            window.electronAPI.openExperimentWindow();
+        });
     }
 
     setupIPCListeners() {
@@ -180,6 +177,14 @@ class AppHandler {
                         break;
                 }
             }
+        });
+
+        // Add listener for study panel updates
+        window.electronAPI.onStudyPanelUpdate((experimentData) => {
+            // Update study panel elements
+            document.getElementById('study-name').textContent = experimentData.name;
+            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
+            document.getElementById('participant-count').textContent = '0'; // Reset participant count for new study
         });
     }
 
@@ -244,8 +249,6 @@ class AppHandler {
                     path: result
                 });
                 this.updateButtonStates(STATES.INITIAL);
-                this.selectFolder.textContent = result;
-                this.selectFolder.disabled = true;
             }
         } catch (error) {
             console.error('Error selecting output folder:', error);
@@ -280,8 +283,6 @@ class AppHandler {
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.generateReport.disabled = this.DISABLED;
-                this.participantNameInput.disabled = this.ENABLED;
                 this.viewCamera.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
@@ -289,43 +290,30 @@ class AppHandler {
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
-                this.generateReport.disabled = this.DISABLED;
-                this.participantNameInput.disabled = this.DISABLED;
-                this.newParticipant.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.READY:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.ENABLED;
                 this.stop.disabled = this.DISABLED;
-                this.generateReport.disabled = this.ENABLED;
-                this.participantNameInput.disabled = this.DISABLED;
-                this.newParticipant.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.RECORDING:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
-                this.generateReport.disabled = this.DISABLED;
-                this.participantNameInput.disabled = this.DISABLED;
-                this.newParticipant.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.CALIBRATE:
                 this.startGaze.disabled = this.ENABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.generateReport.disabled = this.DISABLED;
-                this.participantNameInput.disabled = this.ENABLED;
-                this.newParticipant.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.DISABLED:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
-                this.generateReport.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
                 break;
             default:
@@ -375,24 +363,6 @@ class AppHandler {
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
         };
-    }
-
-    async handleNewParticipant() {
-        try {
-            this.selectFolder.disabled = this.ENABLED;
-            this.selectFolder.textContent = 'Select Folder';
-            this.participantNameInput.value = '';
-            this.participantNameInput.disabled = this.ENABLED;
-            this.calibrationCount = 0;
-
-            // Update button states
-            this.updateButtonStates(STATES.DISABLED);
-            this.generateReport.disabled = this.DISABLED;
-
-            await window.electronAPI.sendPythonCommand(COMMANDS.NEW_PARTICIPANT);
-        } catch (error) {
-            console.error('Error handling new participant:', error);
-        }
     }
 
     async handleGenerateReport() {

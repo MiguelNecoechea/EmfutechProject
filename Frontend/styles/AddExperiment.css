@@ -1,0 +1,86 @@
+/* Specific styles for Add Experiment view */
+.container {
+    grid-template-columns: 1fr !important;
+    max-width: 800px !important;
+}
+
+#experimentForm {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#experimentForm .input-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+}
+
+#experimentForm .input-group label {
+    min-width: 150px;
+    text-align: left;
+}
+
+#experimentForm input[type="text"],
+#experimentForm input[type="number"] {
+    flex: 1;
+    max-width: 400px;
+    padding: 8px;
+}
+
+#experimentForm textarea {
+    flex: 1;
+    max-width: 400px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Specific style for the folder selection group */
+#experimentForm .input-group .folder-selection {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    max-width: 400px;
+}
+
+#experimentForm .input-group .folder-selection input {
+    flex: 1;
+}
+
+/* Override action buttons for this view */
+#experimentForm .action-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#experimentForm .action-buttons button {
+    width: auto;
+    min-width: 120px;
+}
+
+#cancelBtn {
+    color: #dc3545;
+    border: 1px solid #dc3545;
+}
+
+#cancelBtn:hover:not(:disabled) {
+    background-color: #dc3545;
+    color: white;
+}
+
+#confirmBtn {
+    color: #28a745;
+    border: 1px solid #28a745;
+}
+
+#confirmBtn:hover:not(:disabled) {
+    background-color: #28a745;
+    color: white;
+}

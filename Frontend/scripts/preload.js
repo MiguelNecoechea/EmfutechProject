@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld(
         generateReport: () => ipcRenderer.invoke('generate-report'),
         minimize: () => ipcRenderer.send('minimize-window'),
         viewCamera: () => ipcRenderer.send('view-camera'),
-        closeFrameStream: () => ipcRenderer.send('close-frame-stream')
+        closeFrameStream: () => ipcRenderer.send('close-frame-stream'),
+        openExperimentWindow: () => ipcRenderer.send('open-experiment-window'),
+        closeWindow: () => ipcRenderer.send('close-window'),
+        updateStudyPanel: (data) => ipcRenderer.send('update-study-panel', data),
+        onStudyPanelUpdate: (callback) => 
+            ipcRenderer.on('study-panel-update', (event, data) => callback(data)),
     }
 );

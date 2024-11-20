@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles/styles.css">
+    <link rel="stylesheet" href="../styles/styles.css">
     <title>AURA Insight</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="styles/github-markdown.css">
+    <link rel="stylesheet" href="../styles/github-markdown.css">
 </head>
 <body>
     <div class="app-container">
@@ -15,7 +15,7 @@
             <div class="left-panel">
                 <h1 class="title">AURA Insight</h1>
                 <div class="logo">
-                    <img src="images/Mirai.jpeg" alt="Mirai Logo">
+                    <img src="../images/Mirai.jpeg" alt="Mirai Logo">
                 </div>
                 <div class="tracking-signals">
                     <h3>Tracking Signals</h3>
@@ -54,29 +54,34 @@
                     <h2 class="title">Report</h2>
                     <div id="report-area" class="markdown-body" contenteditable="false"></div>
                 </div>
+
                 <div class="bottom-section">
-                    <div class="participant-panel">
-                        <h3>Study</h3>
-                        <div class="participant-inputs">
-                            <div class="input-group">
-                                <label>Folder:</label>
-                                <button class="folder-button" id="selectFolder">Select Folder</button>
+                    <div class="study-panel">
+                        <h3>Current Study</h3>
+                        <div class="study-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value" id="study-name">No study selected</span>
                             </div>
-                            <div class="input-group">
-                                <label>Name:</label>
-                                <input type="text" id="participant-name" placeholder="Enter participant name">
+                            <div class="detail-row">
+                                <span class="detail-label">Length:</span>
+                                <span class="detail-value" id="study-length">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Participants:</span>
+                                <span class="detail-value" id="participant-count">0</span>
                             </div>
                         </div>
                     </div>
                     <div class="action-buttons">
-                        <button class="control-button" id="generate-report">Generate Report</button>
-                        <button class="control-button" id="new-participant">New Participant</button>
+                        <button class="control-button" id="new-study">New Study</button>
                     </div>
                 </div>
+
             </div>
 
         </div>
-        <script type="module" src="scripts/AppHandler.js"></script>
+        <script type="module" src="../scripts/AppHandler.js"></script>
     </div>
 </body>
 </html>
