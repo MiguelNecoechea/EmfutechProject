@@ -292,13 +292,40 @@ input[type="checkbox"] {
 }
 
 .bottom-section {
-    
     display: flex;
     justify-content: space-between;
     border-top: 2px solid #ccc;
     padding-top: 20px;
     margin-top: 20px;
     min-height: 120px;
+}
+
+.info-panels {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+}
+
+.study-panel, .participant-info-panel {
+    flex: 1;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+}
+
+.study-panel h3, .participant-info-panel h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 1.1em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.study-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .action-buttons {
@@ -309,8 +336,8 @@ input[type="checkbox"] {
     margin-left: 20px;
 }
 
-.action-buttons .orange-button {
-    width: 150px; /* Or your preferred width */
+.action-buttons .control-button {
+    width: 150px;
 }
 
 .left-panel {
