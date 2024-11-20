@@ -32,6 +32,7 @@ const COMMANDS = {
     NEW_PARTICIPANT: 'new_participant',
     GENERATE_REPORT: 'generate_report',
     VIEW_CAMERA: 'view_camera',
+    SELECT_PARTICIPANT: 'select_participant'
 };
 
 // Response messages
@@ -69,6 +70,10 @@ class AppHandler {
         // Add this line to load experiments when the app starts
         this.selectedExperimentId = null;
         this.loadExperiments();
+
+        this.timer = null;
+        this.experimentDuration = 0;
+        this.timeRemaining = 0;
     }
 
     setupButtons() {
@@ -112,18 +117,19 @@ class AppHandler {
                 const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
                 if (!confirmed) return;
             }
+            
+            // Get the experiment duration from the study length display
+            const lengthText = document.getElementById('study-length').textContent;
+            const duration = parseInt(lengthText.split(' ')[0]); // Extract number from "X minutes"
+            
             await this.sendCommandToBackend(COMMANDS.START);
+            this.startExperimentTimer(duration);
             window.electronAPI.minimize();
         });
         
         this.stop.addEventListener('click', async () => {
             hasConfirmed = false;
-            await this.sendCommandToBackend(COMMANDS.STOP);
-            if (this.isViewingCamera) {
-                await window.electronAPI.closeFrameStream();
-                this.isViewingCamera = false;
-                this.viewCamera.textContent = 'View Camera';
-            }
+            await this.stopExperiment();
         });
         
         this.viewCamera.addEventListener('click', async () => {
@@ -287,26 +293,8 @@ class AppHandler {
         }
     }
 
-    async selectOutputFolder() {
-        try {
-            this.showOverlay();
-            this.updateButtonStates(STATES.DISABLED);
-            const result = await window.electronAPI.openDirectory();
-            if (result) {
-                await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_PATH, {
-                    path: result
-                });
-                this.updateButtonStates(STATES.INITIAL);
-            }
-        } catch (error) {
-            console.error('Error selecting output folder:', error);
-        } finally {
-            this.hideOverlay();
-            this.checkSignalStates();
-        }
-    }
-
     async cleanup() {
+        this.stopExperimentTimer();
         // Depending on your application logic,
         // ensure that calibration is only handled within the calibration window.
         // If necessary, implement additional cleanup here.
@@ -326,6 +314,8 @@ class AppHandler {
     updateButtonStates(state) {
         // Store current state for reference 
         this.currentState = state;
+        const experimentsList = document.getElementById('experiments-list');
+        const participantsList = document.getElementById('participants-list');
         switch (state) {
             case STATES.INITIAL:
                 this.startGaze.disabled = this.DISABLED;
@@ -333,39 +323,53 @@ class AppHandler {
                 this.stop.disabled = this.DISABLED;
                 this.viewCamera.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
                 break;
             case STATES.CALIBRATING:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
+                experimentsList.style.pointerEvents = 'none';
+                participantsList.style.pointerEvents = 'none';
                 break;
             case STATES.READY:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.ENABLED;
                 this.stop.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
                 break;
             case STATES.RECORDING:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
+                experimentsList.style.pointerEvents = 'none';
+                participantsList.style.pointerEvents = 'none';
                 break;
             case STATES.CALIBRATE:
                 this.startGaze.disabled = this.ENABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
                 break;
             case STATES.DISABLED:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
                 this.stop.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.DISABLED);
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
                 break;
             default:
                 // Handle any other states
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
         }
@@ -392,14 +396,6 @@ class AppHandler {
         }
     }
 
-    showOverlay() {
-        this.overlay.classList.add('active');
-    }
-
-    hideOverlay() {
-        this.overlay.classList.remove('active');
-    }
-
     // Add debounce utility method
     debounce(func, wait) {
         let timeout;
@@ -411,35 +407,6 @@ class AppHandler {
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
         };
-    }
-
-    async handleGenerateReport() {
-        try {
-            this.showOverlay();
-            const response = await window.electronAPI.generateReport();
-            console.log("Report Response:", response);
-            
-            if (response && response.status === 'success') {
-                if (this.reportArea) {
-                    this.reportArea.innerHTML = window.marked.parse(response.message || "No report data received");
-                } else {
-                    console.error('Report area not found');
-                }
-            } else {
-                console.error('Error generating report:', response);
-                if (this.reportArea) {
-                    this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + 
-                        (response ? response.message : 'Unknown error'));
-                }
-            }
-        } catch (error) {
-            console.error('Error generating report:', error);
-            if (this.reportArea) {
-                this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + error.message);
-            }
-        } finally {
-            this.hideOverlay();
-        }
     }
 
     async handleViewCamera() {
@@ -525,17 +492,7 @@ class AppHandler {
                     `;
 
                     // Add click handler for participant selection
-                    participantElement.addEventListener('click', () => {
-                        // Update current participant details in study panel
-                        document.getElementById('current-participant-name').textContent = participant.name;
-                        document.getElementById('current-participant-age').textContent = participant.age;
-
-                        // Highlight selected participant
-                        document.querySelectorAll('.participant-item').forEach(item => {
-                            item.classList.remove('selected');
-                        });
-                        participantElement.classList.add('selected');
-                    });
+                    participantElement.addEventListener('click', () => this.handleParticipantClick(participant, participantElement));
 
                     participantsList.appendChild(participantElement);
                 });
@@ -548,11 +505,116 @@ class AppHandler {
         }
     }
 
+    async handleParticipantClick(participant, participantElement) {
+        // Update UI as before
+        document.getElementById('current-participant-name').textContent = participant.name;
+        document.getElementById('current-participant-age').textContent = participant.age;
+
+        // Highlight selected participant
+        document.querySelectorAll('.participant-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        participantElement.classList.add('selected');
+
+        // Send participant data to backend
+        try {
+            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_NAME, {
+                name: participant.name,
+            });
+
+            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_PATH, {
+                path: participant.folderPath
+            });
+            
+            this.enableDisableCheckboxes(this.ENABLED);
+            
+        } catch (error) {
+            console.error('Error sending participant data to backend:', error);
+        }
+    }
+
     // Add method to clear participant details
     clearParticipantDetails() {
+        this.stopExperimentTimer();
+        this.updateButtonStates(STATES.INITIAL);
+        this.enableDisableCheckboxes(this.DISABLED);
         document.getElementById('current-participant-name').textContent = 'None';
         document.getElementById('current-participant-age').textContent = '-';
     }
+
+    // Add this new method
+    startExperimentTimer(duration) {
+        this.experimentDuration = duration * 60; // Convert minutes to seconds
+        this.timeRemaining = this.experimentDuration;
+        this.updateTimerDisplay();
+
+        this.timer = setInterval(() => {
+            this.timeRemaining--;
+            this.updateTimerDisplay();
+
+            if (this.timeRemaining <= 0) {
+                this.stopExperiment();
+            }
+        }, 1000);
+    }
+
+    // Add this new method
+    updateTimerDisplay() {
+        const minutes = Math.floor(this.timeRemaining / 60);
+        const seconds = this.timeRemaining % 60;
+        const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('time-remaining').textContent = display;
+    }
+
+    // Add this new method
+    stopExperimentTimer() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+        document.getElementById('time-remaining').textContent = '--:--';
+    }
+
+    // Add this new method
+    async stopExperiment() {
+        this.stopExperimentTimer();
+        await this.sendCommandToBackend(COMMANDS.STOP);
+        if (this.isViewingCamera) {
+            await window.electronAPI.closeFrameStream();
+            this.isViewingCamera = false;
+            this.viewCamera.textContent = 'View Camera';
+        }
+    }
+
+    async handleGenerateReport() {
+        try {
+            this.showOverlay();
+            const response = await window.electronAPI.generateReport();
+            console.log("Report Response:", response);
+            
+            if (response && response.status === 'success') {
+                if (this.reportArea) {
+                    this.reportArea.innerHTML = window.marked.parse(response.message || "No report data received");
+                } else {
+                    console.error('Report area not found');
+                }
+            } else {
+                console.error('Error generating report:', response);
+                if (this.reportArea) {
+                    this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + 
+                        (response ? response.message : 'Unknown error'));
+                }
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            if (this.reportArea) {
+                this.reportArea.innerHTML = window.marked.parse('**Error generating report:** ' + error.message);
+            }
+        } finally {
+            this.hideOverlay();
+        }
+    }
+
 }
 
 document.addEventListener('DOMContentLoaded', () => {
