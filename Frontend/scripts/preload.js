@@ -45,4 +45,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('get-participants', experimentId),
     onExperimentUpdate: (callback) =>
         ipcRenderer.on('experiment-update', (_event, data) => callback(data)),
+    focusWindow: () => 
+        ipcRenderer.send('focus-window'),
 });

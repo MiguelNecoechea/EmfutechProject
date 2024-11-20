@@ -579,6 +579,10 @@ class AppHandler {
     async stopExperiment() {
         this.stopExperimentTimer();
         await this.sendCommandToBackend(COMMANDS.STOP);
+        
+        // Bring the window back into focus
+        await window.electronAPI.focusWindow();
+        
         if (this.isViewingCamera) {
             await window.electronAPI.closeFrameStream();
             this.isViewingCamera = false;

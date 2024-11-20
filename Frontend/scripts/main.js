@@ -287,6 +287,15 @@ class ApplicationManager {
         ipcMain.on('open-participant-window', (event, experimentId) => {
             this.createParticipantWindow(experimentId);
         });
+
+        ipcMain.on('focus-window', () => {
+            if (this.mainWindow) {
+                if (this.mainWindow.isMinimized()) {
+                    this.mainWindow.restore();
+                }
+                this.mainWindow.focus();
+            }
+        });
     }
 
     async onAppReady() {
@@ -305,7 +314,7 @@ class ApplicationManager {
     async createWindow() {
         this.mainWindow = new BrowserWindow({
             width: 1200,
-            height: 900,
+            height: 1000,
             minWidth: 1200,
             minHeight: 900,
             webPreferences: {
