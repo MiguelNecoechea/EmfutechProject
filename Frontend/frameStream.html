@@ -3,15 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frame Stream</title>
+    <title>Camera Viewer</title>
     <style>
         body {
             margin: 0;
             display: flex;
             justify-content: center;
-            align-items: center;
+            gap: 10px;
+            padding: 10px;
             height: 100vh;
             background-color: #000;
+        }
+        .stream-container {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background-color: #111;
+            border-radius: 5px;
+            flex: 1;
+            max-width: 50%;
+        }
+        .stream-container.visible {
+            display: flex;
         }
         img {
             max-width: 100%;
@@ -26,24 +39,48 @@
     </style>
 </head>
 <body>
-    <img id="frame" alt="Frame Stream">
-    <div id="error" class="error" style="display: none;"></div>
+    <div id="camera-container" class="stream-container">
+        <img id="camera-frame" alt="Camera Stream">
+        <div id="camera-error" class="error" style="display: none;"></div>
+    </div>
+    <div id="gaze-container" class="stream-container">
+        <img id="gaze-frame" alt="Gaze Stream">
+        <div id="gaze-error" class="error" style="display: none;"></div>
+    </div>
     <script>
-        const frameElement = document.getElementById('frame');
-        const errorElement = document.getElementById('error');
+        const cameraContainer = document.getElementById('camera-container');
+        const cameraElement = document.getElementById('camera-frame');
+        const cameraError = document.getElementById('camera-error');
+        const gazeContainer = document.getElementById('gaze-container');
+        const gazeElement = document.getElementById('gaze-frame');
+        const gazeError = document.getElementById('gaze-error');
         
         window.electronAPI.onFrameData((response) => {
             try {
                 if (response.type === 'frame' && response.data) {
-                    frameElement.style.display = 'block';
-                    errorElement.style.display = 'none';
-                    frameElement.src = `data:image/jpeg;base64,${response.data}`;
+                    cameraContainer.classList.add('visible');
+                    cameraElement.style.display = 'block';
+                    cameraError.style.display = 'none';
+                    cameraElement.src = `data:image/jpeg;base64,${response.data}`;
+                } else if (response.type === 'gaze_frame' && response.data) {
+                    gazeContainer.classList.add('visible');
+                    gazeElement.style.display = 'block';
+                    gazeError.style.display = 'none';
+                    gazeElement.src = `data:image/jpeg;base64,${response.data}`;
                 }
             } catch (error) {
                 console.error('Error processing frame:', error);
-                frameElement.style.display = 'none';
-                errorElement.style.display = 'block';
-                errorElement.textContent = 'Error displaying frame';
+                if (response.type === 'frame') {
+                    cameraContainer.classList.remove('visible');
+                    cameraElement.style.display = 'none';
+                    cameraError.style.display = 'block';
+                    cameraError.textContent = 'Error displaying camera frame';
+                } else {
+                    gazeContainer.classList.remove('visible');
+                    gazeElement.style.display = 'none';
+                    gazeError.style.display = 'block';
+                    gazeError.textContent = 'Error displaying gaze frame';
+                }
             }
         });
     </script>
