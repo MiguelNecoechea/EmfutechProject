@@ -159,7 +159,6 @@ class BackendServer:
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-
         # Set up OpenAI key from encrypted storage
     #     self._setup_openai_key()
 
@@ -761,9 +760,9 @@ class BackendServer:
         """Update the base output path and create necessary subdirectories."""
         try:
             self._base_path = path
-            self._participant_folder = os.path.join(path, self._filename or DEFAULT_PARTICIPANT)
-            self._path = os.path.join(self._participant_folder, COLLECTED_FOLDER)
-            self._training_path = os.path.join(self._participant_folder, TRAINING_FOLDER)
+            self._participant_folder = path
+            self._path = os.path.join(path, COLLECTED_FOLDER)
+            self._training_path = os.path.join(path, TRAINING_FOLDER)
             
             return {"status": STATUS_SUCCESS, "message": "Output path updated"}
         except Exception as e:
