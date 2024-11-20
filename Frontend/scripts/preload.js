@@ -32,5 +32,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveExperiment: (data) =>
         ipcRenderer.invoke('save-experiment', data),
     getExperiments: () =>
-        ipcRenderer.invoke('get-experiments')
+        ipcRenderer.invoke('get-experiments'),
+    saveParticipant: (data) =>
+        ipcRenderer.invoke('save-participant', data),
+    updateParticipantCount: (data) =>
+        ipcRenderer.send('update-participant-count', data),
+    onParticipantUpdate: (callback) =>
+        ipcRenderer.on('participant-update', (_event, data) => callback(data)),
+    openParticipantWindow: () =>
+        ipcRenderer.send('open-participant-window'),
 });

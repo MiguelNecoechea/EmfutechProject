@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add New Participant</title>
+    <link rel="stylesheet" href="../styles/styles.css">
+    <link rel="stylesheet" href="../styles/AddExperiment.css">
+</head>
+<body>
+    <form id="participantForm">
+        <h2 class="title">Add New Participant</h2>
+        <div class="input-group">
+            <label>Name:</label>
+            <input type="text" id="participantName" required placeholder="Enter participant's name">
+        </div>
+
+        <div class="input-group">
+            <label>Age:</label>
+            <input type="number" id="participantAge" min="0" required placeholder="Enter age">
+        </div>
+
+        <div class="input-group">
+            <label>Gender:</label>
+            <select id="participantGender" required>
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+                <option value="prefer_not_to_say">Prefer not to say</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>Birthday:</label>
+            <input type="date" id="participantBirthday" required>
+        </div>
+
+        <div class="action-buttons">
+            <button type="button" class="control-button" id="cancelBtn">Cancel</button>
+            <button type="submit" class="control-button" id="confirmBtn">Confirm</button>
+        </div>
+    </form>
+    <script src="../scripts/AddParticipantView.js"></script>
+</body>
+</html>

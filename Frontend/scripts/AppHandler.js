@@ -159,6 +159,23 @@ class AppHandler {
         document.getElementById('new-study').addEventListener('click', () => {
             window.electronAPI.openExperimentWindow();
         });
+
+        // Add participant button handler
+        const addParticipantBtn = document.getElementById('add-participant');
+        if (addParticipantBtn) {
+            addParticipantBtn.addEventListener('click', () => {
+                window.electronAPI.openParticipantWindow();
+            });
+        }
+
+        // Add participant count update listener
+        window.electronAPI.onParticipantUpdate((participantData) => {
+            const participantCount = document.getElementById('participant-count');
+            if (participantCount) {
+                const currentCount = parseInt(participantCount.textContent) || 0;
+                participantCount.textContent = (currentCount + 1).toString();
+            }
+        });
     }
 
     setupIPCListeners() {
@@ -185,6 +202,16 @@ class AppHandler {
             document.getElementById('study-name').textContent = experimentData.name;
             document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
             document.getElementById('participant-count').textContent = '0'; // Reset participant count for new study
+        });
+
+        // Add listener for participant updates
+        window.electronAPI.onParticipantUpdate((participantData) => {
+            // Update participant count in the UI
+            const participantCount = document.getElementById('participant-count');
+            if (participantCount) {
+                const currentCount = parseInt(participantCount.textContent) || 0;
+                participantCount.textContent = (currentCount + 1).toString();
+            }
         });
     }
 

@@ -169,6 +169,50 @@ class ApplicationManager {
                 return { status: 'error', message: error.message };
             }
         });
+
+        ipcMain.handle('save-participant', async (event, participantData) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const filePath = path.join(dataDir, 'participants.json');
+
+                // Ensure directory exists
+                if (!fs.existsSync(dataDir)) {
+                    fs.mkdirSync(dataDir, { recursive: true });
+                }
+
+                // Read existing data
+                let participants = [];
+                if (fs.existsSync(filePath)) {
+                    const fileContent = fs.readFileSync(filePath, 'utf8');
+                    participants = JSON.parse(fileContent);
+                }
+
+                // Add new participant
+                participants.push({
+                    ...participantData,
+                    createdAt: new Date().toISOString()
+                });
+
+                // Write back to file
+                fs.writeFileSync(filePath, JSON.stringify(participants, null, 2));
+                
+                return { status: 'success' };
+            } catch (error) {
+                return { status: 'error', message: error.message };
+            }
+        });
+
+        ipcMain.on('update-participant-count', (event, participantData) => {
+            // Send the data to the main window to update the participant count
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('participant-update', participantData);
+            }
+        });
+
+        // Add handler for opening participant window
+        ipcMain.on('open-participant-window', () => {
+            this.createParticipantWindow();
+        });
     }
 
     async onAppReady() {
@@ -500,6 +544,23 @@ class ApplicationManager {
         });
 
         await experimentWindow.loadFile('Frontend/UI/AddExperimentView.html');
+    }
+
+    async createParticipantWindow() {
+        const participantWindow = new BrowserWindow({
+            width: 400,
+            height: 300,
+            modal: true,
+            parent: this.mainWindow,
+            webPreferences: {
+                nodeIntegration: true,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js'),
+                sandbox: false
+            }
+        });
+
+        await participantWindow.loadFile('Frontend/UI/AddParticipantView.html');
     }
 }
 

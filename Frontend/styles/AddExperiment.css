@@ -84,3 +84,34 @@
     background-color: #28a745;
     color: white;
 }
+
+#participantForm select {
+    flex: 1;
+    max-width: 400px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}
+
+#participantForm input[type="date"] {
+    flex: 1;
+    max-width: 400px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Override the default action-buttons styles for the participant form */
+#participantForm .action-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#participantForm .action-buttons button {
+    flex: 1;
+    min-width: 100px;
+}
