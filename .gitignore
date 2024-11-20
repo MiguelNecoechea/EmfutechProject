@@ -101,3 +101,14 @@ id_dsa         # SSH private key
 *.crt          # Certificate files
 *.cer          # Certificate files
 *.der          # DER encoded certificate files
+
+# Data Files and Folders
+data/
+Frontend/data/
+*.json
+!package.json
+!package-lock.json
+
+# Specific Data Files
+Frontend/data/experiments.json
+Frontend/data/participants.json
