@@ -76,14 +76,37 @@ body {
 .main-panel {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    gap: 20px;
     padding: 20px;
-    gap: 10px;
     background: white;
     border-radius: 8px;
     border: 2px solid #ccc;
     overflow: hidden;
     height: calc(100% - 150px);
+}
+
+.experiments-section,
+.participants-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.list-container {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+}
+
+.experiments-section .title,
+.participants-section .title {
+    margin: 0 0 10px 0;
+    font-size: 1.5em;
 }
 
 .participant-panel {
@@ -446,24 +469,6 @@ input[type="checkbox"]:disabled + label {
     flex-direction: column;
     height: 100%;
 }
-
-/* Style the scrollbar for better visibility (optional)
-.markdown-body::-webkit-scrollbar {
-    width: 8px;
-}
-
-.markdown-body::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.markdown-body::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-.markdown-body::-webkit-scrollbar-thumb:hover {
-    background: #555;
-} */
 
 #view-camera {
     color: #17a2b8;
