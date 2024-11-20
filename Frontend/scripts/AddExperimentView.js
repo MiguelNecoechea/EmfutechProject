@@ -58,8 +58,7 @@ class AddExperimentView {
         };
 
         try {
-            // Send data to main process
-            const response = await window.electronAPI.sendPythonCommand('create_experiment', experimentData);
+            const response = await window.electronAPI.saveExperiment(experimentData);
             
             if (response.status === 'success') {
                 // Send the experiment data to the main window to update the study panel
@@ -67,11 +66,11 @@ class AddExperimentView {
                 // Close the window
                 window.electronAPI.closeWindow();
             } else {
-                alert('Failed to create experiment: ' + response.message);
+                alert('Failed to save experiment: ' + response.message);
             }
         } catch (error) {
-            console.error('Error creating experiment:', error);
-            alert('Error creating experiment: ' + error.message);
+            console.error('Error saving experiment:', error);
+            alert('Error saving experiment: ' + error.message);
         }
     }
 

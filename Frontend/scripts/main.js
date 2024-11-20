@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
+const fs = require('fs');
 
 class ApplicationManager {
     constructor() {
@@ -116,6 +117,56 @@ class ApplicationManager {
             // Send the data to the main window
             if (this.mainWindow) {
                 this.mainWindow.webContents.send('study-panel-update', experimentData);
+            }
+        });
+
+        ipcMain.handle('save-experiment', async (event, experimentData) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const filePath = path.join(dataDir, 'experiments.json');
+
+                // Ensure directory exists
+                if (!fs.existsSync(dataDir)) {
+                    fs.mkdirSync(dataDir, { recursive: true });
+                }
+
+                // Read existing data
+                let experiments = [];
+                if (fs.existsSync(filePath)) {
+                    const fileContent = fs.readFileSync(filePath, 'utf8');
+                    experiments = JSON.parse(fileContent);
+                }
+
+                // Add new experiment
+                experiments.push({
+                    ...experimentData,
+                    createdAt: new Date().toISOString()
+                });
+
+                // Write back to file
+                fs.writeFileSync(filePath, JSON.stringify(experiments, null, 2));
+                
+                return { status: 'success' };
+            } catch (error) {
+                return { status: 'error', message: error.message };
+            }
+        });
+
+        ipcMain.handle('get-experiments', async () => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const filePath = path.join(dataDir, 'experiments.json');
+
+                if (!fs.existsSync(filePath)) {
+                    return { status: 'success', data: [] };
+                }
+
+                const fileContent = fs.readFileSync(filePath, 'utf8');
+                const experiments = JSON.parse(fileContent);
+                
+                return { status: 'success', data: experiments };
+            } catch (error) {
+                return { status: 'error', message: error.message };
             }
         });
     }
@@ -441,9 +492,10 @@ class ApplicationManager {
             modal: true,
             parent: this.mainWindow,
             webPreferences: {
-                nodeIntegration: false,
+                nodeIntegration: true,
                 contextIsolation: true,
-                preload: path.join(__dirname, 'preload.js')
+                preload: path.join(__dirname, 'preload.js'),
+                sandbox: false
             }
         });
 
