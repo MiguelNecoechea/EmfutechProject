@@ -51,6 +51,7 @@ class AppHandler {
         this.setupIPCListeners();
         this.currentState = STATES.INITIAL;
         this.calibrationCount = 0;
+        this.isCameraActive = false;
         
         // Initial button state update
         this.checkSignalStates();
@@ -63,6 +64,7 @@ class AppHandler {
         });
 
         this.overlay = document.getElementById('overlay');
+        this.isViewingCamera = false;
     }
 
     setupButtons() {
@@ -100,6 +102,7 @@ class AppHandler {
             const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
             if (confirmed) {
                 hasConfirmed = true;
+                this.viewCamera.disabled = this.ENABLED;
                 await this.sendCommandToBackend(COMMANDS.START_GAZE);
             }
         });
@@ -116,13 +119,27 @@ class AppHandler {
         this.stop.addEventListener('click', async () => {
             hasConfirmed = false;
             await this.sendCommandToBackend(COMMANDS.STOP);
-            window.electronAPI.closeFrameStream();
+            if (this.isViewingCamera) {
+                await window.electronAPI.closeFrameStream();
+                this.isViewingCamera = false;
+                this.viewCamera.textContent = 'View Camera';
+            }
         });
         
         this.selectFolder.addEventListener('click', () => this.selectOutputFolder());
         this.newParticipant.addEventListener('click', () => this.handleNewParticipant());
         this.generateReport.addEventListener('click', () => this.handleGenerateReport());  // Add this line
-        this.viewCamera.addEventListener('click', () => this.handleViewCamera());
+        this.viewCamera.addEventListener('click', async () => {
+            if (!this.isViewingCamera) {
+                await this.handleViewCamera();
+                this.isViewingCamera = true;
+                this.viewCamera.textContent = 'Close Camera View';
+            } else {
+                await window.electronAPI.closeFrameStream();
+                this.isViewingCamera = false;
+                this.viewCamera.textContent = 'View Camera';
+            }
+        });
 
         // Checkbox event listeners
         this.signalAura.addEventListener('change', () => this.updateSignalStatus(SIGNALS.AURA, this.signalAura.checked));
@@ -138,6 +155,13 @@ class AppHandler {
                 await this.updateParticipantName(event.target.value);
             }, 500)); // Wait 500ms after typing stops before sending update
         }
+
+        // Add window close handler to reset camera view state
+        window.addEventListener('beforeunload', () => {
+            if (this.isViewingCamera) {
+                window.electronAPI.closeFrameStream();
+            }
+        });
     }
 
     setupIPCListeners() {
@@ -160,6 +184,7 @@ class AppHandler {
     }
 
     async sendCommandToBackend(command) {
+        
         try {
             const response = await window.electronAPI.sendPythonCommand(command);
             if (response.status === 'success') {    
@@ -167,11 +192,16 @@ class AppHandler {
                     case COMMANDS.START:
                         this.updateButtonStates(STATES.RECORDING);
                         break;
-                case COMMANDS.STOP:
-                    this.updateButtonStates(STATES.READY); 
-                    break;
+                    case COMMANDS.STOP:
+                        this.viewCamera.disabled = this.DISABLED;
+                        if (this.signalEye.checked && this.calibrationCount === 0) {
+                            this.updateButtonStates(STATES.CALIBRATE);
+                        } else {
+                            this.updateButtonStates(STATES.READY);
+                        }
+                        break;
+                }
             }
-        }
         } catch (error) {
             console.error(`Error sending ${command} to backend:`, error);
         }
@@ -252,12 +282,13 @@ class AppHandler {
                 this.stop.disabled = this.DISABLED;
                 this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.ENABLED;
+                this.viewCamera.disabled = this.DISABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.CALIBRATING:
                 this.startGaze.disabled = this.DISABLED;
                 this.start.disabled = this.DISABLED;
-                this.stop.disabled = this.DISABLED;
+                this.stop.disabled = this.ENABLED;
                 this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.DISABLED;
                 this.newParticipant.disabled = this.DISABLED;
@@ -279,7 +310,7 @@ class AppHandler {
                 this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.DISABLED;
                 this.newParticipant.disabled = this.DISABLED;
-                this.enableDisableCheckboxes(this.DISABLED); // Ensure checkboxes are disabled during recording
+                this.enableDisableCheckboxes(this.DISABLED);
                 break;
             case STATES.CALIBRATE:
                 this.startGaze.disabled = this.ENABLED;
@@ -287,6 +318,7 @@ class AppHandler {
                 this.stop.disabled = this.DISABLED;
                 this.generateReport.disabled = this.DISABLED;
                 this.participantNameInput.disabled = this.ENABLED;
+                this.newParticipant.disabled = this.ENABLED;
                 this.enableDisableCheckboxes(this.ENABLED);
                 break;
             case STATES.DISABLED:

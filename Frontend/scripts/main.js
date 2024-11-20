@@ -210,7 +210,7 @@ class ApplicationManager {
                     if (this.reportResponseResolver) {
                         this.reportResponseResolver(response);
                         this.reportResponseResolver = null;
-                    } else if (response.type === 'frame' && this.frameStreamWindow) {
+                    } else if ((response.type === 'frame' || response.type === 'gaze_frame') && this.frameStreamWindow) {
                         try {
                             if (!this.frameStreamWindow.isDestroyed()) {
                                 this.frameStreamWindow.webContents.send('frame-data', response);
