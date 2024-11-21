@@ -131,6 +131,31 @@ class AppHandler {
     setupIPCListeners() {
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
+            
+            // Handle signal status updates
+            if (response.signal) {
+                const signalMappings = {
+                    'aura': 'status-aura',
+                    'gaze': 'status-eye',
+                    'emotion': 'status-emotion',
+                    'pointer': 'status-pointer',
+                    'screen': 'status-screen'
+                };
+
+                const statusElement = document.getElementById(signalMappings[response.signal]);
+                if (statusElement) {
+                    if (response.status === 'success') {
+                        statusElement.textContent = 'Active';
+                        statusElement.className = 'signal-status active';
+                    } else if (response.status === 'error') {
+                        statusElement.textContent = 'Error';
+                        statusElement.className = 'signal-status error';
+                        console.error(`Error with ${response.signal}: ${response.message}`);
+                    }
+                }
+            }
+
+            // Handle other messages
             if (response.status === 'success') {
                 switch (response.message) {
                     case MESSAGES.START_CALIBRATION:
@@ -577,12 +602,21 @@ class AppHandler {
     // Add this new method
     async updateSignalStatus(signal, status) {
         try {
-            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_SIGNAL, {
-                signal: signal,
-                status: status
-            });
+            const statusElement = document.getElementById(`status-${signal}`);
+            if (statusElement) {
+                if (this.isRecording && status) {
+                    statusElement.textContent = 'Active';
+                    statusElement.className = 'signal-status active';
+                } else if (!this.isRecording && status) {
+                    statusElement.textContent = 'Ready';
+                    statusElement.className = 'signal-status ready';
+                } else {
+                    statusElement.textContent = 'Inactive';
+                    statusElement.className = 'signal-status inactive';
+                }
+            }
         } catch (error) {
-            console.error(`Error updating signal status for ${signal}:`, error);
+            console.error(`Error updating signal status UI for ${signal}:`, error);
         }
     }
 
