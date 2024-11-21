@@ -49,4 +49,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('focus-window'),
     getExperiment: (experimentId) =>
         ipcRenderer.invoke('get-experiment', experimentId),
+    showContextMenu: (menuType, experimentId) =>
+        ipcRenderer.invoke('show-context-menu', menuType, experimentId),
+    onMenuAction: (callback) =>
+        ipcRenderer.on('menu-action', (_event, action, ...args) => callback(action, ...args)),
 });

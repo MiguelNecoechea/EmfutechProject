@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
@@ -295,6 +295,60 @@ class ApplicationManager {
                 }
                 this.mainWindow.focus();
             }
+        });
+
+        ipcMain.handle('get-experiment', async (event, experimentId) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const filePath = path.join(dataDir, 'experiments.json');
+
+                if (!fs.existsSync(filePath)) {
+                    return { status: 'error', message: 'Experiments file not found' };
+                }
+
+                const fileContent = fs.readFileSync(filePath, 'utf8');
+                const experiments = JSON.parse(fileContent);
+                const experiment = experiments.find(e => e.createdAt === experimentId);
+
+                if (!experiment) {
+                    return { status: 'error', message: 'Experiment not found' };
+                }
+
+                return { status: 'success', data: experiment };
+            } catch (error) {
+                return { status: 'error', message: error.message };
+            }
+        });
+
+        ipcMain.handle('show-context-menu', (event, menuType, experimentId) => {
+            const window = BrowserWindow.fromWebContents(event.sender);
+            
+            let menuTemplate;
+            switch (menuType) {
+                case 'new-study':
+                    menuTemplate = [
+                        {
+                            label: 'New Study',
+                            click: () => {
+                                window.webContents.send('menu-action', 'new-study');
+                            }
+                        }
+                    ];
+                    break;
+                case 'add-participant':
+                    menuTemplate = [
+                        {
+                            label: 'Add Participant',
+                            click: () => {
+                                window.webContents.send('menu-action', 'add-participant', experimentId);
+                            }
+                        }
+                    ];
+                    break;
+            }
+
+            const menu = Menu.buildFromTemplate(menuTemplate);
+            menu.popup({ window });
         });
     }
 
@@ -635,6 +689,7 @@ class ApplicationManager {
             width: 400,
             height: 300,
             modal: true,
+            resizable: false,
             parent: this.mainWindow,
             webPreferences: {
                 nodeIntegration: true,
