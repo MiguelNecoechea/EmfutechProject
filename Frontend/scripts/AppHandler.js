@@ -3,8 +3,8 @@ import { EyeTrackingCalibration } from './EyeTrackingCalibration.js';
 // Button states
 const STATES = {
     INITIAL: 'initial',
-    CALIBRATE: 'calibrate',
-    CALIBRATING: 'calibrating', 
+    CALIBRATE: 'calibrate', 
+    CALIBRATING: 'calibrating',
     READY: 'ready',
     RECORDING: 'recording',
     COMPLETED: 'completed',
@@ -54,7 +54,7 @@ class AppHandler {
         this.isCameraActive = false;
         
         // Initial button state update
-        this.updateButtonStates(STATES.INITIAL);
+        // this.updateButtonStates(STATES.INITIAL);
 
         window.addEventListener('beforeunload', () => {
             this.cleanup();
@@ -151,13 +151,18 @@ class AppHandler {
 
                 const statusElement = document.getElementById(signalMappings[response.signal]);
                 if (statusElement) {
-                    if (response.status === 'success') {
+                    if (response.status === 'calibrating') {
+                        statusElement.textContent = 'Calibrating';
+                        statusElement.className = 'signal-status calibrating';
+                        this.lockUIForCalibration(true);
+                    } else if (response.status === 'success') {
                         statusElement.textContent = 'Active';
                         statusElement.className = 'signal-status active';
                     } else if (response.status === 'error') {
                         statusElement.textContent = 'Error';
                         statusElement.className = 'signal-status error';
                         console.error(`Error with ${response.signal}: ${response.message}`);
+                        this.lockUIForCalibration(false);
                     }
                 }
             }
@@ -167,12 +172,29 @@ class AppHandler {
                 switch (response.message) {
                     case MESSAGES.START_CALIBRATION:
                         console.log("Starting calibration");
+                        const eyeStatus = document.getElementById('status-eye');
+                        eyeStatus.textContent = 'Calibrating';
+                        eyeStatus.className = 'signal-status calibrating';
+                        this.lockUIForCalibration(true);
                         this.updateButtonStates(STATES.CALIBRATING);
                         window.electronAPI.openCalibrationWindow();
                         break;
                     case MESSAGES.CALIBRATION_COMPLETE:
                         this.calibrationCount++;
+                        
+                        // Close camera view if it's open
+                        if (this.isViewingCamera) {
+                            window.electronAPI.closeFrameStream();
+                            this.isViewingCamera = false;
+                            this.viewCamera.textContent = 'View Camera';
+                        }
+                        
+                        // Update eye tracking status to Ready
+                        const eyeTrackingStatus = document.getElementById('status-eye');
+                        eyeTrackingStatus.textContent = 'Ready';
+                        eyeTrackingStatus.className = 'signal-status ready';
                         this.updateButtonStates(STATES.READY);
+                        this.lockUIForCalibration(false);
                         break;
                 }
             }
@@ -222,35 +244,31 @@ class AppHandler {
             if (response.status === 'success') {    
                 switch (command) {
                     case COMMANDS.START:
-                        this.updateButtonStates(STATES.RECORDING);
+                        // Lock UI immediately after successful start
+                        const selectedParticipant = document.querySelector('.participant-item.selected');
+                        if (selectedParticipant) {
+                            this.updateButtonStates(STATES.RECORDING);
+                        }
                         break;
                     case COMMANDS.STOP:
                         // Close camera view if it's open
                         if (this.isViewingCamera) {
                             await window.electronAPI.closeFrameStream();
                             this.isViewingCamera = false;
-                        }
-                        
+                        }   
                         // Disable the view camera button
                         this.viewCamera.disabled = true;
                         this.viewCamera.textContent = 'View Camera';
-                        
-                        // Get the experiment data to check if eye tracking is enabled
-                        const experiment = await window.electronAPI.getExperiment(this.selectedExperimentId);
-                        if (experiment && experiment.data && experiment.data.signals) {
-                            if (experiment.data.signals.eye && this.calibrationCount === 0) {
-                                this.updateButtonStates(STATES.CALIBRATE);
-                            } else {
-                                this.updateButtonStates(STATES.READY);
-                            }
-                        } else {
-                            this.updateButtonStates(STATES.READY);
-                        }
                         break;
                 }
+                return response;
+            } else {
+                console.error(`Command ${command} failed:`, response.message);
+                throw new Error(response.message);
             }
         } catch (error) {
             console.error(`Error sending ${command} to backend:`, error);
+            throw error;
         }
     }
 
@@ -289,56 +307,64 @@ class AppHandler {
 
     // Add this new method to manage button states
     updateButtonStates(state) {
-        // Store current state for reference 
         this.currentState = state;
         const experimentsList = document.getElementById('experiments-list');
         const participantsList = document.getElementById('participants-list');
         const addParticipantBtn = document.getElementById('add-participant');
         const newStudyBtn = document.getElementById('new-study');
 
-        // First, reset all buttons to default state
-        this.viewCamera.disabled = this.DISABLED;
-        addParticipantBtn.disabled = this.DISABLED;
-        newStudyBtn.disabled = this.DISABLED;
-
         switch (state) {
-            case STATES.INITIAL:
-                // Initial state - everything enabled except camera
-                this.viewCamera.disabled = this.DISABLED;
+            case STATES.CALIBRATE:
                 addParticipantBtn.disabled = !this.selectedExperimentId;
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
                 participantsList.style.pointerEvents = 'auto';
                 this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
+                this.updateParticipantButtonStates('stop', this.DISABLED);
+                this.updateParticipantButtonStates('start', this.DISABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.ENABLED);
+                this.lockUIForCalibration(false);
                 break;
-            case STATES.CALIBRATING:
-                // During calibration - disable most interactions
-                addParticipantBtn.disabled = this.DISABLED;
-                newStudyBtn.disabled = this.DISABLED;
-                experimentsList.style.pointerEvents = 'none';
-                participantsList.style.pointerEvents = 'none';
-                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
-                break;
-
-            case STATES.READY:
-                // Ready to record - enable necessary controls
-                addParticipantBtn.disabled = !this.selectedExperimentId;
-                newStudyBtn.disabled = this.ENABLED;
-                experimentsList.style.pointerEvents = 'auto';
-                participantsList.style.pointerEvents = 'auto';
-                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
-                break;
-
             case STATES.RECORDING:
-                // During recording - lock most interactions
                 this.viewCamera.disabled = this.DISABLED;
-                addParticipantBtn.disabled = this.DISABLED;
-                newStudyBtn.disabled = this.DISABLED;
+                addParticipantBtn.disabled = true;
+                newStudyBtn.disabled = true;
                 experimentsList.style.pointerEvents = 'none';
                 participantsList.style.pointerEvents = 'none';
-                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
+                this.updateParticipantButtonStates('stop', this.ENABLED);
+                this.updateParticipantButtonStates('start', this.DISABLED);
+                this.lockUIForCalibration(true);
+                break;
+            case STATES.INITIAL:
+                this.viewCamera.disabled = this.DISABLED;
+                addParticipantBtn.disabled = !this.selectedExperimentId;
+                newStudyBtn.disabled = this.ENABLED;
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
+                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
+                this.lockUIForCalibration(false);
                 break;
 
+            case STATES.CALIBRATING:
+                addParticipantBtn.disabled = this.DISABLED;
+                newStudyBtn.disabled = this.DISABLED;
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
+                this.lockUIForCalibration(true);
+                this.updateParticipantButtonStates('stop', this.DISABLED);
+                this.updateParticipantButtonStates('start', this.DISABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
+                break;
+            case STATES.READY:
+                addParticipantBtn.disabled = !this.selectedExperimentId;
+                newStudyBtn.disabled = this.ENABLED;
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
+                this.updateParticipantButtonStates('stop', this.DISABLED);
+                this.updateParticipantButtonStates('start', this.ENABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
+                this.lockUIForCalibration(false);
+                break;
             case STATES.DISABLED:
                 this.viewCamera.disabled = this.DISABLED;
                 addParticipantBtn.disabled = this.DISABLED;
@@ -351,6 +377,24 @@ class AppHandler {
             default:
                 // Default state - enable basic interactions
         }
+    }
+
+    updateParticipantButtonStates(buttonType = 'all', state = this.DISABLED) {
+        document.querySelectorAll('.participant-item').forEach(item => {
+            const eyeTrackingBtn = item.querySelector('.eye-tracking-button');
+            const startBtn = item.querySelector('.start-button');
+            const stopBtn = item.querySelector('.stop-button');
+            
+            if (buttonType === 'all' || buttonType === 'eye-tracking') {
+                if (eyeTrackingBtn) eyeTrackingBtn.disabled = state;
+            }
+            if (buttonType === 'all' || buttonType === 'start') {
+                if (startBtn) startBtn.disabled = state;
+            }
+            if (buttonType === 'all' || buttonType === 'stop') {
+                if (stopBtn) stopBtn.disabled = state;
+            }
+        });
     }
 
     // Add debounce utility method
@@ -368,10 +412,18 @@ class AppHandler {
 
     async handleViewCamera() {
         try {
-            // Use the IPC bridge to open the frame stream window
-            window.electronAPI.viewCamera();
+            if (!this.isViewingCamera) {
+                // Use the IPC bridge to open the frame stream window
+                await window.electronAPI.viewCamera();
+                this.isViewingCamera = true;
+                this.viewCamera.textContent = 'Close Camera';
+            } else {
+                await window.electronAPI.closeFrameStream();
+                this.isViewingCamera = false;
+                this.viewCamera.textContent = 'View Camera';
+            }
         } catch (error) {
-            console.error('Error opening camera view:', error);
+            console.error('Error handling camera view:', error);
         }
     }
 
@@ -438,15 +490,6 @@ class AppHandler {
                                 const backendSignal = signalMappings[signal] || signal;
                                 await this.updateSignalStatus(backendSignal, status);
                             }
-
-                            // Update button states based on signals
-                            if (signals.eye && this.calibrationCount === 0) {
-                                this.updateButtonStates(STATES.CALIBRATE);
-                            } else if (Object.values(signals).some(status => status)) {
-                                this.updateButtonStates(STATES.READY);
-                            } else {
-                                this.updateButtonStates(STATES.INITIAL);
-                            }
                         }
 
                         // Load participants for this experiment
@@ -487,6 +530,7 @@ class AppHandler {
                     
                     // Check if eye tracking is enabled for this experiment
                     const hasEyeTracking = experimentResponse.data.signals.eye;
+                    const needsCalibration = hasEyeTracking && this.calibrationCount === 0;
                     
                     participantElement.innerHTML = `
                         <div class="participant-content">
@@ -503,10 +547,10 @@ class AppHandler {
                             </div>
                             <div class="participant-controls">
                                 ${hasEyeTracking ? 
-                                    `<button class="control-button eye-tracking-button" title="Start eye tracking calibration">Eye Track</button>` : 
+                                    `<button class="control-button eye-tracking-button" ${this.currentState === STATES.CALIBRATING ? 'disabled' : ''} title="Start eye tracking calibration">Eye Track</button>` : 
                                     ''
                                 }
-                                <button class="control-button start-button" title="Start recording">Start</button>
+                                <button class="control-button start-button" ${needsCalibration ? 'disabled' : ''} title="Start recording">Start</button>
                                 <button class="control-button stop-button" disabled title="Stop recording">Stop</button>
                             </div>
                         </div>
@@ -530,34 +574,11 @@ class AppHandler {
                             const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
                             if (confirmed) {
                                 this.hasConfirmed = true;
-                                startButton.disabled = this.DISABLED;
-                                eyeTrackingButton.disabled = this.DISABLED;
+                                this.updateButtonStates(STATES.CALIBRATING);
                                 await this.sendCommandToBackend(COMMANDS.START_GAZE);
-                                this.viewCamera.disabled = false;
                             }
                         });
                     }
-
-                    // Add method to update button states
-                    const updateButtonStates = (isRecording) => {
-                        startButton.disabled = isRecording;
-                        stopButton.disabled = !isRecording;
-                        
-                        // Update the inactive class on the participant item
-                        document.querySelectorAll('.participant-item').forEach(item => {
-                            if (item !== participantElement) {
-                                item.classList.add('inactive');
-                                const itemStartBtn = item.querySelector('.start-button');
-                                const itemStopBtn = item.querySelector('.stop-button');
-                                if (itemStartBtn && itemStopBtn) {
-                                    itemStartBtn.disabled = true;
-                                    itemStopBtn.disabled = true;
-                                }
-                            } else {
-                                item.classList.remove('inactive');
-                            }
-                        });
-                    };
 
                     startButton.addEventListener('click', async (e) => {
                         e.stopPropagation();
@@ -576,13 +597,14 @@ class AppHandler {
                         
                         await this.handleParticipantClick(participant, participantElement);
                         await this.sendCommandToBackend(COMMANDS.START);
-                        this.updateSignalStatesForRecording(true);
+                        this.updateSignalStatesForRecording(true); 
+                        this.lockExperimentSelection(true);
+                        this.updateButtonStates(STATES.RECORDING);
                         
                         const lengthText = document.getElementById('study-length').textContent;
                         const duration = parseInt(lengthText.split(' ')[0]);
                         
                         this.startExperimentTimer(duration);
-                        updateButtonStates(true);
                         window.electronAPI.minimize();
                     });
 
@@ -590,16 +612,6 @@ class AppHandler {
                         e.stopPropagation();
                         this.hasConfirmed = false;
                         await this.stopExperiment();
-                        updateButtonStates(false);
-                        document.querySelectorAll('.participant-item').forEach(item => {
-                            item.classList.remove('inactive');
-                            const itemStartBtn = item.querySelector('.start-button');
-                            const itemStopBtn = item.querySelector('.stop-button');
-                            if (itemStartBtn && itemStopBtn) {
-                                itemStartBtn.disabled = false;
-                                itemStopBtn.disabled = true;
-                            }
-                        });
                     });
 
                     participantElement.addEventListener('click', () => {
@@ -624,21 +636,12 @@ class AppHandler {
     // Add this new method
     async updateSignalStatus(signal, status) {
         try {
-            const statusElement = document.getElementById(`status-${signal}`);
-            if (statusElement) {
-                if (this.isRecording && status) {
-                    statusElement.textContent = 'Active';
-                    statusElement.className = 'signal-status active';
-                } else if (!this.isRecording && status) {
-                    statusElement.textContent = 'Ready';
-                    statusElement.className = 'signal-status ready';
-                } else {
-                    statusElement.textContent = 'Inactive';
-                    statusElement.className = 'signal-status inactive';
-                }
-            }
+            await window.electronAPI.sendPythonCommand('update_signal', {
+                signal: signal,
+                status: status
+            });
         } catch (error) {
-            console.error(`Error updating signal status UI for ${signal}:`, error);
+            console.error(`Error updating signal status for ${signal}:`, error);
         }
     }
 
@@ -652,16 +655,6 @@ class AppHandler {
             screen: document.getElementById('status-screen')
         };
 
-        const signalMappings = {
-            aura: 'aura',
-            eye: 'gaze',
-            emotion: 'emotion',
-            pointer: 'pointer',
-            screen: 'screen'
-        };
-
-        const backendSignals = {};
-
         // Update each status label based on the signals configuration
         for (const [signal, isEnabled] of Object.entries(signals)) {
             const mappedSignal = signal === 'eye' ? 'gaze' : signal;
@@ -669,31 +662,22 @@ class AppHandler {
             
             if (statusElement) {
                 if (!this.isRecording && isEnabled) {
-                    // If not recording but signal is enabled, show as "Ready"
-                    statusElement.textContent = 'Ready';
-                    statusElement.className = 'signal-status ready';
+                    // Special handling for eye tracking
+                    if (signal === 'eye' && this.calibrationCount === 0) {
+                        statusElement.textContent = 'Needs calibration';
+                        statusElement.className = 'signal-status need-calibration';
+                    } else {
+                        statusElement.textContent = 'Ready';
+                        statusElement.className = 'signal-status ready';
+                    }
                 } else {
                     // If recording or signal is disabled
                     statusElement.textContent = isEnabled ? 'Active' : 'Inactive';
                     statusElement.className = `signal-status ${isEnabled ? 'active' : 'inactive'}`;
                 }
             }
-
-            // Prepare backend signal status
-            backendSignals[signalMappings[signal] || signal] = isEnabled;
         }
-
-        // Update button states based on active signals
-        const anySignalActive = Object.values(signals).some(signal => signal);
-        if (anySignalActive) {
-            if (signals.eye && this.calibrationCount === 0) {
-                this.updateButtonStates(STATES.CALIBRATE);
-            } else {
-                this.updateButtonStates(STATES.READY);
-            }
-        } else {
-            this.updateButtonStates(STATES.INITIAL);
-        }
+        
     }
 
     // Add this method to update signal statuses when recording starts/stops
@@ -735,6 +719,21 @@ class AppHandler {
             document.getElementById('current-participant-name').textContent = participant.name;
             document.getElementById('current-participant-age').textContent = participant.age;
             
+            // Check if eye tracking is enabled and needs calibration
+            if (this.selectedExperimentId) {
+                const response = await window.electronAPI.getExperiment(this.selectedExperimentId);
+                if (response.status === 'success' && response.data && response.data.signals) {
+                    const signals = response.data.signals;
+                    if (signals.eye && this.calibrationCount === 0) {
+                        // Disable start button if eye tracking needs calibration
+                        const startButton = element.querySelector('.start-button');
+                        if (startButton) {
+                            startButton.disabled = true;
+                        }
+                    }
+                }
+            }
+            
         } catch (error) {
             console.error('Error handling participant selection:', error);
         }
@@ -746,7 +745,7 @@ class AppHandler {
             clearInterval(this.timer);
             this.timer = null;
         }
-        this.updateButtonStates(STATES.INITIAL);
+        // this.updateButtonStates(STATES.INITIAL);
         document.getElementById('current-participant-name').textContent = 'None';
         document.getElementById('current-participant-age').textContent = '-';
     }
@@ -769,10 +768,6 @@ class AppHandler {
         this.timeRemaining = this.experimentDuration;
         const timerDisplay = document.getElementById('time-remaining');
         this.updateTimerDisplay(timerDisplay);
-
-        // Lock experiment selection
-        this.lockExperimentSelection(true);
-
         // Clear any existing timer
         this.stopExperimentTimer();
 
@@ -784,18 +779,6 @@ class AppHandler {
                 clearInterval(this.timer);
                 this.timer = null;
                 await this.stopExperiment();
-                
-                // Reset all participant buttons and unlock selection
-                document.querySelectorAll('.participant-item').forEach(item => {
-                    const startBtn = item.querySelector('.start-button');
-                    const stopBtn = item.querySelector('.stop-button');
-                    if (startBtn && stopBtn) {
-                        startBtn.disabled = false;
-                        stopBtn.disabled = true;
-                    }
-                });
-                
-                this.lockExperimentSelection(false);
                 await window.electronAPI.focusWindow();
                 timerDisplay.textContent = '--:--';
             }
@@ -815,6 +798,31 @@ class AppHandler {
         this.hasConfirmed = false;
         this.lockExperimentSelection(false);
         this.updateSignalStatesForRecording(false);
+        
+        // Get the current experiment to check if it has eye tracking
+
+        const experimentResponse = await window.electronAPI.getExperiment(this.selectedExperimentId);
+        if (experimentResponse && experimentResponse.data && experimentResponse.data.signals) {
+            const hasEyeTracking = experimentResponse.data.signals.eye;
+            
+            // Re-enable buttons based on eye tracking status
+            const selectedParticipant = document.querySelector('.participant-item.selected');
+            if (selectedParticipant) {
+                const eyeTrackingBtn = selectedParticipant.querySelector('.eye-tracking-button');
+                const startBtn = selectedParticipant.querySelector('.start-button');
+                const stopBtn = selectedParticipant.querySelector('.stop-button');
+
+                if (hasEyeTracking) {
+                    // Reset calibration and enable eye tracking button
+                    this.calibrationCount = 0;
+                    this.updateButtonStates(STATES.CALIBRATE);
+                } else {
+                    this.updateButtonStates(STATES.READY);
+                }
+            }
+
+        }
+        
         await window.electronAPI.focusWindow();
     }
 
@@ -895,6 +903,12 @@ class AppHandler {
         
         // Add context menu for the entire experiments section
         experimentsSection.addEventListener('contextmenu', async (e) => {
+            // Prevent context menu if calibrating
+            if (this.currentState === STATES.CALIBRATING) {
+                e.preventDefault();
+                return;
+            }
+            
             e.preventDefault();
             e.stopPropagation();
             await window.electronAPI.showContextMenu('study-area');
@@ -910,12 +924,29 @@ class AppHandler {
         
         // Add context menu for the entire participants section
         participantsSection.addEventListener('contextmenu', async (e) => {
+            // Prevent context menu if calibrating
+            if (this.currentState === STATES.CALIBRATING) {
+                e.preventDefault();
+                return;
+            }
+            
             e.preventDefault();
             e.stopPropagation();
             if (this.selectedExperimentId) {
                 await window.electronAPI.showContextMenu('participant-area', this.selectedExperimentId);
             }
         });
+
+        // Add context menu prevention for individual items during calibration
+        document.addEventListener('contextmenu', (e) => {
+            if (this.currentState === STATES.CALIBRATING) {
+                const target = e.target;
+                if (target.closest('.experiment-item') || target.closest('.participant-item')) {
+                    e.preventDefault();
+                    return;
+                }
+            }
+        }, true);
     }
 
     // Add this new method to handle study deletion
@@ -952,6 +983,34 @@ class AppHandler {
             }
         } catch (error) {
             console.error('Error handling participant deletion:', error);
+        }
+    }
+
+    // Add this method to handle UI locking
+    lockUIForCalibration(lock) {
+        const experimentsList = document.getElementById('experiments-list');
+        const participantsList = document.getElementById('participants-list');
+        const addParticipantBtn = document.getElementById('add-participant');
+        const newStudyBtn = document.getElementById('new-study');
+        const studyPanel = document.querySelector('.study-panel');
+        const studyDetails = document.querySelector('.study-details');
+
+        // Lock/unlock UI elements
+        experimentsList.style.pointerEvents = lock ? 'none' : 'auto';
+        participantsList.style.pointerEvents = lock ? 'none' : 'auto';
+        studyPanel.style.pointerEvents = lock ? 'none' : 'auto';
+        addParticipantBtn.disabled = lock;
+        newStudyBtn.disabled = lock;
+
+        // Add visual feedback for locked state
+        if (lock) {
+            experimentsList.style.opacity = '0.6';
+            participantsList.style.opacity = '0.6';
+            studyDetails.style.opacity = '0.6';
+        } else {
+            experimentsList.style.opacity = '1';
+            participantsList.style.opacity = '1';
+            studyDetails.style.opacity = '1';
         }
     }
 

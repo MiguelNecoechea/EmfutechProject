@@ -1050,3 +1050,83 @@ input[type="checkbox"]:disabled + label {
     min-height: 100px;
     position: relative;
 }
+
+/* Add this with your other signal-status styles */
+.signal-status.calibrating {
+    color: #4CAF50;  /* Light green color */
+    animation: pulse 1.5s infinite;
+}
+
+.signal-status.need-calibration {
+    color: #FFA726;  /* Orange color to indicate action needed */
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Visual feedback for locked state */
+.list-container[style*="opacity: 0.6"] {
+    transition: opacity 0.3s ease;
+}
+
+/* Add styles for locked study panel */
+.study-panel[style*="pointer-events: none"] {
+    cursor: not-allowed;
+}
+
+.study-details[style*="opacity: 0.6"] {
+    transition: opacity 0.3s ease;
+}
+
+/* Update existing info panels styles */
+.info-panels {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.study-panel, .participant-info-panel {
+    flex: 1;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.study-panel h3, .participant-info-panel h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #333;
+}
+
+.study-details, .participant-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.detail-label {
+    color: #666;
+    font-size: 14px;
+}
+
+.detail-value {
+    font-weight: 500;
+    color: #333;
+}
