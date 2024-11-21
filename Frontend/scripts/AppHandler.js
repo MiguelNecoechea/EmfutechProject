@@ -526,6 +526,23 @@ class AppHandler {
                 path: participant.folderPath
             });
             
+            // Get the experiment data for the selected participant
+            const experiment = await window.electronAPI.getExperiment(this.selectedExperimentId);
+            
+            // Update signal checkboxes based on experiment configuration
+            if (experiment && experiment.signals) {
+                this.signalAura.checked = experiment.signals.aura;
+                this.signalEye.checked = experiment.signals.eye;
+                this.signalEmotion.checked = experiment.signals.emotion;
+                this.signalPointer.checked = experiment.signals.pointer;
+                this.signalScreen.checked = experiment.signals.screen;
+            }
+
+            // Update signal states in backend
+            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_SIGNAL, {
+                signals: experiment.signals
+            });
+            
             this.enableDisableCheckboxes(this.ENABLED);
             
         } catch (error) {
