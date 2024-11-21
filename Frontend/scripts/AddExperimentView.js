@@ -14,6 +14,13 @@ class AddExperimentView {
         this.selectFolderBtn = document.getElementById('selectFolder');
         this.cancelBtn = document.getElementById('cancelBtn');
         this.confirmBtn = document.getElementById('confirmBtn');
+
+        // Add signal checkboxes
+        this.signalAura = document.querySelector('input[name="signal-aura"]');
+        this.signalEye = document.querySelector('input[name="signal-eye"]');
+        this.signalEmotion = document.querySelector('input[name="signal-emotion"]');
+        this.signalPointer = document.querySelector('input[name="signal-pointer"]');
+        this.signalScreen = document.querySelector('input[name="signal-screen"]');
     }
 
     setupEventListeners() {
@@ -54,7 +61,15 @@ class AddExperimentView {
             name: this.experimentName.value,
             description: this.experimentDescription.value,
             folder: this.experimentFolder.value,
-            length: parseInt(this.experimentLength.value)
+            length: parseInt(this.experimentLength.value),
+            // Add signals configuration
+            signals: {
+                aura: this.signalAura.checked,
+                eye: this.signalEye.checked,
+                emotion: this.signalEmotion.checked,
+                pointer: this.signalPointer.checked,
+                screen: this.signalScreen.checked
+            }
         };
 
         try {
