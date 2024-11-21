@@ -54,7 +54,7 @@ class AppHandler {
         this.isCameraActive = false;
         
         // Initial button state update
-        this.updateButtonStates(STATES.DISABLED);
+        this.updateButtonStates(STATES.INITIAL);
 
         window.addEventListener('beforeunload', () => {
             this.cleanup();
@@ -229,51 +229,66 @@ class AppHandler {
     // Add this new method to manage button states
     updateButtonStates(state) {
         // Store current state for reference 
-        // this.currentState = state;
-        // const experimentsList = document.getElementById('experiments-list');
-        // const participantsList = document.getElementById('participants-list');
-        // switch (state) {
-        //     case STATES.INITIAL:
-        //         this.startGaze.disabled = this.DISABLED;
-        //         this.stop.disabled = this.DISABLED;
-        //         this.viewCamera.disabled = this.DISABLED;
-        //         experimentsList.style.pointerEvents = 'auto';
-        //         participantsList.style.pointerEvents = 'auto';
-        //         break;
-        //     case STATES.CALIBRATING:
-        //         this.startGaze.disabled = this.DISABLED;
-        //         this.stop.disabled = this.ENABLED;
-        //         experimentsList.style.pointerEvents = 'none';
-        //         participantsList.style.pointerEvents = 'none';
-        //         break;
-        //     case STATES.READY:
-        //         this.startGaze.disabled = this.DISABLED;
-        //         this.stop.disabled = this.DISABLED;
-        //         experimentsList.style.pointerEvents = 'auto';
-        //         participantsList.style.pointerEvents = 'auto';
-        //         break;
-        //     case STATES.RECORDING:
-        //         this.startGaze.disabled = this.DISABLED;
-        //         this.stop.disabled = this.ENABLED;
-        //         experimentsList.style.pointerEvents = 'none';
-        //         participantsList.style.pointerEvents = 'none';
-        //         break;
-        //     case STATES.CALIBRATE:
-        //         this.startGaze.disabled = this.ENABLED;
-        //         experimentsList.style.pointerEvents = 'auto';
-        //         participantsList.style.pointerEvents = 'auto';
-        //         break;
-        //     case STATES.DISABLED:
-        //         this.startGaze.disabled = this.DISABLED;
-        //         experimentsList.style.pointerEvents = 'auto';
-        //         participantsList.style.pointerEvents = 'auto';
-        //         break;
-        //     default:
-        //         // Handle any other states
-        //         experimentsList.style.pointerEvents = 'auto';
-        //         participantsList.style.pointerEvents = 'auto';
-        //         break;
-        // }
+        this.currentState = state;
+        const experimentsList = document.getElementById('experiments-list');
+        const participantsList = document.getElementById('participants-list');
+        const addParticipantBtn = document.getElementById('add-participant');
+        const newStudyBtn = document.getElementById('new-study');
+
+        // First, reset all buttons to default state
+        this.viewCamera.disabled = this.DISABLED;
+        addParticipantBtn.disabled = this.DISABLED;
+        newStudyBtn.disabled = this.DISABLED;
+
+        switch (state) {
+            case STATES.INITIAL:
+                // Initial state - everything enabled except camera
+                this.viewCamera.disabled = this.DISABLED;
+                addParticipantBtn.disabled = !this.selectedExperimentId;
+                newStudyBtn.disabled = this.ENABLED;
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
+                break;
+
+            case STATES.CALIBRATING:
+                // During calibration - disable most interactions
+                this.viewCamera.disabled = this.DISABLED;
+                addParticipantBtn.disabled = this.DISABLED;
+                newStudyBtn.disabled = this.DISABLED;
+                experimentsList.style.pointerEvents = 'none';
+                participantsList.style.pointerEvents = 'none';
+                break;
+
+            case STATES.READY:
+                // Ready to record - enable necessary controls
+                this.viewCamera.disabled = this.ENABLED;
+                addParticipantBtn.disabled = !this.selectedExperimentId;
+                newStudyBtn.disabled = this.ENABLED;
+                experimentsList.style.pointerEvents = 'auto';
+                participantsList.style.pointerEvents = 'auto';
+                break;
+
+            case STATES.RECORDING:
+                // During recording - lock most interactions
+                this.viewCamera.disabled = this.DISABLED;
+                addParticipantBtn.disabled = this.DISABLED;
+                newStudyBtn.disabled = this.DISABLED;
+                experimentsList.style.pointerEvents = 'none';
+                participantsList.style.pointerEvents = 'none';
+                break;
+
+            case STATES.DISABLED:
+                // Fully disabled state
+                this.viewCamera.disabled = this.DISABLED;
+                addParticipantBtn.disabled = this.DISABLED;
+                newStudyBtn.disabled = this.DISABLED;
+                experimentsList.style.pointerEvents = 'none';
+                participantsList.style.pointerEvents = 'none';
+                break;
+
+            default:
+                // Default state - enable basic interactions
+        }
     }
 
     // Add debounce utility method
