@@ -75,13 +75,14 @@ def delete_channels(stream: Stream, waves: list[str], channels: list[str]):
                 channels_to_dlt.append(wave + '_' + channel)
     stream.drop_channels(channels_to_dlt)
 
-def resolve_aura() -> str:
+def resolve_aura() -> list[str]:
     """
     Resolve the aura stream.
     :return: The source id of the aura stream that has 40 channels.
     """
     av_streams = resolve_streams()
+    good_streams = []
     for stream in av_streams:
         if stream.n_channels == 40:
-            return stream.source_id
-    raise ValueError("No aura stream with 40 channels found")
+            good_streams.append(stream.source_id)
+    return good_streams
