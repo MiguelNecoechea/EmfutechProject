@@ -610,7 +610,12 @@ class BackendServer:
         try:
             if self._aura_stream_id is None:
                 try:
-                    self._aura_stream_id = resolve_aura()
+                    if self._aura_stream_id is None:
+                        stream_ids = resolve_aura()
+                        if len(stream_ids) == 0:
+                            return {"status": STATUS_ERROR, "message": "No aura stream found"}
+                        self._aura_stream_id = stream_ids[0]
+                        
                     self._stream = Stream(bufsize=buffer_size_multiplier, source_id=self._aura_stream_id)
                     self._stream.connect(processing_flags='all')
                     rename_aura_channels(self._stream)
@@ -1094,3 +1099,19 @@ class BackendServer:
         """Stop the camera stream."""
         self._viewing_camera = False
         return {"status": "success", "message": "Camera streaming stopped"}
+    
+    def get_aura_streams(self):
+        """
+        Get the list of AURA streams.
+        """
+        try:
+            streams = resolve_aura()
+            return {"status": "success", "streams": streams}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def set_aura_stream(self, stream_id):
+        """
+        Set the AURA stream.
+        """
+        self._aura_stream_id = stream_id
