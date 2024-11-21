@@ -85,6 +85,13 @@ class AppHandler {
         this.hasConfirmed = false;
         
         this.viewCamera.addEventListener('click', async () => {
+            // Check if a participant is selected
+            const selectedParticipant = document.querySelector('.participant-item.selected');
+            if (!selectedParticipant) {
+                alert('Please select a participant first');
+                return;
+            }
+
             if (!this.isViewingCamera) {
                 await this.handleViewCamera();
                 this.isViewingCamera = true;
@@ -513,12 +520,20 @@ class AppHandler {
                     if (eyeTrackingButton) {
                         eyeTrackingButton.addEventListener('click', async (e) => {
                             e.stopPropagation();
+                            // Check if this participant is selected
+                            const isSelected = participantElement.classList.contains('selected');
+                            if (!isSelected) {
+                                alert('Please select this participant first');
+                                return;
+                            }
+
                             const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
                             if (confirmed) {
                                 this.hasConfirmed = true;
+                                startButton.disabled = this.DISABLED;
+                                eyeTrackingButton.disabled = this.DISABLED;
                                 await this.sendCommandToBackend(COMMANDS.START_GAZE);
-                                eyeTrackingButton.disabled = true;
-                                startButton.disabled = false;
+                                this.viewCamera.disabled = false;
                             }
                         });
                     }
@@ -546,6 +561,13 @@ class AppHandler {
 
                     startButton.addEventListener('click', async (e) => {
                         e.stopPropagation();
+                        // Check if this participant is selected
+                        const isSelected = participantElement.classList.contains('selected');
+                        if (!isSelected) {
+                            alert('Please select this participant first');
+                            return;
+                        }
+
                         if (!this.hasConfirmed) {
                             const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
                             if (!confirmed) return;
