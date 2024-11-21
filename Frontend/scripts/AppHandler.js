@@ -26,7 +26,7 @@ const COMMANDS = {
     START_GAZE: 'start_eye_gaze',
     START: 'start',
     STOP: 'stop',
-    UPDATE_SIGNAL: 'update_signal_status',
+    UPDATE_SIGNAL: 'update_signal',
     UPDATE_NAME: 'update_participant_name',
     UPDATE_PATH: 'update_output_path',
     NEW_PARTICIPANT: 'new_participant',
@@ -384,9 +384,42 @@ class AppHandler {
                         });
                         experimentElement.classList.add('selected');
 
+                        // Get the experiment data to check signals
+                        const experimentResponse = await window.electronAPI.getExperiment(experiment.createdAt);
+                        if (experimentResponse.status === 'success' && experimentResponse.data && experimentResponse.data.signals) {
+                            const signals = experimentResponse.data.signals;
+                            
+                            // Update UI status labels
+                            this.updateSignalStatusLabels(signals);
+                            
+                            // Update backend signal statuses
+                            const signalMappings = {
+                                aura: 'aura',
+                                eye: 'gaze',
+                                emotion: 'emotion',
+                                pointer: 'pointer',
+                                screen: 'screen'
+                            };
+
+                            // Send each signal status to the backend
+                            for (const [signal, status] of Object.entries(signals)) {
+                                const backendSignal = signalMappings[signal] || signal;
+                                await this.updateSignalStatus(backendSignal, status);
+                            }
+
+                            // Update button states based on signals
+                            if (signals.eye && this.calibrationCount === 0) {
+                                this.updateButtonStates(STATES.CALIBRATE);
+                            } else if (Object.values(signals).some(status => status)) {
+                                this.updateButtonStates(STATES.READY);
+                            } else {
+                                this.updateButtonStates(STATES.INITIAL);
+                            }
+                        }
+
                         // Load participants for this experiment
                         await this.loadParticipants(experiment.createdAt);
-
+                        
                         // Enable add participant button when an experiment is selected
                         addParticipantBtn.disabled = false;
                     });
@@ -496,6 +529,7 @@ class AppHandler {
                         
                         await this.handleParticipantClick(participant, participantElement);
                         await this.sendCommandToBackend(COMMANDS.START);
+                        this.updateSignalStatesForRecording(true);
                         
                         const lengthText = document.getElementById('study-length').textContent;
                         const duration = parseInt(lengthText.split(' ')[0]);
@@ -540,8 +574,20 @@ class AppHandler {
         }
     }
 
-    // Update method to handle signal status updates
-    updateSignalStatusLabels(signals) {
+    // Add this new method
+    async updateSignalStatus(signal, status) {
+        try {
+            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_SIGNAL, {
+                signal: signal,
+                status: status
+            });
+        } catch (error) {
+            console.error(`Error updating signal status for ${signal}:`, error);
+        }
+    }
+
+    // Update the existing updateSignalStatusLabels method
+    async updateSignalStatusLabels(signals) {
         const statusElements = {
             aura: document.getElementById('status-aura'),
             gaze: document.getElementById('status-eye'),
@@ -550,14 +596,36 @@ class AppHandler {
             screen: document.getElementById('status-screen')
         };
 
+        const signalMappings = {
+            aura: 'aura',
+            eye: 'gaze',
+            emotion: 'emotion',
+            pointer: 'pointer',
+            screen: 'screen'
+        };
+
+        const backendSignals = {};
+
         // Update each status label based on the signals configuration
-        Object.entries(signals).forEach(([signal, isEnabled]) => {
-            const statusElement = statusElements[signal === 'eye' ? 'gaze' : signal];
+        for (const [signal, isEnabled] of Object.entries(signals)) {
+            const mappedSignal = signal === 'eye' ? 'gaze' : signal;
+            const statusElement = statusElements[mappedSignal];
+            
             if (statusElement) {
-                statusElement.textContent = isEnabled ? 'Active' : 'Inactive';
-                statusElement.className = `signal-status ${isEnabled ? 'active' : 'inactive'}`;
+                if (!this.isRecording && isEnabled) {
+                    // If not recording but signal is enabled, show as "Ready"
+                    statusElement.textContent = 'Ready';
+                    statusElement.className = 'signal-status ready';
+                } else {
+                    // If recording or signal is disabled
+                    statusElement.textContent = isEnabled ? 'Active' : 'Inactive';
+                    statusElement.className = `signal-status ${isEnabled ? 'active' : 'inactive'}`;
+                }
             }
-        });
+
+            // Prepare backend signal status
+            backendSignals[signalMappings[signal] || signal] = isEnabled;
+        }
 
         // Update button states based on active signals
         const anySignalActive = Object.values(signals).some(signal => signal);
@@ -572,15 +640,19 @@ class AppHandler {
         }
     }
 
-    // Add this new method to handle signal status updates to backend
-    async updateSignalStatus(signal, status) {
-        try {
-            await window.electronAPI.sendPythonCommand(COMMANDS.UPDATE_SIGNAL, {
-                signal: signal,
-                status: status
-            });
-        } catch (error) {
-            console.error(`Error updating ${signal} status:`, error);
+    // Add this method to update signal statuses when recording starts/stops
+    updateSignalStatesForRecording(isRecording) {
+        this.isRecording = isRecording;
+        
+        // Get the current experiment's signals
+        if (this.selectedExperimentId) {
+            window.electronAPI.getExperiment(this.selectedExperimentId)
+                .then(response => {
+                    if (response.status === 'success' && response.data && response.data.signals) {
+                        this.updateSignalStatusLabels(response.data.signals);
+                    }
+                })
+                .catch(error => console.error('Error updating signal states:', error));
         }
     }
 
@@ -607,38 +679,6 @@ class AppHandler {
             document.getElementById('current-participant-name').textContent = participant.name;
             document.getElementById('current-participant-age').textContent = participant.age;
             
-            // Get the experiment data
-            const response = await window.electronAPI.getExperiment(this.selectedExperimentId);
-            if (response.status === 'success' && response.data && response.data.signals) {
-                const signals = response.data.signals;
-                
-                // Update UI status labels
-                this.updateSignalStatusLabels(signals);
-                
-                // Update backend signal statuses
-                const signalMappings = {
-                    aura: 'aura',
-                    eye: 'gaze',  // Map 'eye' to 'gaze' for backend
-                    emotion: 'emotion',
-                    pointer: 'pointer',
-                    screen: 'screen'
-                };
-
-                // Send each signal status to the backend
-                for (const [signal, status] of Object.entries(signals)) {
-                    const backendSignal = signalMappings[signal] || signal;
-                    await this.updateSignalStatus(backendSignal, status);
-                }
-
-                // Update button states based on signals
-                if (signals.eye && this.calibrationCount === 0) {
-                    this.updateButtonStates(STATES.CALIBRATE);
-                } else if (Object.values(signals).some(status => status)) {
-                    this.updateButtonStates(STATES.READY);
-                } else {
-                    this.updateButtonStates(STATES.INITIAL);
-                }
-            }
         } catch (error) {
             console.error('Error handling participant selection:', error);
         }
@@ -718,6 +758,7 @@ class AppHandler {
         await this.sendCommandToBackend(COMMANDS.STOP);
         this.hasConfirmed = false;
         this.lockExperimentSelection(false);
+        this.updateSignalStatesForRecording(false);
         await window.electronAPI.focusWindow();
     }
 
