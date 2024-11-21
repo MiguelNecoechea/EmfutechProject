@@ -72,7 +72,7 @@ class AddExperimentView {
             }
         };
 
-        try {
+        try { 
             const response = await window.electronAPI.saveExperiment(experimentData);
             
             if (response.status === 'success') {

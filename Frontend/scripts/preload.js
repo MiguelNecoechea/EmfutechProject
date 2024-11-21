@@ -53,4 +53,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('show-context-menu', menuType, experimentId),
     onMenuAction: (callback) =>
         ipcRenderer.on('menu-action', (_event, action, ...args) => callback(action, ...args)),
+    onCloseFrameStream: (callback) =>
+        ipcRenderer.on('close-frame-stream', (_event) => callback()),
+    onCameraClosed: (callback) =>
+        ipcRenderer.on('camera-closed', (_event) => callback()),
 });

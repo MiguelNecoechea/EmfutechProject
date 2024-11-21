@@ -660,8 +660,28 @@ class ApplicationManager {
 
         await this.frameStreamWindow.loadFile('Frontend/UI/frameStream.html');
 
-        this.frameStreamWindow.on('closed', async () => {
-            await this.sendToPython('stop_camera_view');
+        // Handle any type of window close
+        const handleClose = async () => {
+            try {
+                // Stop the camera view in the backend
+                await this.sendToPython('stop_camera_view');
+                
+                // Notify both windows about the camera being closed
+                if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
+                    this.frameStreamWindow.webContents.send('close-frame-stream');
+                }
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('camera-closed');
+                }
+            } catch (error) {
+                console.error('Error handling frame stream window close:', error);
+            }
+        };
+
+        // Listen for the window close event
+        this.frameStreamWindow.on('close', handleClose);
+
+        this.frameStreamWindow.on('closed', () => {
             this.frameStreamWindow = null;
         });
     }

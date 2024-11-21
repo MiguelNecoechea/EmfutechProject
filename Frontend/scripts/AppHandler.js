@@ -173,6 +173,12 @@ class AppHandler {
             // Refresh the experiments list
             await this.loadExperiments();
         });
+
+        // Add listener for camera closed events
+        window.electronAPI.onCameraClosed(() => {
+            this.isViewingCamera = false;
+            this.viewCamera.textContent = 'View Camera';
+        });
     }
 
     async sendCommandToBackend(command) {
@@ -184,7 +190,16 @@ class AppHandler {
                         this.updateButtonStates(STATES.RECORDING);
                         break;
                     case COMMANDS.STOP:
-                        this.viewCamera.disabled = this.DISABLED;
+                        // Close camera view if it's open
+                        if (this.isViewingCamera) {
+                            await window.electronAPI.closeFrameStream();
+                            this.isViewingCamera = false;
+                        }
+                        
+                        // Disable the view camera button
+                        this.viewCamera.disabled = true;
+                        this.viewCamera.textContent = 'View Camera';
+                        
                         // Get the experiment data to check if eye tracking is enabled
                         const experiment = await window.electronAPI.getExperiment(this.selectedExperimentId);
                         if (experiment && experiment.data && experiment.data.signals) {
@@ -226,6 +241,17 @@ class AppHandler {
         // If necessary, implement additional cleanup here.
     }
 
+    // Add method to handle camera button state
+    updateCameraButtonState(experimentId, state) {
+        // Check if camera is enabled in study before enabling view camera button
+        window.electronAPI.getExperiment(experimentId).then(experiment => {
+            if (experiment && experiment.data && experiment.data.signals &&
+                (experiment.data.signals.eye || experiment.data.signals.emotion)) {
+                this.viewCamera.disabled = state;
+            }
+        });
+    }
+
     // Add this new method to manage button states
     updateButtonStates(state) {
         // Store current state for reference 
@@ -248,24 +274,24 @@ class AppHandler {
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
                 participantsList.style.pointerEvents = 'auto';
+                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 break;
-
             case STATES.CALIBRATING:
                 // During calibration - disable most interactions
-                this.viewCamera.disabled = this.DISABLED;
                 addParticipantBtn.disabled = this.DISABLED;
                 newStudyBtn.disabled = this.DISABLED;
                 experimentsList.style.pointerEvents = 'none';
                 participantsList.style.pointerEvents = 'none';
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 break;
 
             case STATES.READY:
                 // Ready to record - enable necessary controls
-                this.viewCamera.disabled = this.ENABLED;
                 addParticipantBtn.disabled = !this.selectedExperimentId;
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
                 participantsList.style.pointerEvents = 'auto';
+                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 break;
 
             case STATES.RECORDING:
@@ -275,15 +301,16 @@ class AppHandler {
                 newStudyBtn.disabled = this.DISABLED;
                 experimentsList.style.pointerEvents = 'none';
                 participantsList.style.pointerEvents = 'none';
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 break;
 
             case STATES.DISABLED:
-                // Fully disabled state
                 this.viewCamera.disabled = this.DISABLED;
                 addParticipantBtn.disabled = this.DISABLED;
                 newStudyBtn.disabled = this.DISABLED;
                 experimentsList.style.pointerEvents = 'none';
                 participantsList.style.pointerEvents = 'none';
+                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 break;
 
             default:
