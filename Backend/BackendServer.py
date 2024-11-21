@@ -379,7 +379,6 @@ class BackendServer:
                     aura_response = self.start_aura()
                     if aura_response["status"] != STATUS_SUCCESS:
                         raise Exception(aura_response["message"])
-                    
                     try:
                         channels_names = ['timestamp'] + list(self._stream.info['ch_names'])
                         self._aura_writer = AuraDataWriter(self._path, f'{self._filename}{AURA_FILE_SUFFIX}', channels_names)
@@ -392,8 +391,8 @@ class BackendServer:
                                 daemon=True
                             )
                             with self.thread_tracking(self._aura_thread):
+                                self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_AURA})
                                 self._aura_thread.start()
-                    
                     except Exception as e:
                         print(f"Error starting Aura thread: {str(e)}")
                         raise
@@ -414,6 +413,7 @@ class BackendServer:
                             daemon=True
                         )
                         with self.thread_tracking(self._emotion_thread):
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_EMOTION})
                             self._emotion_thread.start()
                 
                 # Coordinate/Gaze
@@ -427,6 +427,7 @@ class BackendServer:
                             daemon=True
                         )
                         with self.thread_tracking(self._regressor_thread):
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
                             self._regressor_thread.start()
                 
                 # Pointer
@@ -438,7 +439,9 @@ class BackendServer:
                         raise Exception(pointer_response["message"])
                     self._pointer_tracker.start_time = self._start_time
                     self._pointer_tracker.is_tracking = True
+                    self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_POINTER})
 
+                # TODO: Add screen recording
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
                 return {"status": STATUS_ERROR, "message": "Data collection already started"}
