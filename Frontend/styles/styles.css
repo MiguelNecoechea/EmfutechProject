@@ -741,16 +741,19 @@ input[type="checkbox"]:disabled + label {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.9em;
+    font-weight: 500;
+}
+
+.signal-status.ready {
+    color: #2196F3;  /* Blue color for ready state */
 }
 
 .signal-status.active {
-    background-color: #4CAF50;
-    color: white;
+    color: #4CAF50;  /* Green color for active state */
 }
 
 .signal-status.inactive {
-    background-color: #f44336;
-    color: white;
+    color: #F44336;  /* Red color for inactive state */
 }
 
 .participant-header {
