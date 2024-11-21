@@ -339,10 +339,9 @@ class BackendServer:
         """Initialize and start eye gaze tracking."""
         self.manage_camera(OPEN_CAMERA)
         self._create_directories()
-
+        self._eye_gaze = GazeProcessor()
         def eye_gaze_task():
             with self.thread_tracking(threading.current_thread()):
-                self._eye_gaze = GazeProcessor()
                 while True:
                     if self._camera:
                         frame = self.get_frame()
@@ -357,8 +356,7 @@ class BackendServer:
                 self._fitting_eye_gaze = False
                 self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
 
-        if not self._fitting_eye_gaze and self._run_gaze:
-            self._fitting_eye_gaze = True
+        if not self._fitting_eye_gaze and not self._eye_gaze_running:
             local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
             local_thread.start()
             return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
