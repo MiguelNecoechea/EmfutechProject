@@ -416,6 +416,7 @@ class BackendServer:
                 
                 # Coordinate/Gaze
                 if self._run_gaze:
+                    print("Starting tracking") # TODO: Remove
                     self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
                     self._gaze_writer.create_new_file()
                     
@@ -440,6 +441,7 @@ class BackendServer:
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_POINTER})
 
                 # TODO: Add screen recording
+
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
                 return {"status": STATUS_ERROR, "message": "Data collection already started"}
@@ -514,11 +516,11 @@ class BackendServer:
     def stop_data_collection(self):
         """Stop all testing and data collection."""
         self._data_collection_active = False
-        # self._start_time = None
+        self._start_time = None
         if self._pointer_tracker is not None:
             self._pointer_tracker.stop_tracking()
-            self._pointer_tracker.is_tracking = False
-            self._pointer_tracker.clear_coordinates()
+            self._pointer_tracker = None  
+            self._pointer_tracking_active = False 
             if self._pointer_writer:
                 self._pointer_writer.close_file()
             self._pointer_writer = None  # Clear reference
