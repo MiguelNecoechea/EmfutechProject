@@ -26,7 +26,8 @@ body {
 }
 
 .title {
-    
+    font-size: 24px;
+    font-weight: bold;
     margin-top: 0;
 }
 
@@ -101,6 +102,7 @@ body {
     padding: 10px;
     overflow-y: auto;
     background-color: #f9f9f9;
+    margin-top: 10px;
 }
 
 .experiments-section .title,
@@ -329,15 +331,7 @@ input[type="checkbox"] {
 }
 
 .action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    justify-content: center;
-    margin-left: 20px;
-}
-
-.action-buttons .control-button {
-    width: 150px;
+    display: none;
 }
 
 .left-panel {
@@ -562,21 +556,90 @@ input[type="checkbox"]:disabled + label {
 }
 
 .participant-item {
-    background-color: #f5f5f5;
-    border-radius: 8px;
-    padding: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
     margin-bottom: 8px;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 
 .participant-item:hover {
-    background-color: #e0e0e0;
+    border-color: #adb5bd;
+    background-color: #f8f9fa;
 }
 
 .participant-item.selected {
-    background-color: #d0d0d0;
-    border: 2px solid #007bff;
+    border-color: #0d6efd;
+    background-color: #f0f7ff;
+    box-shadow: 0 0 0 1px #0d6efd;
+}
+
+.participant-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 12px;
+}
+
+.participant-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.participant-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+}
+
+.participant-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.participant-details span {
+    display: block;
+}
+
+.participant-folder {
+    margin-top: 8px;
+}
+
+.participant-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 120px; /* Fixed width for buttons column */
+}
+
+.participant-controls .control-button {
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 0.9em;
+    text-align: center;
+}
+
+/* Update inactive state styles */
+.participant-item.inactive {
+    opacity: 0.6;
+}
+
+.participant-item.inactive .stop-button:not(:disabled) {
+    opacity: 1;
+}
+
+/* Keep buttons clickable */
+.participant-controls {
+    pointer-events: auto;
 }
 
 .detail-row {
@@ -652,4 +715,320 @@ input[type="checkbox"]:disabled + label {
 /* Add red color when time is running low (less than 1 minute) */
 #time-remaining.low-time {
     color: #dc3545;
+}
+
+.signal-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.signal-status.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.signal-status.inactive {
+    background-color: #f44336;
+    color: white;
+}
+
+.participant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.participant-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.participant-controls .control-button {
+    padding: 4px 12px;
+    font-size: 0.9em;
+    min-width: 60px;
+}
+
+.participant-controls .start-button {
+    background-color: transparent;
+    color: #28a745;
+    border: 1px solid #28a745;
+}
+
+.participant-controls .start-button:hover:not(:disabled) {
+    background-color: #28a745;
+    color: white;
+}
+
+.participant-controls .start-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.participant-controls .stop-button {
+    background-color: transparent;
+    color: #dc3545;
+    border: 1px solid #dc3545;
+}
+
+.participant-controls .stop-button:hover:not(:disabled) {
+    background-color: #dc3545;
+    color: white;
+}
+
+.participant-controls .stop-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+/* Add inactive state styles */
+.participant-item.inactive .start-button,
+.participant-item.inactive .stop-button {
+    background-color: #f8f9fa;
+    color: #adb5bd;
+    border-color: #adb5bd;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Add the shake animation for disabled buttons */
+.participant-controls .control-button:disabled {
+    animation: shake 0.4s ease-in-out;
+}
+
+.participant-item .timer-display {
+    margin-top: 8px;
+    text-align: right;
+    font-size: 0.9em;
+}
+
+/* Add styles for locked state */
+.experiments-section .list-container[style*="pointer-events: none"] .experiment-item {
+    cursor: not-allowed;
+}
+
+.participants-section .list-container .participant-item[style*="pointer-events: none"] {
+    cursor: not-allowed;
+}
+
+/* Ensure stop button remains clickable when parent is locked */
+.participant-item .stop-button:not(:disabled) {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+}
+
+.participant-controls .eye-tracking-button {
+    background-color: transparent;
+    color: #17a2b8;
+    border: 1px solid #17a2b8;
+}
+
+.participant-controls .eye-tracking-button:hover:not(:disabled) {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.participant-controls .eye-tracking-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+/* Common styles for both experiment and participant items */
+.experiment-item,
+.participant-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.experiment-item:hover,
+.participant-item:hover {
+    border-color: #adb5bd;
+    background-color: #f8f9fa;
+}
+
+.experiment-item.selected,
+.participant-item.selected {
+    border-color: #0d6efd;
+    background-color: #f0f7ff;
+    box-shadow: 0 0 0 1px #0d6efd;
+}
+
+.experiment-content,
+.participant-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px;
+}
+
+.experiment-info,
+.participant-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.experiment-name,
+.participant-name {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.experiment-details,
+.participant-details {
+    display: flex;
+    gap: 12px;
+    font-size: 0.8em;
+    color: #666;
+}
+
+.experiment-details span,
+.participant-details span {
+    white-space: nowrap;
+}
+
+.experiment-folder,
+.participant-folder {
+    margin-top: 8px;
+    font-size: 0.8em;
+    color: #666;
+    cursor: pointer;
+}
+
+.experiment-folder span,
+.participant-folder span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #f0f0f0;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.experiment-folder span:hover,
+.participant-folder span:hover {
+    background-color: #e0e0e0;
+}
+
+/* Specific styles for experiment list */
+.experiments-section .list-container {
+    margin-bottom: 20px;
+}
+
+/* Keep the existing participant-specific styles */
+.participant-controls {
+    display: flex;
+    gap: 6px;
+    margin-left: 12px;
+}
+
+.participant-controls .control-button {
+    padding: 4px 8px;
+    font-size: 0.85em;
+    min-width: 50px;
+    height: 28px;
+    margin: 0;
+}
+
+/* Update inactive state styles */
+.participant-item.inactive {
+    opacity: 0.6;
+}
+
+.participant-item.inactive .stop-button:not(:disabled) {
+    opacity: 1;
+}
+
+/* Keep buttons clickable */
+.participant-controls {
+    pointer-events: auto;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.section-header .title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.section-header .control-button {
+    padding: 6px 12px;
+    font-size: 13px;
+    background-color: transparent;
+    color: #0d6efd;
+    border: 1px solid #0d6efd;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    width: fit-content;
+    white-space: nowrap;
+}
+
+.section-header .control-button:hover:not(:disabled) {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.section-header .control-button:disabled {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Remove the bottom section buttons */
+.action-buttons {
+    display: none;
+}
+
+/* Update list container to account for header */
+.list-container {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+    margin-top: 10px;
+}
+
+/* Add context menu hint on hover */
+.experiments-section .list-container:hover,
+.participants-section .list-container:hover {
+    position: relative;
+}
+
+.experiments-section .list-container:hover::after,
+.participants-section .list-container:hover::after {
+    content: 'Right-click to add new';
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.8em;
+    color: #666;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none;
 }
