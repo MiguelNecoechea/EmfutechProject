@@ -565,17 +565,16 @@ class BackendServer:
     
     def handle_update_signal_status(self, signal, status):
         """Update the status of a signal."""
-        bool_status = status.lower() == 'true'
         if signal == SIGNAL_AURA:
-            self._run_aura = bool_status
+            self._run_aura = status
         elif signal == SIGNAL_GAZE:
-            self._run_gaze = bool_status
+            self._run_gaze = status
         elif signal == SIGNAL_EMOTION:
-            self._run_emotion = bool_status
+            self._run_emotion = status
         elif signal == SIGNAL_POINTER:
-            self._run_pointer = bool_status
+            self._run_pointer = status
         elif signal == SIGNAL_SCREEN:
-            self._run_screen = bool_status
+            self._run_screen = status
         
         return {"status": STATUS_SUCCESS, "message": f"Signal {signal} updated to {status}"}
 
