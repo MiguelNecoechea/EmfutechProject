@@ -1035,22 +1035,15 @@ input[type="checkbox"]:disabled + label {
     min-height: 0;
 }
 
-/* Add context menu hint on hover */
-.experiments-section .list-container:hover,
-.participants-section .list-container:hover {
-    position: relative;
+.empty-list-message {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    user-select: none;
 }
 
-.experiments-section .list-container:hover::after,
-.participants-section .list-container:hover::after {
-    content: 'Right-click to add new';
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    font-size: 0.8em;
-    color: #666;
-    background-color: rgba(255, 255, 255, 0.9);
-    padding: 4px 8px;
-    border-radius: 4px;
-    pointer-events: none;
+#experiments-list, #participants-list {
+    min-height: 100px;
+    position: relative;
 }

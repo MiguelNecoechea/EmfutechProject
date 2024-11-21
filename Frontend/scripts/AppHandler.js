@@ -121,6 +121,9 @@ class AppHandler {
                     const experimentId = args[0];
                     window.electronAPI.openParticipantWindow(experimentId);
                     break;
+                case 'delete-study':
+                    this.handleDeleteStudy(args[0]);
+                    break;
             }
         });
     }
@@ -388,6 +391,13 @@ class AppHandler {
                         addParticipantBtn.disabled = false;
                     });
 
+                    // Add context menu to experiment elements
+                    experimentElement.addEventListener('contextmenu', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        await window.electronAPI.showContextMenu('study', experiment.createdAt);
+                    });
+
                     experimentsList.appendChild(experimentElement);
                 });
             } else {
@@ -513,6 +523,13 @@ class AppHandler {
 
                     participantElement.addEventListener('click', () => {
                         this.handleParticipantClick(participant, participantElement);
+                    });
+
+                    // Add context menu to participant elements
+                    participantElement.addEventListener('contextmenu', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        await window.electronAPI.showContextMenu('participant', participant.createdAt);
                     });
 
                     participantsList.appendChild(participantElement);
@@ -775,20 +792,70 @@ class AppHandler {
         const experimentsList = document.getElementById('experiments-list');
         const experimentsSection = document.querySelector('.experiments-section');
         
+        // Remove any existing listeners
+        const newExperimentsList = experimentsList.cloneNode(true);
+        experimentsList.parentNode.replaceChild(newExperimentsList, experimentsList);
+        
+        // Add context menu for the entire experiments section
         experimentsSection.addEventListener('contextmenu', async (e) => {
             e.preventDefault();
-            await window.electronAPI.showContextMenu('new-study');
+            e.stopPropagation();
+            await window.electronAPI.showContextMenu('study-area');
         });
 
         // For participants section
+        const participantsList = document.getElementById('participants-list');
         const participantsSection = document.querySelector('.participants-section');
         
+        // Remove any existing listeners
+        const newParticipantsList = participantsList.cloneNode(true);
+        participantsList.parentNode.replaceChild(newParticipantsList, participantsList);
+        
+        // Add context menu for the entire participants section
         participantsSection.addEventListener('contextmenu', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
             if (this.selectedExperimentId) {
-                await window.electronAPI.showContextMenu('add-participant', this.selectedExperimentId);
+                await window.electronAPI.showContextMenu('participant-area', this.selectedExperimentId);
             }
         });
+    }
+
+    // Add this new method to handle study deletion
+    async handleDeleteStudy(experimentId) {
+        try {
+            const response = await window.electronAPI.deleteExperiment(experimentId);
+            if (response.status === 'success') {
+                // Clear participant details if the deleted study was selected
+                if (this.selectedExperimentId === experimentId) {
+                    this.clearParticipantDetails();
+                    this.selectedExperimentId = null;
+                }
+                // Reload the experiments list
+                await this.loadExperiments();
+            } else {
+                console.error('Error deleting study:', response.message);
+            }
+        } catch (error) {
+            console.error('Error handling study deletion:', error);
+        }
+    }
+
+    // Add method to handle participant deletion
+    async handleDeleteParticipant(participantId) {
+        try {
+            const response = await window.electronAPI.deleteParticipant(participantId);
+            if (response.status === 'success') {
+                // Reload the participants list
+                if (this.selectedExperimentId) {
+                    await this.loadParticipants(this.selectedExperimentId);
+                }
+            } else {
+                console.error('Error deleting participant:', response.message);
+            }
+        } catch (error) {
+            console.error('Error handling participant deletion:', error);
+        }
     }
 
 }

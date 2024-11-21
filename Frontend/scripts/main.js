@@ -320,35 +320,177 @@ class ApplicationManager {
             }
         });
 
-        ipcMain.handle('show-context-menu', (event, menuType, experimentId) => {
-            const window = BrowserWindow.fromWebContents(event.sender);
-            
-            let menuTemplate;
-            switch (menuType) {
-                case 'new-study':
-                    menuTemplate = [
-                        {
-                            label: 'New Study',
-                            click: () => {
-                                window.webContents.send('menu-action', 'new-study');
-                            }
-                        }
-                    ];
-                    break;
-                case 'add-participant':
-                    menuTemplate = [
-                        {
-                            label: 'Add Participant',
-                            click: () => {
-                                window.webContents.send('menu-action', 'add-participant', experimentId);
-                            }
-                        }
-                    ];
-                    break;
-            }
+            // Start of Selection
+            ipcMain.handle('show-context-menu', (event, menuType, id) => {
+                const window = BrowserWindow.fromWebContents(event.sender);
+                
+                let menuTemplate = [];
 
-            const menu = Menu.buildFromTemplate(menuTemplate);
-            menu.popup({ window });
+                switch (menuType) {
+                    case 'study':
+                        menuTemplate = [
+                            {
+                                label: 'New Study',
+                                click: () => {
+                                    window.webContents.send('menu-action', 'new-study');
+                                }
+                            },
+                            {
+                                label: 'Add Participant',
+                                click: () => {
+                                    window.webContents.send('menu-action', 'add-participant', id);
+                                }
+                            },
+                            { type: 'separator' },
+                            {
+                                label: 'Delete Study',
+                                click: async () => {
+                                    const choice = await dialog.showMessageBox(window, {
+                                        type: 'warning',
+                                        buttons: ['Cancel', 'Delete'],
+                                        defaultId: 0,
+                                        title: 'Confirm Study Deletion',
+                                        message: 'Are you sure you want to delete this study?',
+                                        detail: 'This will permanently delete the study and all associated participant data.'
+                                    });
+
+                                    if (choice.response === 1) {
+                                        window.webContents.send('menu-action', 'delete-study', id);
+                                    }
+                                }
+                            }
+                        ];
+                        break;
+
+                    case 'participant':
+                    case 'participant-area':
+                        // Only show menu if we have a selected study ID
+                        if (id) {  // id here is the selectedExperimentId
+                            menuTemplate = [
+                                {
+                                    label: 'Add Participant',
+                                    click: () => {
+                                        window.webContents.send('menu-action', 'add-participant', id);
+                                    }
+                                }
+                            ];
+                            
+                            // Only add delete option for individual participants
+                            if (menuType === 'participant') {
+                                menuTemplate.push(
+                                    { type: 'separator' },
+                                    {
+                                        label: 'Delete Participant',
+                                        click: async () => {
+                                            const choice = await dialog.showMessageBox(window, {
+                                                type: 'warning',
+                                                buttons: ['Cancel', 'Delete'],
+                                                defaultId: 0,
+                                                title: 'Confirm Participant Deletion',
+                                                message: 'Are you sure you want to delete this participant?',
+                                                detail: 'This will permanently delete all participant data.'
+                                            });
+
+                                            if (choice.response === 1) {
+                                                window.webContents.send('menu-action', 'delete-participant', id);
+                                            }
+                                        }
+                                    }
+                                );
+                            }
+                        } else {
+                            // Show message if no study is selected
+                            dialog.showMessageBox(window, {
+                                type: 'info',
+                                title: 'No Study Selected',
+                                message: 'Please select a study first before adding participants.',
+                            });
+                            return; // Don't show context menu
+                        }
+                        break;
+
+                    case 'study-area':
+                        menuTemplate = [
+                            {
+                                label: 'New Study',
+                                click: () => {
+                                    window.webContents.send('menu-action', 'new-study');
+                                }
+                            }
+                        ];
+                        break;
+                }
+
+                if (menuTemplate.length > 0) {
+                    const menu = Menu.buildFromTemplate(menuTemplate);
+                    menu.popup({ window });
+                }
+            });
+
+        // Add new handler for deleting experiments
+        ipcMain.handle('delete-experiment', async (event, experimentId) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const experimentsPath = path.join(dataDir, 'experiments.json');
+                const participantsPath = path.join(dataDir, 'participants.json');
+
+                // Read experiments file
+                const experiments = JSON.parse(fs.readFileSync(experimentsPath, 'utf8'));
+                const experimentToDelete = experiments.find(e => e.createdAt === experimentId);
+
+                if (!experimentToDelete) {
+                    return { status: 'error', message: 'Experiment not found' };
+                }
+
+                // Delete experiment folder if it exists
+                if (experimentToDelete.folder && fs.existsSync(experimentToDelete.folder)) {
+                    fs.rmSync(experimentToDelete.folder, { recursive: true, force: true });
+                }
+
+                // Remove experiment from experiments.json
+                const updatedExperiments = experiments.filter(e => e.createdAt !== experimentId);
+                fs.writeFileSync(experimentsPath, JSON.stringify(updatedExperiments, null, 2));
+
+                // Remove associated participants
+                if (fs.existsSync(participantsPath)) {
+                    const participants = JSON.parse(fs.readFileSync(participantsPath, 'utf8'));
+                    const updatedParticipants = participants.filter(p => p.experimentId !== experimentId);
+                    fs.writeFileSync(participantsPath, JSON.stringify(updatedParticipants, null, 2));
+                }
+
+                return { status: 'success' };
+            } catch (error) {
+                return { status: 'error', message: error.message };
+            }
+        });
+
+        // Add handler for deleting participants
+        ipcMain.handle('delete-participant', async (event, participantId) => {
+            try {
+                const dataDir = path.join(__dirname, '..', 'data');
+                const participantsPath = path.join(dataDir, 'participants.json');
+
+                // Read participants file
+                const participants = JSON.parse(fs.readFileSync(participantsPath, 'utf8'));
+                const participantToDelete = participants.find(p => p.createdAt === participantId);
+
+                if (!participantToDelete) {
+                    return { status: 'error', message: 'Participant not found' };
+                }
+
+                // Delete participant folder if it exists
+                if (participantToDelete.folderPath && fs.existsSync(participantToDelete.folderPath)) {
+                    fs.rmSync(participantToDelete.folderPath, { recursive: true, force: true });
+                }
+
+                // Remove participant from participants.json
+                const updatedParticipants = participants.filter(p => p.createdAt !== participantId);
+                fs.writeFileSync(participantsPath, JSON.stringify(updatedParticipants, null, 2));
+
+                return { status: 'success' };
+            } catch (error) {
+                return { status: 'error', message: error.message };
+            }
         });
     }
 

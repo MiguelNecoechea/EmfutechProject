@@ -57,4 +57,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('close-frame-stream', (_event) => callback()),
     onCameraClosed: (callback) =>
         ipcRenderer.on('camera-closed', (_event) => callback()),
+    deleteExperiment: (experimentId) =>
+        ipcRenderer.invoke('delete-experiment', experimentId),
+    deleteParticipant: (participantId) =>
+        ipcRenderer.invoke('delete-participant', participantId),
 });
