@@ -55,6 +55,12 @@
         const gazeElement = document.getElementById('gaze-frame');
         const gazeError = document.getElementById('gaze-error');
         
+        // Add listener for window close event
+        window.electronAPI.onCloseFrameStream(() => {
+            cameraContainer.classList.remove('visible');
+            gazeContainer.classList.remove('visible');
+        });
+        
         window.electronAPI.onFrameData((response) => {
             try {
                 if (response.type === 'frame' && response.data) {
