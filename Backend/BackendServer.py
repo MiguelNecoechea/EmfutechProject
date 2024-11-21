@@ -311,7 +311,7 @@ class BackendServer:
         command = message.get("command")
         params = message.get("params", {})
         handlers = {
-            'update_signal_status': self.handle_update_signal_status,
+            'update_signal': self.handle_update_signal_status,
             'start_eye_gaze': self.start_eye_gaze,
             'start': self.start_data_collection,
             'stop': self.stop_data_collection,
@@ -564,6 +564,7 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": str(e)}
     
     def handle_update_signal_status(self, signal, status):
+        print(f"Updating signal {signal} to {status}")
         """Update the status of a signal."""
         if signal == SIGNAL_AURA:
             self._run_aura = status
