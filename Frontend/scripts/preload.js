@@ -69,4 +69,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('window-closed', (_event) => callback()),
     onStreamData: (callback) =>
         ipcRenderer.on('stream-data', (_event, data) => callback(data)),
+    onSignalStatusUpdate: (callback) => {
+        ipcRenderer.on('signal-status-update', (event, data) => callback(data));
+    },
 });
