@@ -72,4 +72,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onSignalStatusUpdate: (callback) => {
         ipcRenderer.on('signal-status-update', (event, data) => callback(data));
     },
+    onCalibrationStatus: (callback) => ipcRenderer.on('calibration-status', (_, status) => callback(status)),
 });
