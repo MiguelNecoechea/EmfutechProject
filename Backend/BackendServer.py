@@ -28,6 +28,8 @@ from IO.SignalProcessing.AuraTools import rename_aura_channels, is_stream_ready
 from IO.VideoProcessing.EmotionRecognizer import EmotionRecognizer
 from IO.PointerTracking.PointerTracker import CursorTracker
 from IO.FileWriting.PointerWriter import PointerWriter
+from IO.FileWriting.KeyboardWriter import KeyboardWriter
+from IO.KeyboardTracking.KeyboardTracker import KeyboardTracker
 
 # Constants
 DEFAULT_PORT = "5556"
@@ -44,6 +46,7 @@ GAZE_FILE_SUFFIX = '_gaze.csv'
 POINTER_FILE_SUFFIX = '_pointer_data.csv'
 TRAINING_GAZE_FILE = 'training_gaze.csv'
 TRAINING_AURA_FILE = 'training_aura.csv'
+KEYBOARD_FILE_SUFFIX = '_keyboard.csv'
 
 # Collection types
 TRAINING_MODE = 'training'
@@ -214,6 +217,10 @@ class BackendServer:
     #     except Exception as e:
     #         print(f"Error initializing encryption: {e}")
     #         raise
+
+        # Add keyboard tracking objects
+        self._keyboard_tracker = None
+        self._keyboard_writer = None
 
     @contextmanager
     def thread_tracking(self, thread):
@@ -447,7 +454,18 @@ class BackendServer:
                     self.send_signal_update(SIGNAL_POINTER, 'recording')
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_POINTER})
 
-                # TODO: Add keyboard recording
+                # Keyboard
+                if self._run_keyboard:
+                    self._keyboard_writer = KeyboardWriter(self._path, f'{self._filename}{KEYBOARD_FILE_SUFFIX}')
+                    self._keyboard_writer.create_new_file()
+                    keyboard_response = self.start_keyboard_tracking()
+                    if keyboard_response["status"] != STATUS_SUCCESS:
+                        self.send_signal_update(SIGNAL_KEYBOARD, 'error')
+                        raise Exception(keyboard_response["message"])
+                    self._keyboard_tracker.start_time = self._start_time
+                    self._keyboard_tracker.is_tracking = True
+                    self.send_signal_update(SIGNAL_KEYBOARD, 'recording')
+                    self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_KEYBOARD})
 
                 # TODO: Add screen recording
 
@@ -569,6 +587,14 @@ class BackendServer:
             self.send_signal_update(SIGNAL_SCREEN, 'ready')
         if self._run_keyboard:
             self.send_signal_update(SIGNAL_KEYBOARD, 'ready')
+
+        # Stop keyboard tracking
+        if self._keyboard_tracker is not None:
+            self._keyboard_tracker.stop_tracking()
+            self._keyboard_tracker = None
+            if self._keyboard_writer:
+                self._keyboard_writer.close_file()
+            self._keyboard_writer = None
 
         return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
 
@@ -1190,3 +1216,11 @@ class BackendServer:
                 self._socket.send_json({"type": "signal_update", "signal": signal, "status": status})
         except Exception as e:
             print(f"Error sending signal update: {str(e)}")
+
+    def start_keyboard_tracking(self):
+        """Initialize and start keyboard tracking."""
+        if not hasattr(self, '_keyboard_tracker') or self._keyboard_tracker is None:
+            self._keyboard_tracker = KeyboardTracker(writer=self._keyboard_writer)
+            return {"status": STATUS_SUCCESS, "message": "Keyboard tracking started"}
+        else:
+            return {"status": STATUS_ERROR, "message": "Keyboard tracking already active"}
