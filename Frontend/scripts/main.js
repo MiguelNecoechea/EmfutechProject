@@ -14,6 +14,7 @@ class ApplicationManager {
         this.pendingReportResponse = null;
         this.reportResponseResolver = null;
         this.frameStreamWindow = null;
+        this.streamSelectorWindow = null;
         this.setupEventHandlers();
     }
 
@@ -492,6 +493,12 @@ class ApplicationManager {
                 return { status: 'error', message: error.message };
             }
         });
+
+        ipcMain.on('open-stream-selector', () => {
+            if (!this.streamSelectorWindow) {
+                this.createStreamSelectorWindow();
+            }
+        });
     }
 
     async onAppReady() {
@@ -600,44 +607,25 @@ class ApplicationManager {
     }
 
     async startMessageLoop() {
-        try {
-            for await (const [msg] of this.socket) {
-                if (this.isShuttingDown || !this.socket) break;
+        while (!this.isShuttingDown) {
+            try {
+                const message = await this.socket.receive();
+                const response = JSON.parse(message.toString());
 
-                try {
-                    const response = JSON.parse(msg.toString());
-                    
-                    if (this.reportResponseResolver) {
-                        this.reportResponseResolver(response);
-                        this.reportResponseResolver = null;
-                    } else if ((response.type === 'frame' || response.type === 'gaze_frame') && this.frameStreamWindow) {
-                        try {
-                            if (!this.frameStreamWindow.isDestroyed()) {
-                                this.frameStreamWindow.webContents.send('frame-data', response);
-                            }
-                        } catch (windowError) {
-                            console.error('Error sending frame data:', windowError);
-                            this.frameStreamWindow = null;
-                        }
-                    } else if (this.mainWindow) {
-                        try {
-                            if (!this.mainWindow.isDestroyed()) {
-                                this.mainWindow.webContents.send('python-message', response);
-                            }
-                        } catch (windowError) {
-                            console.error('Error sending message to main window:', windowError);
-                            this.mainWindow = null;
-                        }
+                // Route AURA streams data to stream selector window if it exists
+                if (response.streams && Array.isArray(response.streams)) {
+                    if (this.streamSelectorWindow) {
+                        this.streamSelectorWindow.webContents.send('stream-data', response);
                     }
-                } catch (error) {
-                    if (!this.isShuttingDown) {
-                        console.error('Error processing message:', error);
-                    }
+                    continue;
                 }
-            }
-        } catch (error) {
-            if (!this.isShuttingDown) {
-                console.error('ZMQ message loop error:', error);
+
+                // Send other messages to main window
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('python-message', response);
+                }
+            } catch (error) {
+                console.error('Error in message loop:', error);
             }
         }
     }
@@ -865,6 +853,29 @@ class ApplicationManager {
             'Frontend/UI/AddParticipantView.html',
             { query: { experimentId } }
         );
+    }
+
+    async createStreamSelectorWindow() {
+        this.streamSelectorWindow = new BrowserWindow({
+            width: 400,
+            height: 300,
+            modal: true,
+            parent: this.mainWindow,
+            resizable: false,
+            webPreferences: {
+                nodeIntegration: true,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js'),
+                sandbox: false
+            }
+        });
+
+        await this.streamSelectorWindow.loadFile('Frontend/UI/StreamSelector.html');
+
+        // Handle window closed event
+        this.streamSelectorWindow.on('closed', () => {
+            this.streamSelectorWindow = null;
+        });
     }
 }
 

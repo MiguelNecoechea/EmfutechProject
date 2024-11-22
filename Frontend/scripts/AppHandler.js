@@ -74,6 +74,8 @@ class AppHandler {
 
         // Setup context menus
         this.setupContextMenus();
+
+        this.isStreamSelectorOpen = false;  // Add this flag
     }
 
     setupButtons() {
@@ -133,17 +135,33 @@ class AppHandler {
                     break;
             }
         });
-    }
 
+        // Add AURA settings button handler
+        document.getElementById('aura-settings').addEventListener('click', () => {
+            this.isStreamSelectorOpen = true;  // Set flag when opening window
+            window.electronAPI.openStreamSelector();
+            window.electronAPI.sendPythonCommand('get_aura_streams');
+        });
+    }
+    
     setupIPCListeners() {
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
+            
+            // Handle AURA streams data
+            if (response.streams && Array.isArray(response.streams)) {
+                if (this.isStreamSelectorOpen) {
+                    console.log('Forwarding streams to selector window:', response.streams);
+                    // The stream selector window will handle this message
+                    return;
+                }
+            }
             
             // Handle signal status updates
             if (response.signal) {
                 const signalMappings = {
                     'aura': 'status-aura',
-                    'gaze': 'status-eye',
+                    'gaze': 'status-eye', 
                     'emotion': 'status-emotion',
                     'pointer': 'status-pointer',
                     'screen': 'status-screen'
@@ -235,6 +253,11 @@ class AppHandler {
         window.electronAPI.onCameraClosed(() => {
             this.isViewingCamera = false;
             this.viewCamera.textContent = 'View Camera';
+        });
+
+        // Add listener for when stream selector window closes
+        window.electronAPI.onWindowClosed(() => {
+            this.isStreamSelectorOpen = false;  // Reset flag when window closes
         });
     }
 

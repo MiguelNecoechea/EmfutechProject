@@ -61,4 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('delete-experiment', experimentId),
     deleteParticipant: (participantId) =>
         ipcRenderer.invoke('delete-participant', participantId),
+    openStreamSelector: () => ipcRenderer.send('open-stream-selector'),
+    onWindowClosed: (callback) =>
+        ipcRenderer.on('window-closed', (_event) => callback()),
+    onStreamData: (callback) =>
+        ipcRenderer.on('stream-data', (_event, data) => callback(data)),
 });
