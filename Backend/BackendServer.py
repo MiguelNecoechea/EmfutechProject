@@ -1106,27 +1106,36 @@ class BackendServer:
                 print("Starting camera stream...")
                 while self._viewing_camera and self._camera and self._camera.isOpened():
                     try:
+                        # Get and process camera frame
                         ret, frame = self._camera.read()
                         if not ret or frame is None:
                             print("Failed to capture frame")
                             continue
 
-                        # Resize and encode frame
+                        # Process camera frame
                         frame = cv2.resize(frame, (640, 480))
                         ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        
                         if ret:
-                            # Convert to base64 and create message
                             frame_data = base64.b64encode(buffer).decode('utf-8')
-                            message = {
+                            self._socket.send_json({
                                 'type': 'frame',
                                 'data': frame_data
-                            }
-                            
-                            # Convert to JSON string and send
-                            json_str = json.dumps(message)
-                            self._socket.send(json_str.encode('utf-8'))
+                            })
+
+                        # Process gaze frame if available
+                        if hasattr(self, '_last_gaze_frame') and self._last_gaze_frame is not None:
+                            with threading.Lock():
+                                gaze_frame = self._last_gaze_frame.copy()
                         
+                        if gaze_frame is not None:
+                            gaze_frame = cv2.resize(gaze_frame, (640, 480))
+                            ret_gaze, buffer_gaze = cv2.imencode('.jpg', gaze_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                            if ret_gaze:
+                                gaze_data = base64.b64encode(buffer_gaze).decode('utf-8')
+                                self._socket.send_json({
+                                    'type': 'gaze_frame',
+                                    'data': gaze_data
+                                })                    
                         time.sleep(0.033)  # ~30 FPS
                         
                     except Exception as e:

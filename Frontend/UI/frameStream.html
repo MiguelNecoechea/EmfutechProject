@@ -57,7 +57,10 @@
         
         function updateFrame(element, data, errorElement) {
             try {
-                console.log('Updating frame, data length:', data.length);
+                if (!data) {
+                    throw new Error('No frame data provided');
+                }
+
                 element.src = `data:image/jpeg;base64,${data}`;
                 errorElement.style.display = 'none';
                 element.style.display = 'block';
@@ -72,6 +75,15 @@
         window.electronAPI.onFrameData((event, message) => {
             try {
                 
+                if (typeof message === 'string') {
+                    try {
+                        message = JSON.parse(message);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                        return;
+                    }
+                }
+
                 if (message && message.type === 'frame' && message.data) {
                     frameCount++;
                     if (frameCount % 30 === 0) {
@@ -83,6 +95,7 @@
                 }
             } catch (error) {
                 console.error('Error processing frame:', error);
+                console.error('Message that caused error:', message);
             }
         });
 

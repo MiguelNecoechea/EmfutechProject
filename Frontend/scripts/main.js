@@ -899,7 +899,6 @@ class ApplicationManager {
         try {
             // Parse the message
             const data = JSON.parse(message);
-            console.log('Parsed message:', data); // Debug log
 
             // Handle different message types
             if (data.type === 'frame' || data.type === 'gaze_frame') {
