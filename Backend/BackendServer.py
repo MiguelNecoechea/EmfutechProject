@@ -323,7 +323,9 @@ class BackendServer:
             'new_participant': self.handle_new_participant,
             'generate_report': self.generate_report,
             'view_camera': self.view_camera,
-            'stop_camera_view': self.stop_camera_view
+            'stop_camera_view': self.stop_camera_view,
+            'get_aura_streams': self.get_aura_streams,
+            'set_aura_stream': self.set_aura_stream
         }
         handler = handlers.get(command)
         if handler:
