@@ -126,42 +126,31 @@ class ApplicationManager {
                 const dataDir = path.join(__dirname, '..', 'data');
                 const filePath = path.join(dataDir, 'experiments.json');
 
-                // Ensure data directory exists
-                if (!fs.existsSync(dataDir)) {
-                    fs.mkdirSync(dataDir, { recursive: true });
-                }
-
                 // Create experiment folder
                 const experimentFolder = path.join(
                     experimentData.folder,
                     experimentData.name
                 );
-
-                // Create the experiment folder
                 fs.mkdirSync(experimentFolder, { recursive: true });
 
-                // Update the folder path in experimentData to include the experiment name
+                // Update the folder path in experimentData
                 const experimentWithUpdatedPath = {
                     ...experimentData,
                     folder: experimentFolder,
                     createdAt: new Date().toISOString()
                 };
 
-                // Read existing data
-                let experiments = [];
-                if (fs.existsSync(filePath)) {
-                    const fileContent = fs.readFileSync(filePath, 'utf8');
-                    experiments = JSON.parse(fileContent);
-                }
-
-                // Add new experiment
+                // Read existing experiments
+                const experiments = await this.readJSONSafely(filePath);
                 experiments.push(experimentWithUpdatedPath);
 
-                // Write back to file
-                fs.writeFileSync(filePath, JSON.stringify(experiments, null, 2));
+                // Write updated experiments
+                await this.writeJSONSafely(filePath, experiments);
                 
-                // After successful save, broadcast update to all windows
-                this.mainWindow.webContents.send('experiment-update');
+                // Broadcast update
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('experiment-update');
+                }
                 
                 return { 
                     status: 'success',
@@ -195,52 +184,34 @@ class ApplicationManager {
 
         ipcMain.handle('save-participant', async (event, participantData) => {
             try {
-                // Get experiment data to access its folder
-                const experiments = JSON.parse(
-                    fs.readFileSync(path.join(__dirname, '..', 'data', 'experiments.json'), 'utf8')
-                );
-                const experiment = experiments.find(e => e.createdAt === participantData.experimentId);
+                const experimentsPath = path.join(__dirname, '..', 'data', 'experiments.json');
+                const experiments = await this.readJSONSafely(experimentsPath);
                 
+                const experiment = experiments.find(e => e.createdAt === participantData.experimentId);
                 if (!experiment) {
                     throw new Error('Experiment not found');
                 }
 
-                // Create participant folder inside experiment folder
+                // Create participant folder
                 const participantFolder = path.join(
                     experiment.folder,
                     participantData.name
                 );
-
-                // Create folders recursively
                 fs.mkdirSync(participantFolder, { recursive: true });
-
-                // Save participant data to participants.json
-                const dataDir = path.join(__dirname, '..', 'data');
-                const filePath = path.join(dataDir, 'participants.json');
-
-                // Ensure data directory exists
-                if (!fs.existsSync(dataDir)) {
-                    fs.mkdirSync(dataDir, { recursive: true });
-                }
-
-                // Read existing participants
-                let participants = [];
-                if (fs.existsSync(filePath)) {
-                    const fileContent = fs.readFileSync(filePath, 'utf8');
-                    participants = JSON.parse(fileContent);
-                }
 
                 // Add folder path to participant data
                 const participantWithFolder = {
                     ...participantData,
-                    folderPath: participantFolder
+                    folderPath: participantFolder,
+                    createdAt: new Date().toISOString()
                 };
 
-                // Add new participant
+                // Save participant data
+                const participantsPath = path.join(__dirname, '..', 'data', 'participants.json');
+                const participants = await this.readJSONSafely(participantsPath);
                 participants.push(participantWithFolder);
-
-                // Write back to file
-                fs.writeFileSync(filePath, JSON.stringify(participants, null, 2));
+                
+                await this.writeJSONSafely(participantsPath, participants);
                 
                 return { 
                     status: 'success',
@@ -876,6 +847,48 @@ class ApplicationManager {
         this.streamSelectorWindow.on('closed', () => {
             this.streamSelectorWindow = null;
         });
+    }
+
+    async readJSONSafely(filePath) {
+        try {
+            // Ensure the directory exists
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            // If file doesn't exist, return empty array
+            if (!fs.existsSync(filePath)) {
+                return [];
+            }
+
+            // Read and parse file
+            const data = await fs.promises.readFile(filePath, 'utf8');
+            return JSON.parse(data);
+        } catch (error) {
+            console.error(`Error reading JSON file ${filePath}:`, error);
+            throw error;
+        }
+    }
+
+    async writeJSONSafely(filePath, data) {
+        try {
+            // Ensure the directory exists
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+
+            // Write to temporary file first
+            const tempPath = `${filePath}.tmp`;
+            await fs.promises.writeFile(tempPath, JSON.stringify(data, null, 2));
+            
+            // Rename temp file to actual file (atomic operation)
+            await fs.promises.rename(tempPath, filePath);
+        } catch (error) {
+            console.error(`Error writing JSON file ${filePath}:`, error);
+            throw error;
+        }
     }
 }
 
