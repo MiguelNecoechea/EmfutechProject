@@ -273,8 +273,7 @@ class BackendServer:
         for writer in writers:
             if writer:
                 try:
-                    if writer:
-                        writer.close_file()
+                    writer.close_file()
                 except Exception as e:
                     print(f"Error closing writer: {e}")
 
@@ -326,7 +325,8 @@ class BackendServer:
             'view_camera': self.view_camera,
             'stop_camera_view': self.stop_camera_view,
             'get_aura_streams': self.get_aura_streams,
-            'set_aura_stream': self.set_aura_stream
+            'set_aura_stream': self.set_aura_stream,
+            'shutdown': self.cleanup,
         }
         handler = handlers.get(command)
         if handler:

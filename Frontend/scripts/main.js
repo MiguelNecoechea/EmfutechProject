@@ -582,22 +582,21 @@ class ApplicationManager {
         while (!this.isShuttingDown) {
             try {
                 const message = await this.socket.receive();
-                const response = JSON.parse(message.toString());
-
-                // Route AURA streams data to stream selector window if it exists
-                if (response.streams && Array.isArray(response.streams)) {
-                    if (this.streamSelectorWindow) {
-                        this.streamSelectorWindow.webContents.send('stream-data', response);
-                    }
-                    continue;
-                }
-
-                // Send other messages to main window
-                if (this.mainWindow) {
+                const response = this.handleMessage(message);
+                if (response) {
                     this.mainWindow.webContents.send('python-message', response);
                 }
             } catch (error) {
-                console.error('Error in message loop:', error);
+                if (error.code === 'EAGAIN') {
+                    if (!this.isShuttingDown) {
+                        console.error('EAGAIN Error: No message received.');
+                    }
+                    // If shutting down, silently ignore the EAGAIN error
+                } else {
+                    console.error('Error in message loop:', error);
+                }
+                // Optional: Add a short delay to prevent a tight loop in case of continuous errors
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
     }
@@ -626,32 +625,27 @@ class ApplicationManager {
 
         this.isShuttingDown = true;
         console.log('Starting cleanup...');
-
-        // Close frame stream window first
-        if (this.frameStreamWindow) {
-            try {
-                // Send stop camera view before closing socket
-                if (this.socket) {
-                    await this.sendToPython('stop_camera_view');
-                }
-                this.frameStreamWindow.destroy();
-                this.frameStreamWindow = null;
-            } catch (error) {
-                console.error('Error closing frame stream window:', error);
-            }
+    
+        try {
+            // Optional: Send a shutdown message to the backend if needed
+            await this.sendToPython('shutdown'); // Define a 'shutdown' command in your backend
+    
+            // Wait briefly to allow any final messages to be processed
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+            console.error('Error sending shutdown command:', error);
         }
-
-        // Send final stop command and close socket
+    
+        // Proceed to close the socket after signaling shutdown
         if (this.socket) {
             try {
-                await this.sendToPython('stop');
                 await this.socket.close();
                 console.log('ZMQ socket closed');
             } catch (error) {
                 console.error('Error closing ZMQ socket:', error);
             }
             this.socket = null;
-        }
+        }    
 
         // Close other windows
         if (this.calibrationWindow) {
@@ -889,6 +883,49 @@ class ApplicationManager {
         } catch (error) {
             console.error(`Error writing JSON file ${filePath}:`, error);
             throw error;
+        }
+    }
+
+    handleMessage(message) {
+        try {
+            // Parse the message if it's a string
+            const data = typeof message === 'string' ? JSON.parse(message) : message;
+
+            // Handle different message types
+            if (data.type === 'frame' || data.type === 'gaze_frame') {
+                // Forward camera/gaze frames to the frame stream window
+                if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
+                    this.frameStreamWindow.webContents.send(data.type, data.data);
+                }
+                return null; // No need to broadcast frames to main window
+            }
+
+            if (data.type === 'signal_update') {
+                // Forward signal updates to main window
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('signal-status-update', {
+                        signal: data.signal,
+                        status: data.status
+                    });
+                }
+                return null;
+            }
+
+            // Handle report response
+            if (this.reportResponseResolver) {
+                this.reportResponseResolver(data);
+                return null;
+            }
+
+            // For any other messages, forward them to the main window
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('python-message', data);
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Error handling message:', error);
+            return null;
         }
     }
 }
