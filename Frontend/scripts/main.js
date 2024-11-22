@@ -262,10 +262,11 @@ class ApplicationManager {
 
         ipcMain.on('focus-window', () => {
             if (this.mainWindow) {
+                this.mainWindow.show();  // Make sure window is visible
+                this.mainWindow.focus(); // Focus the window
                 if (this.mainWindow.isMinimized()) {
-                    this.mainWindow.restore();
+                    this.mainWindow.restore(); // Restore if minimized
                 }
-                this.mainWindow.focus();
             }
         });
 
