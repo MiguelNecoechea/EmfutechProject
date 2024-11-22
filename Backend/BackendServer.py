@@ -54,7 +54,7 @@ SIGNAL_GAZE = 'gaze'
 SIGNAL_EMOTION = 'emotion'
 SIGNAL_POINTER = 'pointer'
 SIGNAL_SCREEN = 'screen'
-
+SIGNAL_KEYBOARD = 'keyboard'
 OPEN_CAMERA = 'open'
 CLOSE_CAMERA = 'close'
 
@@ -123,6 +123,7 @@ class BackendServer:
         self._run_gaze = False
         self._run_pointer = False
         self._run_screen = False
+        self._run_keyboard = False
 
         # Threads for the data collection
         self._aura_thread = None
@@ -569,18 +570,46 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": str(e)}
     
     def handle_update_signal_status(self, signal, status):
-        print(f"Updating signal {signal} to {status}")
         """Update the status of a signal."""
+        print(f"Updating signal {signal} to {status}")
+        
+        # Validate signal type
+        valid_signals = [SIGNAL_AURA, SIGNAL_GAZE, SIGNAL_EMOTION, 
+                        SIGNAL_POINTER, SIGNAL_SCREEN, SIGNAL_KEYBOARD]
+        if signal not in valid_signals:
+            return {"status": STATUS_ERROR, "message": f"Invalid signal type: {signal}"}
+
+        # Update internal state
+        signal_updated = False
         if signal == SIGNAL_AURA:
             self._run_aura = status
+            signal_updated = True
         elif signal == SIGNAL_GAZE:
             self._run_gaze = status
+            signal_updated = True
         elif signal == SIGNAL_EMOTION:
             self._run_emotion = status
+            signal_updated = True
         elif signal == SIGNAL_POINTER:
             self._run_pointer = status
+            signal_updated = True
         elif signal == SIGNAL_SCREEN:
             self._run_screen = status
+            signal_updated = True
+        elif signal == SIGNAL_KEYBOARD:
+            self._run_keyboard = status
+            signal_updated = True
+
+        if not signal_updated:
+            return {"status": STATUS_ERROR, "message": "No signal was updated"}
+
+        # Send status update message
+        self._socket.send_json({
+            "type": "signal_update",
+            "signal": signal,
+            "status": status,
+            "message": f"Signal {signal} updated to {status}"
+        })
         
         return {"status": STATUS_SUCCESS, "message": f"Signal {signal} updated to {status}"}
 
