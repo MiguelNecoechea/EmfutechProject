@@ -909,16 +909,18 @@ class ApplicationManager {
             }
 
             if (data.type === 'signal_update') {
+                // Add debug logging
+                console.log('Main process received signal update:', data);
                 // Forward signal updates to main window
                 if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                     this.mainWindow.webContents.send('signal-status-update', {
                         signal: data.signal,
-                        status: data.status
+                        status: data.status,
+                        message: data.message
                     });
                 }
                 return null;
             }
-
 
             // Add specific handling for calibration messages
             if (data.message === 'start-calibration') {

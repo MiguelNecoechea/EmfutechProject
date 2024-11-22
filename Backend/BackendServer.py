@@ -353,7 +353,7 @@ class BackendServer:
         self._eye_gaze = GazeProcessor()
         def eye_gaze_task():
             with self.thread_tracking(threading.current_thread()):
-                self.handle_update_signal_status(SIGNAL_GAZE, 'calibrating')
+                self.send_signal_update(SIGNAL_GAZE, 'connecting')
                 while True:
                     if self._camera:
                         frame = self.get_frame()
@@ -609,7 +609,7 @@ class BackendServer:
                 self._aura_training_thread = None
             
             self.start_regressor()
-            self.handle_update_signal_status(SIGNAL_GAZE, 'ready')
+            self.send_signal_update(SIGNAL_GAZE, 'ready')
             return {"status": STATUS_SUCCESS, "message": CALIBRATION_COMPLETE_MSG}
         except Exception as e:
             print(f"Error stopping training data recording: {e}")
@@ -1213,7 +1213,15 @@ class BackendServer:
         """
         try:
             if hasattr(self, '_socket') and self._socket and not self._socket.closed:
-                self._socket.send_json({"type": "signal_update", "signal": signal, "status": status})
+                # Add debug logging
+                print(f"Backend sending signal update: signal={signal}, status={status}")
+                message = {
+                    "type": "signal_update", 
+                    "signal": signal, 
+                    "status": status
+                }
+                print(f"Sending message: {message}")
+                self._socket.send_json(message)
         except Exception as e:
             print(f"Error sending signal update: {str(e)}")
 

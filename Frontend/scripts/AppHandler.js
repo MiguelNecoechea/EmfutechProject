@@ -105,6 +105,7 @@ class AppHandler {
                 element.className = 'signal-status';
             }
         });
+
     }
 
     setupButtons() {
@@ -174,7 +175,6 @@ class AppHandler {
     }
     
     setupIPCListeners() {
-        // Handle Python messages
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
             
@@ -187,26 +187,17 @@ class AppHandler {
             }
 
             // Handle calibration complete message
-            if (response.message === MESSAGES.CALIBRATION_COMPLETE) {
+            if (response.message === 'calibration-complete') {
                 console.log('Calibration completed, updating state to READY');
                 this.currentState = STATES.READY;
                 this.calibrationCount++;
                 this.updateButtonStates(STATES.READY);
+                // Unlock UI after calibration
                 this.lockUIForCalibration(false);
                 return;
             }
-        });
 
-        // Add specific calibration status listener
-        window.electronAPI.onCalibrationStatus((status) => {
-            console.log('Received calibration status:', status);
-            if (status === 'complete') {
-                console.log('Calibration completed via status update');
-                this.currentState = STATES.READY;
-                this.calibrationCount++;
-                this.updateButtonStates(STATES.READY);
-                this.lockUIForCalibration(false);
-            }
+            // Handle other message types...
         });
 
         // Add specific signal status update listener
@@ -1079,9 +1070,8 @@ class AppHandler {
 
     handleSignalStatusUpdate(response) {
         const { signal, status, message } = response;
-        console.log(`Updating signal ${signal} to ${status}`); // Debug log
-
-        // Map signal names to element IDs
+        // Map backend signal names to frontend element IDs
+        console.log(`Handling signal update: signal=${signal}, status=${status}, message=${message}`);
         const signalMappings = {
             'aura': 'status-aura',
             'gaze': 'status-eye',
@@ -1091,7 +1081,7 @@ class AppHandler {
             'keyboard': 'status-keyboard'
         };
 
-        const elementId = signalMappings[signal.toLowerCase()];
+        const elementId = signalMappings[signal.toLowerCase()];        
         const statusElement = document.getElementById(elementId);
 
         if (!statusElement) {
@@ -1100,7 +1090,7 @@ class AppHandler {
         }
 
         // Update the status text and class
-        let statusText = 'Unknown';
+        let statusText = 'Inactive';
         let statusClass = '';
 
         switch (status.toLowerCase()) {
@@ -1111,14 +1101,6 @@ class AppHandler {
             case 'need_calibration':
                 statusText = 'Needs Calibration';
                 statusClass = 'need-calibration';
-                break;
-            case 'inactive':
-                statusText = 'Inactive';
-                statusClass = '';
-                break;
-            case 'connecting':
-                statusText = 'Connecting...';
-                statusClass = 'connecting';
                 break;
             case 'calibrating':
                 statusText = 'Calibrating';
@@ -1136,23 +1118,31 @@ class AppHandler {
                 statusText = 'Ready';
                 statusClass = 'ready';
                 break;
+            case 'connecting':
+                statusText = 'Connecting';
+                statusClass = 'connecting';
+                break;
+            case 'inactive':
+                statusText = 'Inactive';
+                statusClass = '';
+                break;
             default:
-                console.warn(`Unknown status received: ${status} for signal ${signal}`);
+                statusText = 'Inactive';
+                statusClass = '';
                 break;
         }
-
+        
         // Update the element
-        console.log(`Setting ${elementId} to "${statusText}" with class "${statusClass}"`); // Debug log
         statusElement.textContent = statusText;
-        statusElement.className = `signal-status ${statusClass}`.trim();
+        statusElement.className = 'signal-status' + (statusClass ? ` ${statusClass}` : '');
 
-        // Update tooltip if message is provided
         if (message) {
             statusElement.title = message;
         }
 
         // Update internal state
         this.signalStates[signal.toLowerCase()] = status.toLowerCase();
+        console.log(`Updated signal states:`, this.signalStates);
     }
 
 }
