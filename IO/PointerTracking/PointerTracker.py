@@ -1,21 +1,26 @@
 from pynput import mouse
+from pynput.mouse import Controller
 import time
 
 class CursorTracker:
     def __init__(self, writer=None):
         """
-        Initializes the CursorTracker with a mouse listener and optional writer.
-        
-        Args:
-            writer: Optional PointerWriter object to write coordinates to file
+        Initializes the CursorTracker with mouse listener and optional writer.
         """
-        self._listener = mouse.Listener(on_click=self.on_click)
+        self._listener = mouse.Listener(
+            on_click=self.on_click,
+            on_move=self.on_move
+        )
         self._listener.start()
+        self._mouse_controller = Controller()
         self._click_coordinates = []
         self._writer = writer
         self._start_time = None
         self._is_tracking = False
-        
+        self._is_clicked = False
+        self._tracking_interval = 0.2  # 200ms interval for movement tracking
+        self._last_track_time = 0
+
     @property
     def start_time(self):
         """Gets the start time."""
@@ -36,36 +41,29 @@ class CursorTracker:
         self._is_tracking = bool(value)
 
     def on_click(self, x, y, button, pressed):
+        """Callback for click events"""
+        if self._is_tracking:
+            self._is_clicked = pressed
+            self.handle_position(x, y)
+
+    def on_move(self, x, y):
+        """Callback for mouse movement"""
+        if self._is_tracking:
+            current_time = time.time()
+            # Only track movement at specified intervals
+            if current_time - self._last_track_time >= self._tracking_interval:
+                self.handle_position(x, y)
+                self._last_track_time = current_time
+
+    def handle_position(self, x, y):
         """
-        Callback function that is called on mouse click events.
-
-        Args:
-            x (int): The x-coordinate of the cursor.
-            y (int): The y-coordinate of the cursor.
-            button (Button): The mouse button that was clicked.
-            pressed (bool): True if the button was pressed, False if released.
-        """
-        if pressed and self._is_tracking:
-            self.handle_click(x, y)
-
-    def handle_click(self, x, y):
-        """
-        Handles the click event by storing coordinates and writing to file if writer exists.
-
-        Args:
-            x (int): The x-coordinate of the cursor.
-            y (int): The y-coordinate of the cursor.
-
-        Returns:
-            tuple: A tuple containing the (x, y) coordinates.
+        Handles tracking of pointer position and click state
         """
         coordinates = (int(x), int(y))
-        self._click_coordinates.append(coordinates)
         
-        # Write to file if writer exists
         if self._writer and self._start_time is not None:
             timestamp = time.time() - self._start_time
-            self._writer.write(timestamp, coordinates[0], coordinates[1])
+            self._writer.write(timestamp, coordinates[0], coordinates[1], self._is_clicked)
             
         return coordinates
 
