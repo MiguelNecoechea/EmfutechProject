@@ -9,6 +9,7 @@ import queue
 from contextlib import contextmanager
 from cryptography.fernet import Fernet
 import base64
+import json
 
 from mne_lsl.stream import StreamLSL as Stream
 from DataProcessing.LLMProcessor import DataAnalyzer
@@ -737,8 +738,8 @@ class BackendServer:
                     if self._aura_writer:
                         self._aura_writer.close_file()
                     break
-            self.send_signal_update(SIGNAL_AURA, 'active')
-                    
+            self.send_signal_update(SIGNAL_AURA, 'ready')
+            
         except Exception as e:
             print(f"Error in aura collection loop: {str(e)}")
             self.send_signal_update(SIGNAL_AURA, 'error')
@@ -887,8 +888,6 @@ class BackendServer:
                 for file_path in data_files:
                     if AURA_FILE_SUFFIX in file_path:
                         training_file = os.path.join(os.path.dirname(self._training_path), 'training', f'{self._filename}_{TRAINING_AURA_FILE}')
-                        print(training_file)
-                        print(file_path)
                         data_analyzer.preprocess_aura(file_path, training_file)
                     else:
                         data_analyzer.upload_file(file_path)
@@ -1062,12 +1061,6 @@ class BackendServer:
     def manage_camera(self, action='open'):
         """
         Open or close the camera.
-        
-        Args:
-            action (str): Either 'open' or 'close'. Defaults to 'open'.
-            
-        Returns:
-            dict: Status message indicating success or failure
         """
         try:
             if action == 'open':
@@ -1075,10 +1068,12 @@ class BackendServer:
                     self._camera = cv2.VideoCapture(DEFAULT_CAMERA_INDEX)
                     if not self._camera.isOpened():
                         raise Exception("Could not open camera")
+                    return {"status": STATUS_SUCCESS, "message": "Camera opened successfully"}
             elif action == 'close':
                 if self._camera is not None:
                     self._camera.release()
-                    self._camera = None     
+                    self._camera = None
+                    return {"status": STATUS_SUCCESS, "message": "Camera closed successfully"}
             else:
                 return {"status": STATUS_ERROR, "message": f"Invalid action: {action}"}
                 
@@ -1086,6 +1081,7 @@ class BackendServer:
             if self._camera is not None:
                 self._camera.release()
                 self._camera = None
+            return {"status": STATUS_ERROR, "message": str(e)}
 
     def get_frame(self):
         """
@@ -1100,44 +1096,42 @@ class BackendServer:
         """
         Capture frames from the camera and stream them to the frontend via ZMQ.
         """
-        # Make sure camera is open
         if self._camera is None or not self._camera.isOpened():
-            self.manage_camera(OPEN_CAMERA)
-            
+            result = self.manage_camera(OPEN_CAMERA)
+            if result["status"] == STATUS_ERROR:
+                return result
+
         def stream_frames():
             try:
                 print("Starting camera stream...")
-                while self._viewing_camera:
+                while self._viewing_camera and self._camera and self._camera.isOpened():
                     try:
-                        # Get and process camera frame
-                        frame = self.get_frame()
-                        if frame is not None:
-                            # Encode camera frame
-                            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                            if ret:
-                                # Send camera frame
-                                self._socket.send_json({
-                                    'type': 'frame',
-                                    'data': base64.b64encode(buffer).decode('utf-8')
-                                })
+                        ret, frame = self._camera.read()
+                        if not ret or frame is None:
+                            print("Failed to capture frame")
+                            continue
+
+                        # Resize and encode frame
+                        frame = cv2.resize(frame, (640, 480))
+                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                         
-                        # Get and process gaze frame if available
-                        with threading.Lock():
-                            gaze_frame = getattr(self, '_last_gaze_frame', None)
-                            if gaze_frame is not None:
-                                # Encode gaze frame
-                                ret, gaze_buffer = cv2.imencode('.jpg', gaze_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                                if ret:
-                                    # Send gaze frame
-                                    self._socket.send_json({
-                                        'type': 'gaze_frame',
-                                        'data': base64.b64encode(gaze_buffer).decode('utf-8')
-                                    })
+                        if ret:
+                            # Convert to base64 and create message
+                            frame_data = base64.b64encode(buffer).decode('utf-8')
+                            message = {
+                                'type': 'frame',
+                                'data': frame_data
+                            }
+                            
+                            # Convert to JSON string and send
+                            json_str = json.dumps(message)
+                            self._socket.send(json_str.encode('utf-8'))
                         
                         time.sleep(0.033)  # ~30 FPS
+                        
                     except Exception as e:
                         print(f"Error processing frame: {e}")
-                        time.sleep(0.1)  # Add delay on error
+                        time.sleep(0.1)
                         
             except Exception as e:
                 print(f"Fatal error in stream_frames: {e}")
@@ -1145,13 +1139,13 @@ class BackendServer:
                 self._viewing_camera = False
                 print("Camera streaming stopped")
 
-        # Start streaming in a new thread if not already streaming
         if not self._viewing_camera:
             self._viewing_camera = True
-            threading.Thread(target=stream_frames, daemon=True).start()
-            return {"status": "success", "message": "Camera streaming started"}
+            thread = threading.Thread(target=stream_frames, daemon=True)
+            thread.start()
+            return {"status": STATUS_SUCCESS, "message": "Camera streaming started"}
         else:
-            return {"status": "error", "message": "Camera is already streaming"}
+            return {"status": STATUS_ERROR, "message": "Camera is already streaming"}
 
     def stop_camera_view(self):
         """Stop the camera stream."""
@@ -1178,4 +1172,8 @@ class BackendServer:
         """
         Send a signal update message to the frontend.
         """
-        self._socket.send_json({"type": "signal_update", "signal": signal, "status": status})
+        try:
+            if hasattr(self, '_socket') and self._socket and not self._socket.closed:
+                self._socket.send_json({"type": "signal_update", "signal": signal, "status": status})
+        except Exception as e:
+            print(f"Error sending signal update: {str(e)}")
