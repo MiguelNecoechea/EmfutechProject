@@ -900,6 +900,15 @@ class ApplicationManager {
             const data = JSON.parse(message);
 
             // Handle different message types
+            if (data.type === 'stream_list') {
+                // Forward stream list to stream selector window
+                if (this.streamSelectorWindow && !this.streamSelectorWindow.isDestroyed()) {
+                    console.log('Forwarding stream list to selector window:', data);
+                    this.streamSelectorWindow.webContents.send('stream-data', data);
+                }
+                return null;
+            }
+
             if (data.type === 'frame' || data.type === 'gaze_frame') {
                 // Forward camera/gaze frames to the frame stream window
                 if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
