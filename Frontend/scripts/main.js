@@ -582,7 +582,16 @@ class ApplicationManager {
         while (!this.isShuttingDown) {
             try {
                 const message = await this.socket.receive();
-                const response = this.handleMessage(message);
+
+                // Convert the message to a string and parse it
+                let messageString;
+                if (message instanceof Uint8Array) {
+                    messageString = new TextDecoder().decode(message);
+                } else {
+                    messageString = message.toString();
+                }
+
+                const response = this.handleMessage(messageString);
                 if (response) {
                     this.mainWindow.webContents.send('python-message', response);
                 }
@@ -888,16 +897,17 @@ class ApplicationManager {
 
     handleMessage(message) {
         try {
-            // Parse the message if it's a string
-            const data = typeof message === 'string' ? JSON.parse(message) : message;
+            // Parse the message
+            const data = JSON.parse(message);
+            console.log('Parsed message:', data); // Debug log
 
             // Handle different message types
             if (data.type === 'frame' || data.type === 'gaze_frame') {
                 // Forward camera/gaze frames to the frame stream window
                 if (this.frameStreamWindow && !this.frameStreamWindow.isDestroyed()) {
-                    this.frameStreamWindow.webContents.send(data.type, data.data);
+                    this.frameStreamWindow.webContents.send('frame', data);
                 }
-                return null; // No need to broadcast frames to main window
+                return null;
             }
 
             if (data.type === 'signal_update') {
@@ -925,6 +935,7 @@ class ApplicationManager {
             return null;
         } catch (error) {
             console.error('Error handling message:', error);
+            console.error('Raw message:', message);
             return null;
         }
     }
