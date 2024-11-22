@@ -438,10 +438,14 @@ class BackendServer:
                     self._pointer_writer.create_new_file()
                     pointer_response = self.start_pointer_tracking()
                     if pointer_response["status"] != STATUS_SUCCESS:
+                        self.send_signal_update(SIGNAL_POINTER, 'error')
                         raise Exception(pointer_response["message"])
                     self._pointer_tracker.start_time = self._start_time
                     self._pointer_tracker.is_tracking = True
+                    self.send_signal_update(SIGNAL_POINTER, 'recording')
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_POINTER})
+
+                # TODO: Add keyboard recording
 
                 # TODO: Add screen recording
 
@@ -549,7 +553,20 @@ class BackendServer:
         self._emotion_thread = None
         self._regressor_thread = None
         self._screen_recording_thread = None
-        # Add other threads if necessary
+
+        # Set signals to ready if they were active
+        if self._run_aura:
+            self.send_signal_update(SIGNAL_AURA, 'ready')
+        if self._run_gaze:
+            self.send_signal_update(SIGNAL_GAZE, 'ready')
+        if self._run_emotion:
+            self.send_signal_update(SIGNAL_EMOTION, 'ready')
+        if self._run_pointer:
+            self.send_signal_update(SIGNAL_POINTER, 'ready')
+        if self._run_screen:
+            self.send_signal_update(SIGNAL_SCREEN, 'ready')
+        if self._run_keyboard:
+            self.send_signal_update(SIGNAL_KEYBOARD, 'ready')
 
         return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
 
@@ -604,13 +621,12 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": "No signal was updated"}
 
         # Send status update message
-        self._socket.send_json({
-            "type": "signal_update",
-            "signal": signal,
-            "status": status,
-            "message": f"Signal {signal} updated to {status}"
-        })
-        
+        if status == True and signal == SIGNAL_GAZE:
+            self.send_signal_update(signal, 'need_calibration')
+        elif status == True:
+            self.send_signal_update(signal, 'ready')
+        else:
+            self.send_signal_update(signal, 'inactive')
         return {"status": STATUS_SUCCESS, "message": f"Signal {signal} updated to {status}"}
 
     # Signal initialization functions
@@ -640,6 +656,7 @@ class BackendServer:
     def start_aura(self, buffer_size_multiplier=1):
         try:
             if self._aura_stream_id is None:
+                self.send_signal_update(SIGNAL_AURA, 'connecting')
                 try:
                     if self._aura_stream_id is None:
                         stream_ids = resolve_aura()
@@ -650,7 +667,9 @@ class BackendServer:
                     self._stream = Stream(bufsize=buffer_size_multiplier, source_id=self._aura_stream_id)
                     self._stream.connect(processing_flags='all')
                     rename_aura_channels(self._stream)
+                    self.send_signal_update(SIGNAL_AURA, 'active')
                 except ValueError as e:
+                    self.send_signal_update(SIGNAL_AURA, 'error')
                     return {"status": STATUS_ERROR, "message": str(e)}
                 
             # Create thread without starting it
@@ -673,9 +692,10 @@ class BackendServer:
         Initialize and start emotion recognition.
         """
         try:
+            self.send_signal_update(SIGNAL_EMOTION, 'calibrating')
             self._emotion_handler = EmotionRecognizer('opencv')
             self._emotion_thread = threading.Thread(target=self._emotion_collection_loop, daemon=True)
-
+            self.send_signal_update(SIGNAL_EMOTION, 'active')
             return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": str(e)}
@@ -695,6 +715,7 @@ class BackendServer:
                 channels_names = ['timestamp'] + self._stream.info['ch_names']
                 aura_writer_training = AuraDataWriter(self._training_path, TRAINING_AURA_FILE, channels_names)
                 aura_writer_training.create_new_file()
+            self.send_signal_update(SIGNAL_AURA, 'recording')
             
             while True:
                 if is_stream_ready(self._stream):
@@ -716,9 +737,11 @@ class BackendServer:
                     if self._aura_writer:
                         self._aura_writer.close_file()
                     break
+            self.send_signal_update(SIGNAL_AURA, 'active')
                     
         except Exception as e:
             print(f"Error in aura collection loop: {str(e)}")
+            self.send_signal_update(SIGNAL_AURA, 'error')
             raise
 
     def _emotion_collection_loop(self):
@@ -730,6 +753,7 @@ class BackendServer:
         is set to False.
         """
         with self.thread_tracking(threading.current_thread()):
+            self.send_signal_update(SIGNAL_EMOTION, 'recording')
             while True:
                 if self._emotion_handler and self._camera:
                     frame = self.get_frame()
@@ -745,6 +769,7 @@ class BackendServer:
                     break
             if self._emotion_writer:
                 self._emotion_writer.close_file()
+            self.send_signal_update(SIGNAL_EMOTION, 'ready')
 
     def _coordinate_regressor_loop(self):
         """
@@ -758,6 +783,7 @@ class BackendServer:
         Predictions are rounded to integer screen coordinates before writing.
         """
         with self.thread_tracking(threading.current_thread()):
+            self.send_signal_update(SIGNAL_GAZE, 'recording')
             while True:
                 if self._camera:
                     frame = self.get_frame()
@@ -782,7 +808,8 @@ class BackendServer:
                         
                 if not self._data_collection_active:
                     break
-
+            self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
+        
     def update_coordinates(self, x, y):
         """
         Update current coordinates.
@@ -1146,3 +1173,9 @@ class BackendServer:
         Set the AURA stream.
         """
         self._aura_stream_id = stream_id
+    
+    def send_signal_update(self, signal, status):
+        """
+        Send a signal update message to the frontend.
+        """
+        self._socket.send_json({"type": "signal_update", "signal": signal, "status": status})
