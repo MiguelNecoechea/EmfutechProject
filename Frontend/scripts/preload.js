@@ -7,8 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('python-command', command, params),
     onPythonMessage: (callback) =>
         ipcRenderer.on('python-message', (_event, data) => callback(data)),
-    onFrameData: (callback) =>
-        ipcRenderer.on('frame-data', (_event, data) => callback(data)),
+    onFrameData: (callback) => {
+        ipcRenderer.on('frame', callback);
+        ipcRenderer.on('gaze_frame', callback);
+    },
     openCalibrationWindow: () => 
         ipcRenderer.send('open-calibration-window'),
     openDirectory: () => 
@@ -53,8 +55,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('show-context-menu', menuType, experimentId),
     onMenuAction: (callback) =>
         ipcRenderer.on('menu-action', (_event, action, ...args) => callback(action, ...args)),
-    onCloseFrameStream: (callback) =>
-        ipcRenderer.on('close-frame-stream', (_event) => callback()),
+    onCloseFrameStream: (callback) => {
+        ipcRenderer.on('close-frame-stream', callback);
+    },
     onCameraClosed: (callback) =>
         ipcRenderer.on('camera-closed', (_event) => callback()),
     deleteExperiment: (experimentId) =>
