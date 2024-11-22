@@ -855,7 +855,6 @@ class AppHandler {
         this.updateSignalStatesForRecording(false);
         
         // Get the current experiment to check if it has eye tracking
-
         const experimentResponse = await window.electronAPI.getExperiment(this.selectedExperimentId);
         if (experimentResponse && experimentResponse.data && experimentResponse.data.signals) {
             const hasEyeTracking = experimentResponse.data.signals.eye;
@@ -863,10 +862,6 @@ class AppHandler {
             // Re-enable buttons based on eye tracking status
             const selectedParticipant = document.querySelector('.participant-item.selected');
             if (selectedParticipant) {
-                const eyeTrackingBtn = selectedParticipant.querySelector('.eye-tracking-button');
-                const startBtn = selectedParticipant.querySelector('.start-button');
-                const stopBtn = selectedParticipant.querySelector('.stop-button');
-
                 if (hasEyeTracking) {
                     // Reset calibration and enable eye tracking button
                     this.calibrationCount = 0;
@@ -875,9 +870,9 @@ class AppHandler {
                     this.updateButtonStates(STATES.READY);
                 }
             }
-
         }
         
+        // Focus the window when experiment stops
         await window.electronAPI.focusWindow();
     }
 
@@ -1095,14 +1090,6 @@ class AppHandler {
         // Update internal state
         this.signalStates[signal] = status;
 
-        // Debug log the element and its current state
-        console.log(`Updating element ${elementId}:`, {
-            element: statusElement,
-            newStatus: status,
-            currentText: statusElement.textContent,
-            currentClass: statusElement.className
-        });
-
         // Update UI based on status
         switch (status) {
             case true:  // Handle boolean true
@@ -1144,6 +1131,10 @@ class AppHandler {
                 statusElement.textContent = 'Error';
                 statusElement.className = 'signal-status error';
                 break;
+            case 'ready':
+                statusElement.textContent = 'Ready';
+                statusElement.className = 'signal-status ready';
+                break;
             
             default:
                 console.warn(`Unknown status received: ${status} for signal ${signal}`);
@@ -1155,12 +1146,6 @@ class AppHandler {
             statusElement.title = message;
         }
 
-        // Debug log the final state
-        console.log(`Updated element ${elementId} final state:`, {
-            text: statusElement.textContent,
-            class: statusElement.className,
-            title: statusElement.title
-        });
     }
 
     handleSignalError(response) {
