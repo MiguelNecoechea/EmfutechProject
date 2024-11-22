@@ -20,7 +20,7 @@ class AddExperimentView {
         this.signalEye = document.querySelector('input[name="signal-eye"]');
         this.signalEmotion = document.querySelector('input[name="signal-emotion"]');
         this.signalPointer = document.querySelector('input[name="signal-pointer"]');
-        this.signalScreen = document.querySelector('input[name="signal-screen"]');
+        this.signalKeyboard = document.querySelector('input[name="signal-keyboard"]');
     }
 
     setupEventListeners() {
@@ -62,13 +62,14 @@ class AddExperimentView {
             description: this.experimentDescription.value,
             folder: this.experimentFolder.value,
             length: parseInt(this.experimentLength.value),
-            // Add signals configuration
+            // Update signals configuration
             signals: {
                 aura: this.signalAura.checked,
                 eye: this.signalEye.checked,
                 emotion: this.signalEmotion.checked,
                 pointer: this.signalPointer.checked,
-                screen: this.signalScreen.checked
+                keyboard: this.signalKeyboard.checked,
+                screen: true // Always true
             }
         };
 
@@ -111,6 +112,19 @@ class AddExperimentView {
         const length = parseInt(this.experimentLength.value);
         if (isNaN(length) || length <= 0) {
             alert('Please enter a valid experiment length (must be greater than 0)');
+            return false;
+        }
+
+        // Add signal validation
+        const hasSignalSelected = 
+            this.signalAura.checked ||
+            this.signalEye.checked ||
+            this.signalEmotion.checked ||
+            this.signalPointer.checked ||
+            this.signalKeyboard.checked;
+
+        if (!hasSignalSelected) {
+            alert('Please select at least one tracking signal');
             return false;
         }
 
