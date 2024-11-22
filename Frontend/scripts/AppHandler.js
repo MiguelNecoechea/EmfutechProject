@@ -174,19 +174,39 @@ class AppHandler {
     }
     
     setupIPCListeners() {
-        // Update this listener to properly handle signal status updates
+        // Handle Python messages
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
             
             // Handle signal status updates
             if (response.type === 'signal_update') {
                 const { signal, status } = response;
-                console.log(`Received signal update: ${signal} -> ${status}`); // Debug log
+                console.log(`Received signal update: ${signal} -> ${status}`);
                 this.handleSignalStatusUpdate(response);
-                return; // Exit after handling signal update
+                return;
             }
 
-            // Handle other message types...
+            // Handle calibration complete message
+            if (response.message === MESSAGES.CALIBRATION_COMPLETE) {
+                console.log('Calibration completed, updating state to READY');
+                this.currentState = STATES.READY;
+                this.calibrationCount++;
+                this.updateButtonStates(STATES.READY);
+                this.lockUIForCalibration(false);
+                return;
+            }
+        });
+
+        // Add specific calibration status listener
+        window.electronAPI.onCalibrationStatus((status) => {
+            console.log('Received calibration status:', status);
+            if (status === 'complete') {
+                console.log('Calibration completed via status update');
+                this.currentState = STATES.READY;
+                this.calibrationCount++;
+                this.updateButtonStates(STATES.READY);
+                this.lockUIForCalibration(false);
+            }
         });
 
         // Add specific signal status update listener
