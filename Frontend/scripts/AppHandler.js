@@ -438,10 +438,20 @@ class AppHandler {
 
     updateParticipantButtonStates(buttonType = 'all', state = this.DISABLED) {
         document.querySelectorAll('.participant-item').forEach(item => {
+            const isSelected = item.classList.contains('selected');
             const eyeTrackingBtn = item.querySelector('.eye-tracking-button');
             const startBtn = item.querySelector('.start-button');
             const stopBtn = item.querySelector('.stop-button');
             
+            // Always disable buttons for non-selected participants
+            if (!isSelected) {
+                if (eyeTrackingBtn) eyeTrackingBtn.disabled = true;
+                if (startBtn) startBtn.disabled = true;
+                if (stopBtn) stopBtn.disabled = true;
+                return;
+            }
+            
+            // Update buttons only for selected participant
             if (buttonType === 'all' || buttonType === 'eye-tracking') {
                 if (eyeTrackingBtn) eyeTrackingBtn.disabled = state;
             }
@@ -607,10 +617,10 @@ class AppHandler {
                             </div>
                             <div class="participant-controls">
                                 ${hasEyeTracking ? 
-                                    `<button class="control-button eye-tracking-button" ${this.currentState === STATES.CALIBRATING ? 'disabled' : ''} title="Start eye tracking calibration">Eye Track</button>` : 
+                                    `<button class="control-button eye-tracking-button" disabled title="Start eye tracking calibration">Eye Track</button>` : 
                                     ''
                                 }
-                                <button class="control-button start-button" ${needsCalibration ? 'disabled' : ''} title="Start recording">Start</button>
+                                <button class="control-button start-button" disabled title="Start recording">Start</button>
                                 <button class="control-button stop-button" disabled title="Stop recording">Stop</button>
                             </div>
                         </div>
@@ -807,11 +817,9 @@ class AppHandler {
                 if (response.status === 'success' && response.data && response.data.signals) {
                     const signals = response.data.signals;
                     if (signals.eye && this.calibrationCount === 0) {
-                        // Disable start button if eye tracking needs calibration
-                        const startButton = element.querySelector('.start-button');
-                        if (startButton) {
-                            startButton.disabled = true;
-                        }
+                        this.updateButtonStates(STATES.CALIBRATE);
+                    } else {
+                        this.updateButtonStates(STATES.READY);
                     }
                 }
             }
