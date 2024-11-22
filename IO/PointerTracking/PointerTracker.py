@@ -18,7 +18,7 @@ class CursorTracker:
         self._start_time = None
         self._is_tracking = False
         self._is_clicked = False
-        self._tracking_interval = 0.2  # 200ms interval for movement tracking
+        self._tracking_interval = 1 / 30  # 30 samples per second
         self._last_track_time = 0
 
     @property
