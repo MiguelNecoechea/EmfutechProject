@@ -897,7 +897,6 @@ class ApplicationManager {
 
     handleMessage(message) {
         try {
-            // Parse the message
             const data = JSON.parse(message);
 
             // Handle different message types
@@ -920,6 +919,26 @@ class ApplicationManager {
                 return null;
             }
 
+
+            // Add specific handling for calibration messages
+            if (data.message === 'start-calibration') {
+                // Create calibration window when backend signals it's ready
+                this.createCalibrationWindow();
+                return null;
+            }
+
+            if (data.message === 'calibration-complete') {
+                // Close calibration window when calibration is complete
+                if (this.calibrationWindow) {
+                    this.calibrationWindow.close();
+                }
+                // Notify main window of completion
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('calibration-status', 'complete');
+                }
+                return null;
+            }
+
             // Handle report response
             if (this.reportResponseResolver) {
                 this.reportResponseResolver(data);
@@ -934,7 +953,6 @@ class ApplicationManager {
             return null;
         } catch (error) {
             console.error('Error handling message:', error);
-            console.error('Raw message:', message);
             return null;
         }
     }
