@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select AURA Stream</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .stream-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stream-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .stream-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .stream-item:last-child {
+            border-bottom: none;
+        }
+
+        .stream-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .stream-item.selected {
+            background-color: #e3f2fd;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn {
+            background-color: white;
+            border-color: #2196F3;
+            color: #2196F3;
+        }
+
+        .refresh-btn:hover {
+            background-color: #e3f2fd;
+        }
+
+        .select-btn {
+            background-color: #2196F3;
+            border-color: #2196F3;
+            color: white;
+        }
+
+        .select-btn:hover {
+            background-color: #1976D2;
+        }
+
+        .cancel-btn {
+            background-color: white;
+            border-color: #ccc;
+            color: #666;
+        }
+
+        .cancel-btn:hover {
+            background-color: #f5f5f5;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .select-container {
+            margin: 15px 0;
+        }
+
+        .stream-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 16px;
+            padding-right: 32px;
+        }
+
+        .stream-select:hover {
+            border-color: #999;
+        }
+
+        .stream-select:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="stream-selector">
+        <h2>Select AURA Stream</h2>
+        <div class="select-container">
+            <select id="streamSelect" class="stream-select">
+                <option value="" disabled selected>Select a stream...</option>
+            </select>
+        </div>
+        <div class="button-group">
+            <button class="refresh-btn" id="refreshBtn">Refresh</button>
+            <button class="select-btn" id="selectBtn" disabled>Select</button>
+            <button class="cancel-btn" id="cancelBtn">Cancel</button>
+        </div>
+    </div>
+    <script>
+        let selectedStream = null;
+
+        function updateStreamList(streams) {
+            const streamSelect = document.getElementById('streamSelect');
+            streamSelect.innerHTML = '<option value="" disabled selected>Select a stream...</option>';
+            
+            if (!streams || streams.length === 0) {
+                streamSelect.innerHTML = '<option value="" disabled selected>No streams available</option>';
+                return;
+            }
+
+            if (typeof streams === 'string') {
+                try {
+                    streams = JSON.parse(streams);
+                } catch (e) {
+                    streams = [streams];
+                }
+            }
+
+            if (!Array.isArray(streams)) {
+                if (typeof streams === 'object') {
+                    streams = Object.values(streams);
+                } else {
+                    streams = [streams];
+                }
+            }
+
+            streams = streams.filter(stream => stream != null);
+
+            streams.forEach(stream => {
+                const option = document.createElement('option');
+                option.value = stream;
+                option.textContent = stream;
+                streamSelect.appendChild(option);
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('streamSelect').addEventListener('change', (e) => {
+            selectedStream = e.target.value;
+            document.getElementById('selectBtn').disabled = !selectedStream;
+        });
+
+        document.getElementById('refreshBtn').onclick = () => {
+            const streamSelect = document.getElementById('streamSelect');
+            streamSelect.innerHTML = '<option value="" disabled selected>Loading streams...</option>';
+            window.electronAPI.sendPythonCommand('get_aura_streams');
+        };
+        
+        document.getElementById('selectBtn').onclick = () => {
+            if (selectedStream) {
+                window.electronAPI.sendPythonCommand('set_aura_stream', { stream_id: selectedStream });
+                window.electronAPI.closeWindow();
+            }
+        };
+        
+        document.getElementById('cancelBtn').onclick = () => {
+            window.electronAPI.closeWindow();
+        };
+
+        // Setup IPC listeners
+        window.electronAPI.onStreamData((response) => {
+            if (response.status === 'success') {
+                if (response.streams) {
+                    updateStreamList(response.streams);
+                } else {
+                    console.warn('No streams data in response:', response);
+                    updateStreamList([]);
+                }
+            } else {
+                console.error('Error in stream response:', response);
+                const streamSelect = document.getElementById('streamSelect');
+                streamSelect.innerHTML = '<option value="" disabled selected>Error loading streams</option>';
+            }
+        });
+
+        // Initial load
+        window.electronAPI.sendPythonCommand('get_aura_streams');
+    </script>
+</body>
+</html> 
