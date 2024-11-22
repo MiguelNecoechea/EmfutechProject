@@ -250,6 +250,21 @@ class AppHandler {
             if (this.selectedExperimentId === data.experimentId) {
                 // Reload participants list for the current experiment
                 await this.loadParticipants(this.selectedExperimentId);
+                
+                // Preserve the experiment selection state
+                const experimentElements = document.querySelectorAll('.experiment-item');
+                experimentElements.forEach(element => {
+                    const experimentName = element.querySelector('h3').textContent;
+                    if (experimentName === document.getElementById('study-name').textContent) {
+                        element.classList.add('selected');
+                    }
+                });
+                
+                // Re-enable the add participant button
+                const addParticipantBtn = document.getElementById('add-participant');
+                if (addParticipantBtn) {
+                    addParticipantBtn.disabled = false;
+                }
             }
         });
 
@@ -565,6 +580,9 @@ class AppHandler {
             const participantsList = document.getElementById('participants-list');
             participantsList.innerHTML = '';
 
+            // Preserve the current state
+            const currentState = this.currentState;
+
             if (response.status === 'success') {
                 response.data.forEach(participant => {
                     const participantElement = document.createElement('div');
@@ -669,6 +687,15 @@ class AppHandler {
 
                     participantsList.appendChild(participantElement);
                 });
+            }
+
+            // Restore the state after loading participants
+            this.updateButtonStates(currentState);
+            
+            // Update participant count
+            const participantCount = document.getElementById('participant-count');
+            if (participantCount) {
+                participantCount.textContent = response.data.length.toString();
             }
         } catch (error) {
             console.error('Error loading participants:', error);
