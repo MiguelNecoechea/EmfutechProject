@@ -106,6 +106,33 @@ class AppHandler {
             }
         });
 
+        window.electronAPI.onCalibrationStatus((status) => {
+            console.log('Received calibration status:', status);
+            if (status === 'complete') {
+                this.handleCalibrationComplete();
+            }
+        });
+
+    }
+
+    handleCalibrationComplete() {
+        console.log('Handling calibration completion');
+        // Update state
+        this.currentState = STATES.READY;
+        
+        // Unlock UI
+        this.lockUIForCalibration(false);
+        
+        // Enable start button if it exists
+        const startButton = document.getElementById('start-button');
+        if (startButton) {
+            startButton.disabled = false;
+            startButton.classList.remove('disabled');
+            startButton.classList.add('ready');
+        }
+        
+        // Update any other UI elements that depend on calibration state
+        this.updateButtonStates(STATES.READY);
     }
 
     setupButtons() {
@@ -196,6 +223,17 @@ class AppHandler {
                 this.lockUIForCalibration(false);
                 return;
             }
+
+            window.electronAPI.onSignalStatusUpdate((data) => {
+                console.log('Received signal status update:', data);
+                this.handleSignalStatusUpdate(data);
+                
+                // Special handling for gaze signal becoming ready
+                if (data.signal === 'gaze' && data.status === 'ready') {
+                    console.log('Eye tracking calibration completed');
+                    this.handleCalibrationComplete();
+                }
+            });
 
             // Handle other message types...
         });

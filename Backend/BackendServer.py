@@ -609,7 +609,16 @@ class BackendServer:
                 self._aura_training_thread = None
             
             self.start_regressor()
+            
+            # Send both the signal update and calibration complete message
             self.send_signal_update(SIGNAL_GAZE, 'ready')
+            
+            # Send explicit calibration complete message
+            self._socket.send_json({
+                "type": "calibration_status",
+                "message": CALIBRATION_COMPLETE_MSG
+            })
+            
             return {"status": STATUS_SUCCESS, "message": CALIBRATION_COMPLETE_MSG}
         except Exception as e:
             print(f"Error stopping training data recording: {e}")
@@ -781,6 +790,7 @@ class BackendServer:
         Uses the emotion_handler to recognize emotions and writes the dominant emotion
         along with a timestamp to the emotion_writer. Runs until data_collection_active
         is set to False.
+        Records at 30 samples per second.
         """
         with self.thread_tracking(threading.current_thread()):
             self.send_signal_update(SIGNAL_EMOTION, 'recording')
@@ -795,7 +805,7 @@ class BackendServer:
 
                         timestamp = round(time.time() - self._start_time, 3)
                         self._emotion_writer.write_data(timestamp, emotion)
-                time.sleep(0.001)  # Small sleep to prevent CPU overuse
+                time.sleep(0.033)  # ~30 FPS
                 if not self._data_collection_active:
                     break
             if self._emotion_writer:
@@ -812,6 +822,7 @@ class BackendServer:
         
         The gaze input consists of x,y,z coordinates for both left and right eyes.
         Predictions are rounded to integer screen coordinates before writing.
+        Records at 30 samples per second.
         """
         with self.thread_tracking(threading.current_thread()):
             self.send_signal_update(SIGNAL_GAZE, 'recording')
@@ -836,6 +847,9 @@ class BackendServer:
                         y = int(y)
                         timestamp = round(time.time() - self._start_time, 3)
                         self._gaze_writer.write(timestamp, [x, y])
+                        
+                        # Sleep to maintain 30Hz sampling rate
+                        time.sleep(0.033)  # ~30 FPS
                         
                 if not self._data_collection_active:
                     break
