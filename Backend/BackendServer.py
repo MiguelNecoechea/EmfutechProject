@@ -1197,9 +1197,20 @@ class BackendServer:
         """
         try:
             streams = resolve_aura()
-            return {"status": "success", "streams": streams}
+            # Add debug logging
+            return {
+                "type": "stream_list",  # Add message type
+                "status": "success",
+                "streams": streams if streams else []  # Ensure we always return a list
+            }
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            print(f"Error getting AURA streams: {e}")
+            return {
+                "type": "stream_list",
+                "status": "error",
+                "message": str(e),
+                "streams": []
+            }
     
     def set_aura_stream(self, stream_id):
         """
