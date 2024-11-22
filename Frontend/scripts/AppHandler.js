@@ -18,7 +18,8 @@ const SIGNALS = {
     GAZE: 'gaze',
     EMOTION: 'emotion',
     POINTER: 'pointer',
-    SCREEN: 'screen'
+    SCREEN: 'screen',
+    KEYBOARD: 'keyboard'
 };
 
 // Backend commands
@@ -76,6 +77,34 @@ class AppHandler {
         this.setupContextMenus();
 
         this.isStreamSelectorOpen = false;  // Add this flag
+
+        // Initialize signal states
+        this.signalStates = {
+            aura: 'inactive',
+            gaze: 'inactive',
+            emotion: 'inactive',
+            pointer: 'inactive',
+            screen: 'inactive',
+            keyboard: 'inactive'
+        };
+
+        // Initialize all status elements with 'Inactive'
+        const statusElements = [
+            'status-aura',
+            'status-eye',
+            'status-emotion',
+            'status-pointer',
+            'status-screen',
+            'status-keyboard'
+        ];
+
+        statusElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = 'Inactive';
+                element.className = 'signal-status';
+            }
+        });
     }
 
     setupButtons() {
@@ -148,6 +177,17 @@ class AppHandler {
         window.electronAPI.onPythonMessage((response) => {
             console.log('Received from Python:', response);
             
+            // Handle different message types
+            if (response.type === 'signal_update') {
+                // Direct signal status updates from backend
+                const { signal, status, message } = response;
+                this.handleSignalStatusUpdate({
+                    signal: signal,
+                    status: status,
+                    message: message
+                });
+            }
+            
             // Handle AURA streams data
             if (response.streams && Array.isArray(response.streams)) {
                 if (this.isStreamSelectorOpen) {
@@ -158,31 +198,10 @@ class AppHandler {
             }
             
             // Handle signal status updates
-            if (response.signal) {
-                const signalMappings = {
-                    'aura': 'status-aura',
-                    'gaze': 'status-eye', 
-                    'emotion': 'status-emotion',
-                    'pointer': 'status-pointer',
-                    'screen': 'status-screen'
-                };
-
-                const statusElement = document.getElementById(signalMappings[response.signal]);
-                if (statusElement) {
-                    if (response.status === 'calibrating') {
-                        statusElement.textContent = 'Calibrating';
-                        statusElement.className = 'signal-status calibrating';
-                        this.lockUIForCalibration(true);
-                    } else if (response.status === 'success') {
-                        statusElement.textContent = 'Active';
-                        statusElement.className = 'signal-status active';
-                    } else if (response.status === 'error') {
-                        statusElement.textContent = 'Error';
-                        statusElement.className = 'signal-status error';
-                        console.error(`Error with ${response.signal}: ${response.message}`);
-                        this.lockUIForCalibration(false);
-                    }
-                }
+            if (response.type === 'signal_update') {
+                this.handleSignalStatusUpdate(response);
+            } else if (response.type === 'signal_error') {
+                this.handleSignalError(response);
             }
 
             // Handle other messages
@@ -705,18 +724,31 @@ class AppHandler {
 
     // Add this method to update signal statuses when recording starts/stops
     updateSignalStatesForRecording(isRecording) {
-        this.isRecording = isRecording;
-        
-        // Get the current experiment's signals
-        if (this.selectedExperimentId) {
-            window.electronAPI.getExperiment(this.selectedExperimentId)
-                .then(response => {
-                    if (response.status === 'success' && response.data && response.data.signals) {
-                        this.updateSignalStatusLabels(response.data.signals);
+        Object.entries(this.signalStates).forEach(([signal, state]) => {
+            if (state === 'active' || state === 'ready') {
+                const signalMappings = {
+                    'aura': 'status-aura',
+                    'gaze': 'status-eye',
+                    'emotion': 'status-emotion',
+                    'pointer': 'status-pointer',
+                    'screen': 'status-screen',
+                    'keyboard': 'status-keyboard'
+                };
+
+                const statusElement = document.getElementById(signalMappings[signal]);
+                if (statusElement) {
+                    if (isRecording) {
+                        statusElement.textContent = 'Recording';
+                        statusElement.className = 'signal-status recording';
+                        this.signalStates[signal] = 'recording';
+                    } else {
+                        statusElement.textContent = 'Active';
+                        statusElement.className = 'signal-status active';
+                        this.signalStates[signal] = 'active';
                     }
-                })
-                .catch(error => console.error('Error updating signal states:', error));
-        }
+                }
+            }
+        });
     }
 
     async handleParticipantClick(participant, element) {
@@ -1034,6 +1066,122 @@ class AppHandler {
             experimentsList.style.opacity = '1';
             participantsList.style.opacity = '1';
             studyDetails.style.opacity = '1';
+        }
+    }
+
+    handleSignalStatusUpdate(response) {
+        const { signal, status, message } = response;
+        console.log(`Updating signal ${signal} to ${status}`, response); // Enhanced debug log
+
+        // Ensure consistent signal mapping
+        const signalMappings = {
+            'aura': 'status-aura',
+            'gaze': 'status-eye',
+            'emotion': 'status-emotion',
+            'pointer': 'status-pointer',
+            'screen': 'status-screen',
+            'keyboard': 'status-keyboard'
+        };
+
+        const elementId = signalMappings[signal];
+        const statusElement = document.getElementById(elementId);
+
+        if (!statusElement) {
+            console.error(`Status element not found: ${elementId} for signal: ${signal}`);
+            console.log('Available elements:', Object.keys(signalMappings).map(key => document.getElementById(signalMappings[key])));
+            return;
+        }
+
+        // Update internal state
+        this.signalStates[signal] = status;
+
+        // Debug log the element and its current state
+        console.log(`Updating element ${elementId}:`, {
+            element: statusElement,
+            newStatus: status,
+            currentText: statusElement.textContent,
+            currentClass: statusElement.className
+        });
+
+        // Update UI based on status
+        switch (status) {
+            case true:  // Handle boolean true
+            case 'true':
+            case 'active':
+                statusElement.textContent = 'Active';
+                statusElement.className = 'signal-status active';
+                break;
+            
+            case false:  // Handle boolean false
+            case 'false':
+            case 'inactive':
+                statusElement.textContent = 'Inactive';
+                statusElement.className = 'signal-status';
+                break;
+            
+            case 'connecting':
+                statusElement.textContent = 'Connecting...';
+                statusElement.className = 'signal-status connecting';
+                break;
+            
+            case 'calibrating':
+                statusElement.textContent = 'Calibrating';
+                statusElement.className = 'signal-status calibrating';
+                this.lockUIForCalibration(true);
+                break;
+            
+            case 'need_calibration':
+                statusElement.textContent = 'Needs Calibration';
+                statusElement.className = 'signal-status need-calibration';
+                break;
+            
+            case 'recording':
+                statusElement.textContent = 'Recording';
+                statusElement.className = 'signal-status recording';
+                break;
+            
+            case 'error':
+                statusElement.textContent = 'Error';
+                statusElement.className = 'signal-status error';
+                break;
+            
+            default:
+                console.warn(`Unknown status received: ${status} for signal ${signal}`);
+                break;
+        }
+
+        // Update tooltip if message is provided
+        if (message) {
+            statusElement.title = message;
+        }
+
+        // Debug log the final state
+        console.log(`Updated element ${elementId} final state:`, {
+            text: statusElement.textContent,
+            class: statusElement.className,
+            title: statusElement.title
+        });
+    }
+
+    handleSignalError(response) {
+        const { signal, message } = response;
+        const signalMappings = {
+            'aura': 'status-aura',
+            'gaze': 'status-eye',
+            'emotion': 'status-emotion',
+            'pointer': 'status-pointer',
+            'screen': 'status-screen',
+            'keyboard': 'status-keyboard'
+        };
+
+        const statusElement = document.getElementById(signalMappings[signal]);
+        if (statusElement) {
+            statusElement.textContent = 'Error';
+            statusElement.className = 'signal-status error';
+            statusElement.title = message || 'An error occurred';
+            
+            // Update internal state
+            this.signalStates[signal] = 'error';
         }
     }
 
