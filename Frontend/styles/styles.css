@@ -1167,3 +1167,36 @@ input[type="checkbox"]:disabled + label {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* Add new signal status styles */
+.signal-status.connecting {
+    color: #2196F3;  /* Blue */
+    animation: pulse 1.5s infinite;
+}
+
+.signal-status.need-calibration {
+    color: #FFA726;  /* Orange */
+}
+
+.signal-status.active {
+    color: #4CAF50;  /* Green */
+}
+
+.signal-status.recording {
+    color: #F44336;  /* Red */
+    animation: pulse 1.5s infinite;
+}
+
+.signal-status.error {
+    color: #F44336;  /* Red */
+}
+
+/* Add tooltip styles */
+.signal-status {
+    position: relative;
+    cursor: help;
+}
+
+.signal-status[title] {
+    border-bottom: 1px dotted #666;
+}
