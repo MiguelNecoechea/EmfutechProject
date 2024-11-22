@@ -791,7 +791,7 @@ class ApplicationManager {
     async createExperimentWindow() {
         const experimentWindow = new BrowserWindow({
             width: 600,
-            height: 900,
+            height: 950,
             modal: true,
             parent: this.mainWindow,
             resizable: false,
@@ -809,7 +809,7 @@ class ApplicationManager {
     async createParticipantWindow(experimentId) {
         const participantWindow = new BrowserWindow({
             width: 400,
-            height: 300,
+            height: 325,
             modal: true,
             resizable: false,
             parent: this.mainWindow,
