@@ -287,7 +287,7 @@ class BackendServer:
 
         # Clean up ZMQ resources
         if hasattr(self, '_socket') and self._socket:
-            self._socket.close()
+            self._socket.close(linger=0)
         if hasattr(self, '_context') and self._context:
             self._context.term()
 
@@ -346,6 +346,7 @@ class BackendServer:
         self._eye_gaze = GazeProcessor()
         def eye_gaze_task():
             with self.thread_tracking(threading.current_thread()):
+                self.handle_update_signal_status(SIGNAL_GAZE, 'calibrating')
                 while True:
                     if self._camera:
                         frame = self.get_frame()
@@ -524,7 +525,6 @@ class BackendServer:
     def stop_data_collection(self):
         """Stop all testing and data collection."""
         self._data_collection_active = False
-        self._start_time = None
         if self._pointer_tracker is not None:
             self._pointer_tracker.stop_tracking()
             self._pointer_tracker = None  
@@ -554,12 +554,13 @@ class BackendServer:
         self._emotion_thread = None
         self._regressor_thread = None
         self._screen_recording_thread = None
+        self._start_time = None
 
         # Set signals to ready if they were active
         if self._run_aura:
             self.send_signal_update(SIGNAL_AURA, 'ready')
         if self._run_gaze:
-            self.send_signal_update(SIGNAL_GAZE, 'ready')
+            self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
         if self._run_emotion:
             self.send_signal_update(SIGNAL_EMOTION, 'ready')
         if self._run_pointer:
@@ -582,6 +583,7 @@ class BackendServer:
                 self._aura_training_thread = None
             
             self.start_regressor()
+            self.handle_update_signal_status(SIGNAL_GAZE, 'ready')
             return {"status": STATUS_SUCCESS, "message": CALIBRATION_COMPLETE_MSG}
         except Exception as e:
             print(f"Error stopping training data recording: {e}")
@@ -693,12 +695,13 @@ class BackendServer:
         Initialize and start emotion recognition.
         """
         try:
-            self.send_signal_update(SIGNAL_EMOTION, 'calibrating')
+            self.send_signal_update(SIGNAL_EMOTION, 'active')
             self._emotion_handler = EmotionRecognizer('opencv')
             self._emotion_thread = threading.Thread(target=self._emotion_collection_loop, daemon=True)
             self.send_signal_update(SIGNAL_EMOTION, 'active')
             return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
         except Exception as e:
+            self.send_signal_update(SIGNAL_EMOTION, 'error')
             return {"status": STATUS_ERROR, "message": str(e)}
     
     # Signal collection loops
@@ -763,6 +766,7 @@ class BackendServer:
                         self._last_emotion = emotion
                     if emotion is not None:
                         emotion = emotion[0]['dominant_emotion']
+
                         timestamp = round(time.time() - self._start_time, 3)
                         self._emotion_writer.write_data(timestamp, emotion)
                 time.sleep(0.001)  # Small sleep to prevent CPU overuse
