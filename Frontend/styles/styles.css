@@ -1170,25 +1170,25 @@ input[type="checkbox"]:disabled + label {
 
 /* Add new signal status styles */
 .signal-status.connecting {
-    color: #2196F3;  /* Blue */
+    color: #2196F3; 
     animation: pulse 1.5s infinite;
 }
 
 .signal-status.need-calibration {
-    color: #FFA726;  /* Orange */
+    color: #FFA726; 
 }
 
 .signal-status.active {
-    color: #4CAF50;  /* Green */
+    color: #3691db; 
 }
 
 .signal-status.recording {
-    color: #F44336;  /* Red */
+    color: #1cea23;  
     animation: pulse 1.5s infinite;
 }
 
 .signal-status.error {
-    color: #F44336;  /* Red */
+    color: #F44336; 
 }
 
 /* Add tooltip styles */
