@@ -156,35 +156,35 @@
             const streamSelect = document.getElementById('streamSelect');
             streamSelect.innerHTML = '<option value="" disabled selected>Select a stream...</option>';
             
+            console.log('Updating stream list with:', streams);  // Debug log
+
             if (!streams || streams.length === 0) {
                 streamSelect.innerHTML = '<option value="" disabled selected>No streams available</option>';
                 return;
             }
 
-            if (typeof streams === 'string') {
-                try {
-                    streams = JSON.parse(streams);
-                } catch (e) {
-                    streams = [streams];
-                }
-            }
-
+            // Ensure streams is an array
+            let streamArray = streams;
             if (!Array.isArray(streams)) {
                 if (typeof streams === 'object') {
-                    streams = Object.values(streams);
+                    streamArray = Object.values(streams);
                 } else {
-                    streams = [streams];
+                    streamArray = [streams];
                 }
             }
 
-            streams = streams.filter(stream => stream != null);
+            // Filter out null values and add options
+            streamArray
+                .filter(stream => stream != null)
+                .forEach(stream => {
+                    const option = document.createElement('option');
+                    option.value = stream;
+                    option.textContent = stream;
+                    streamSelect.appendChild(option);
+                });
 
-            streams.forEach(stream => {
-                const option = document.createElement('option');
-                option.value = stream;
-                option.textContent = stream;
-                streamSelect.appendChild(option);
-            });
+            // Enable/disable select button based on available streams
+            document.getElementById('selectBtn').disabled = streamArray.length === 0;
         }
 
         // Event Listeners
@@ -212,13 +212,10 @@
 
         // Setup IPC listeners
         window.electronAPI.onStreamData((response) => {
+            console.log('Received stream data:', response);  // Debug log
+            
             if (response.status === 'success') {
-                if (response.streams) {
-                    updateStreamList(response.streams);
-                } else {
-                    console.warn('No streams data in response:', response);
-                    updateStreamList([]);
-                }
+                updateStreamList(response.streams);
             } else {
                 console.error('Error in stream response:', response);
                 const streamSelect = document.getElementById('streamSelect');
