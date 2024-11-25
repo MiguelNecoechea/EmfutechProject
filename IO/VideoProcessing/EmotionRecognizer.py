@@ -32,8 +32,4 @@ class EmotionRecognizer:
         return result
 
     def stop_processing(self):
-        """
-        Releases the webcam from the current experiment.
-        """
-        if self.cap:
-            self.cap.release()
+        pass
