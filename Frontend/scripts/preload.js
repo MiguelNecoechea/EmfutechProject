@@ -81,4 +81,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onCalibrationStatus: (callback) => {
         ipcRenderer.on('calibration-status', (_, status) => callback(status));
     },
+    openDataViewer: (data) => 
+        ipcRenderer.send('open-data-viewer', data),
+    onDataUpdate: (callback) => {
+        ipcRenderer.on('data-update', (event, data) => callback(data));
+    },
+    getDataFilePath: (params) => ipcRenderer.invoke('get-data-file-path', params),
+    getParticipantData: (params) => {
+        return ipcRenderer.invoke('get-participant-data', params);
+    },
+    onInitDataViewer: (callback) => {
+        ipcRenderer.on('init-data-viewer', (event, data) => callback(data));
+    }
 });

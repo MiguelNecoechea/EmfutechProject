@@ -15,6 +15,7 @@ class ApplicationManager {
         this.reportResponseResolver = null;
         this.frameStreamWindow = null;
         this.streamSelectorWindow = null;
+        this.dataViewerWindow = null;
         this.setupEventHandlers();
     }
 
@@ -467,6 +468,75 @@ class ApplicationManager {
         ipcMain.on('open-stream-selector', () => {
             if (!this.streamSelectorWindow) {
                 this.createStreamSelectorWindow();
+            }
+        });
+
+        ipcMain.on('open-data-viewer', (event, participantData) => {
+            this.createDataViewerWindow(participantData);
+        });
+
+        ipcMain.handle('get-data-file-path', async (event, params) => {
+            const { participantId, experimentId, dataType } = params;
+            const filePath = path.join(
+                __dirname, 
+                '..', 
+                'data',
+                'experiments',
+                experimentId,
+                'participants',
+                participantId,
+                `${dataType}.csv`
+            );
+
+            if (!fs.existsSync(filePath)) {
+                return { status: 'error', message: 'Data file not found' };
+            }
+
+            return { status: 'success', filePath };
+        });
+
+        ipcMain.handle('get-participant-data', async (event, params) => {
+            try {
+                const { folderPath, dataType } = params;
+                console.log('Received params:', params);
+                
+                if (!folderPath) {
+                    throw new Error('Participant folder path not provided');
+                }
+        
+                // Use the raw folder path directly
+                const collectedFolder = path.join(folderPath, 'collected');
+                console.log('Looking for data in:', collectedFolder);
+        
+                if (!fs.existsSync(collectedFolder)) {
+                    fs.mkdirSync(collectedFolder, { recursive: true });
+                    console.log('Created collected folder:', collectedFolder);
+                }
+        
+                const files = fs.readdirSync(collectedFolder)
+                    .filter(file => file.endsWith('.csv'))
+                    .map(filename => {
+                        const type = filename.split('_').pop().replace('.csv', '');
+                        return {
+                            type,
+                            name: filename,
+                            path: path.join(collectedFolder, filename),
+                            exists: true
+                        };
+                    });
+        
+                console.log('Found CSV files:', files);
+        
+                return { 
+                    status: 'success', 
+                    data: {
+                        files,
+                        folderPath: collectedFolder
+                    }
+                };
+            } catch (error) {
+                console.error('Error in get-participant-data:', error);
+                return { status: 'error', message: error.message };
             }
         });
     }
@@ -964,6 +1034,46 @@ class ApplicationManager {
             console.error('Error handling message:', error);
             return null;
         }
+    }
+
+    async createDataViewerWindow(participantData) {
+        if (this.dataViewerWindow) {
+            this.dataViewerWindow.focus();
+            return;
+        }
+
+        console.log('Creating data viewer with participant data:', participantData);
+
+        this.dataViewerWindow = new BrowserWindow({
+            width: 1000,
+            height: 800,
+            minWidth: 800,
+            minHeight: 600,
+            show: false,  // Don't show window until it's ready
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js'),
+                devTools: true
+            }
+        });
+
+        // Load the HTML file
+        await this.dataViewerWindow.loadFile('Frontend/UI/dataCollectedViewer.html');
+
+        // Wait for window to be ready
+        this.dataViewerWindow.once('ready-to-show', () => {
+            // Send the participant data
+            this.dataViewerWindow.webContents.send('init-data-viewer', participantData);
+            // Show the window
+            this.dataViewerWindow.show();
+        });
+
+        this.dataViewerWindow.webContents.openDevTools();
+
+        this.dataViewerWindow.on('closed', () => {
+            this.dataViewerWindow = null;
+        });
     }
 }
 

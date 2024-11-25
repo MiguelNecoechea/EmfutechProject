@@ -113,6 +113,22 @@ class AppHandler {
             }
         });
 
+        // Add a property to store cleanup functions
+        this.cleanupFunctions = [];
+
+        // Store the signal status update cleanup function
+        const cleanupSignalStatusListener = window.electronAPI.onSignalStatusUpdate((data) => {
+            console.log('Signal status update received:', data);
+            this.handleSignalStatusUpdate(data);
+        });
+        this.cleanupFunctions.push(cleanupSignalStatusListener);
+
+        // Modify the beforeunload event listener to include cleanup
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+            // Clean up all stored listeners
+            this.cleanupFunctions.forEach(cleanup => cleanup());
+        });
     }
 
     handleCalibrationComplete() {
@@ -634,9 +650,7 @@ class AppHandler {
                                     <span>Gender: ${participant.gender}</span>
                                     <span>Added: ${new Date(participant.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <div class="participant-folder">
-                                    <span title="${participant.folderPath}">📁 ${participant.name}</span>
-                                </div>
+                                <button class="view-data-button" title="View collected data">View Data</button>
                             </div>
                             <div class="participant-controls">
                                 ${hasEyeTracking ? 
@@ -653,6 +667,24 @@ class AppHandler {
                     const startButton = participantElement.querySelector('.start-button');
                     const stopButton = participantElement.querySelector('.stop-button');
                     const eyeTrackingButton = participantElement.querySelector('.eye-tracking-button');
+                    const viewDataButton = participantElement.querySelector('.view-data-button');
+                    viewDataButton.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const isSelected = participantElement.classList.contains('selected');
+                        if (!isSelected) {
+                            alert('Please select this participant first');
+                            return;
+                        }
+                        
+                        // Pass all necessary participant data including folderPath
+                        console.log('Opening data viewer with participant:', participant);
+                        window.electronAPI.openDataViewer({
+                            participantId: participant.createdAt,
+                            experimentId: this.selectedExperimentId,
+                            name: participant.name,
+                            folderPath: participant.folderPath
+                        });
+                    });
 
                     if (eyeTrackingButton) {
                         eyeTrackingButton.addEventListener('click', async (e) => {
@@ -979,24 +1011,26 @@ class AppHandler {
         const participants = participantsList.querySelectorAll('.participant-item');
         participants.forEach(participant => {
             const stopButton = participant.querySelector('.stop-button');
-            const content = participant.querySelector('.participant-details');
-            const header = participant.querySelector('h4');
-            const folder = participant.querySelector('.participant-folder');
+            const content = participant.querySelector('.participant-content');
+            const participantInfo = participant.querySelector('.participant-info');
             
-            if (lock) {
-                participant.style.pointerEvents = 'none';
-                if (stopButton && !stopButton.disabled) {
-                    stopButton.style.pointerEvents = 'auto';
-                    participant.style.pointerEvents = 'auto';
-                }
-                content.style.opacity = '0.6';
-                header.style.opacity = '0.6';
-                folder.style.opacity = '0.6';
-            } else {
+            // Set pointer events for the participant item
+            participant.style.pointerEvents = lock ? 'none' : 'auto';
+
+            // Handle stop button if it exists
+            if (stopButton && !stopButton.disabled) {
+                stopButton.style.pointerEvents = 'auto';
                 participant.style.pointerEvents = 'auto';
-                content.style.opacity = '1';
-                header.style.opacity = '1';
-                folder.style.opacity = '1';
+            }
+
+            // Set opacity for content if it exists
+            if (content) {
+                content.style.opacity = lock ? '0.6' : '1';
+            }
+
+            // Set opacity for participant info if it exists
+            if (participantInfo) {
+                participantInfo.style.opacity = lock ? '0.6' : '1';
             }
         });
     }
@@ -1240,6 +1274,7 @@ class AppHandler {
         this.signalStates[signal.toLowerCase()] = status.toLowerCase();
         console.log(`Updated signal states:`, this.signalStates);
     }
+    
 
 }
 
