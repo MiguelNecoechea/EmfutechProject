@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Viewer</title>
+    <link rel="stylesheet" href="../styles/dataViewer.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Data Viewer</h1>
+            <div id="participant-info"></div>
+        </header>
+        
+        <div class="data-container">
+            <div id="visualization-area"></div>
+        </div>
+    </div>
+
+    <!-- Add your preferred visualization library -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="../scripts/dataViewer.js"></script>
+
+    <!-- Add error handling for script loading -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('Error: ' + msg + '\nurl: ' + url + '\nline: ' + line);
+            return false;
+        };
+    </script>
+</body>
+</html>

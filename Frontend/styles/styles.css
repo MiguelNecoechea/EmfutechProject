@@ -1309,3 +1309,35 @@ input[type="checkbox"]:disabled + label {
         margin-bottom: 15px;
     }
 }
+
+/* Add these styles after the participant-controls styles */
+
+.view-data-button {
+    background-color: transparent;
+    color: #2196F3;
+    border: 1px solid #2196F3;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+    width: fit-content;
+}
+
+.view-data-button:hover:not(:disabled) {
+    background-color: #2196F3;
+    color: white;
+}
+
+.view-data-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.view-data-button:active:not(:disabled) {
+    transform: scale(0.98);
+}

@@ -1,0 +1,181 @@
+/* Main container styles */
+.container {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    height: 100vh;
+    background-color: #f5f5f5;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Header styles */
+header {
+    margin-bottom: 20px;
+}
+
+header h1 {
+    font-size: 24px;
+    color: #333;
+    margin: 0;
+}
+
+#participant-info h2 {
+    font-size: 18px;
+    color: #666;
+    margin: 10px 0;
+}
+
+/* Data container styles */
+.data-container {
+    flex: 1;
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    overflow: auto;
+    margin-top: 20px;
+}
+
+/* Visualization controls */
+.visualization-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    margin: 20px 0;
+    padding: 10px;
+    border-top: 1px solid #ddd;
+}
+
+#data-type-selector {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    color: #333;
+    font-size: 14px;
+}
+
+#refresh-data {
+    padding: 8px 16px;
+    background-color: transparent;
+    color: #2196F3;
+    border: 1px solid #2196F3;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#refresh-data:hover {
+    background-color: #2196F3;
+    color: white;
+}
+
+/* Visualization area styles */
+#visualization-area {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 400px;
+}
+
+/* Plot container styles */
+#gaze-scatter,
+#gaze-heatmap,
+#pointer-combined,
+#pointer-heatmap {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Responsive design */
+@media screen and (max-width: 900px) {
+    .container {
+        padding: 15px;
+    }
+
+    #visualization-area {
+        gap: 15px;
+    }
+
+    #gaze-scatter,
+    #gaze-heatmap,
+    #pointer-combined,
+    #pointer-heatmap {
+        height: 300px !important;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .container {
+        padding: 10px;
+    }
+
+    .visualization-controls {
+        flex-direction: column;
+    }
+
+    #data-type-selector,
+    #refresh-data {
+        width: 100%;
+    }
+
+    #gaze-scatter,
+    #gaze-heatmap,
+    #pointer-combined,
+    #pointer-heatmap {
+        height: 250px !important;
+    }
+}
+
+/* Larger screens */
+@media screen and (min-width: 1400px) {
+    .container {
+        max-width: 1800px;
+    }
+}
+
+.participant-details {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.participant-details p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.participant-details strong {
+    color: #333;
+    min-width: 100px;
+    display: inline-block;
+}
+
+.visualization-controls {
+    margin: 20px 0;
+    padding: 10px;
+    border-top: 1px solid #ddd;
+}
+
+.visualization-controls select,
+.visualization-controls button {
+    padding: 8px;
+    margin-right: 10px;
+}
+
+#participant-info {
+    margin: 20px 0;
+}
+
+.data-container {
+    margin-top: 20px;
+}
+
+#visualization-area {
+    min-height: 400px;
+} 
