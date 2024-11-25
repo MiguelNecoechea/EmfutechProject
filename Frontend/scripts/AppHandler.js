@@ -1066,8 +1066,48 @@ class AppHandler {
             if (response.status === 'success') {
                 // Clear participant details if the deleted study was selected
                 if (this.selectedExperimentId === experimentId) {
+                    // Clear participant details and list
                     this.clearParticipantDetails();
                     this.selectedExperimentId = null;
+                    
+                    // Clear the participants list
+                    const participantsList = document.getElementById('participants-list');
+                    if (participantsList) {
+                        participantsList.innerHTML = '';
+                    }
+                    
+                    // Reset participant count
+                    const participantCount = document.getElementById('participant-count');
+                    if (participantCount) {
+                        participantCount.textContent = '0';
+                    }
+                    
+                    // Clear study details
+                    document.getElementById('study-name').textContent = 'None';
+                    document.getElementById('study-length').textContent = '-';
+                    
+                    // Reset signal status labels to inactive
+                    const statusElements = [
+                        'status-aura',
+                        'status-eye',
+                        'status-emotion',
+                        'status-pointer',
+                        'status-screen',
+                        'status-keyboard'
+                    ];
+                    statusElements.forEach(elementId => {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            element.textContent = 'Inactive';
+                            element.className = 'signal-status';
+                        }
+                    });
+                    
+                    // Disable add participant button
+                    const addParticipantBtn = document.getElementById('add-participant');
+                    if (addParticipantBtn) {
+                        addParticipantBtn.disabled = true;
+                    }
                 }
                 // Reload the experiments list
                 await this.loadExperiments();
