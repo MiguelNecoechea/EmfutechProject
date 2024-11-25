@@ -3,7 +3,7 @@
   <component name="Black">
     <option name="sdkName" value="TensorFlow" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="emfutech_experiments" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="emfutech" project-jdk-type="Python SDK" />
   <component name="PyPackaging">
     <option name="earlyReleasesAsUpgrades" value="true" />
   </component>
