@@ -252,26 +252,31 @@ class AppHandler {
             document.getElementById('participant-count').textContent = '0'; // Reset participant count for new study
         });
 
-        // Update the participant update listener to refresh the list
+        // Update the participant update listener
         window.electronAPI.onParticipantUpdate(async (data) => {
             if (this.selectedExperimentId === data.experimentId) {
                 // Reload participants list for the current experiment
                 await this.loadParticipants(this.selectedExperimentId);
                 
-                // Preserve the experiment selection state
-                const experimentElements = document.querySelectorAll('.experiment-item');
-                experimentElements.forEach(element => {
-                    const experimentName = element.querySelector('h3').textContent;
-                    if (experimentName === document.getElementById('study-name').textContent) {
-                        element.classList.add('selected');
+                // Wait for the DOM to update
+                setTimeout(() => {
+                    // Find and select the newly added participant
+                    const participantsList = document.getElementById('participants-list');
+                    const participants = participantsList.querySelectorAll('.participant-item');
+                    participants.forEach(element => {
+                        const nameElement = element.querySelector('.participant-name');
+                        if (nameElement && nameElement.textContent === data.participant.name) {
+                            // Call handleParticipantClick instead of just adding the selected class
+                            this.handleParticipantClick(data.participant, element);
+                        }
+                    });
+                    
+                    // Re-enable the add participant button
+                    const addParticipantBtn = document.getElementById('add-participant');
+                    if (addParticipantBtn) {
+                        addParticipantBtn.disabled = false;
                     }
-                });
-                
-                // Re-enable the add participant button
-                const addParticipantBtn = document.getElementById('add-participant');
-                if (addParticipantBtn) {
-                    addParticipantBtn.disabled = false;
-                }
+                }, 100); // Small delay to ensure DOM is updated
             }
         });
 
@@ -280,7 +285,7 @@ class AppHandler {
             await this.loadExperiments();
         });
 
-        // Update study panel listener
+        // Update study panel listener to select new experiment
         window.electronAPI.onStudyPanelUpdate(async (experimentData) => {
             document.getElementById('study-name').textContent = experimentData.name;
             document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
@@ -288,6 +293,17 @@ class AppHandler {
             
             // Refresh the experiments list
             await this.loadExperiments();
+
+            // Select the newly added experiment
+            const experimentsList = document.getElementById('experiments-list');
+            const experiments = experimentsList.querySelectorAll('.experiment-item');
+            experiments.forEach(element => {
+                const nameElement = element.querySelector('h3');
+                if (nameElement && nameElement.textContent === experimentData.name) {
+                    
+                    element.click();
+                }
+            });
         });
 
         // Add listener for camera closed events
@@ -597,8 +613,8 @@ class AppHandler {
             const participantsList = document.getElementById('participants-list');
             participantsList.innerHTML = '';
 
-            // Preserve the current state
-            const currentState = this.currentState;
+            // Store the currently selected experiment element
+            const selectedExperiment = document.querySelector('.experiment-item.selected');
 
             if (response.status === 'success') {
                 response.data.forEach(participant => {
@@ -706,9 +722,11 @@ class AppHandler {
                 });
             }
 
-            // Restore the state after loading participants
-            this.updateButtonStates(currentState);
-            
+            // Restore experiment selection
+            if (selectedExperiment) {
+                selectedExperiment.classList.add('selected');
+            }
+
             // Update participant count
             const participantCount = document.getElementById('participant-count');
             if (participantCount) {
