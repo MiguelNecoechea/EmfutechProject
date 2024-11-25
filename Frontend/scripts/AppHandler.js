@@ -395,6 +395,7 @@ class AppHandler {
                 newStudyBtn.disabled = true;
                 experimentsList.style.pointerEvents = 'none';
                 participantsList.style.pointerEvents = 'none';
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 this.updateParticipantButtonStates('stop', this.ENABLED);
                 this.updateParticipantButtonStates('start', this.DISABLED);
                 this.lockUIForCalibration(true);
@@ -423,7 +424,7 @@ class AppHandler {
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
                 participantsList.style.pointerEvents = 'auto';
-                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
+                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 this.updateParticipantButtonStates('stop', this.DISABLED);
                 this.updateParticipantButtonStates('start', this.ENABLED);
                 this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
@@ -437,7 +438,6 @@ class AppHandler {
                 participantsList.style.pointerEvents = 'none';
                 this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 break;
-
             default:
                 // Default state - enable basic interactions
         }
