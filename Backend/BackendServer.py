@@ -377,10 +377,11 @@ class BackendServer:
                 while True:
                     if self._camera:
                         frame = self.get_frame()
-                        gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                        if gaze_data[2] is not None:
-                            with threading.Lock():
-                                self._last_gaze_frame = gaze_data[2].copy()
+                        if frame is not None:   
+                            gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                            if gaze_data[2] is not None:
+                                with threading.Lock():
+                                    self._last_gaze_frame = gaze_data[2].copy()
                         
                         if gaze_data[0] is not None and gaze_data[1] is not None:
                             break
@@ -889,24 +890,24 @@ class BackendServer:
             while True:
                 if self._camera:
                     frame = self.get_frame()
-                    gaze_vector = self._eye_gaze.get_gaze_vector(frame)
-                    if gaze_vector[2] is not None:
-                        with threading.Lock():
-                            self._last_gaze_frame = gaze_vector[2].copy()
-                    left_eye = gaze_vector[0]
-                    right_eye = gaze_vector[1] 
-                    if left_eye is not None and right_eye is not None:
-                        gaze_input = [[
-                            *left_eye,   # x, y, z coordinates for left eye
-                            *right_eye   # x, y, z coordinates for right eye
-                        ]]
-
-                        predicted_coords = self._regressor.make_prediction(gaze_input)
-                        x, y = predicted_coords[0]  # Extract x,y from nested array
-                        x = int(x)
-                        y = int(y)
-                        timestamp = round(time.time() - self._start_time, 3)
-                        self._gaze_writer.write(timestamp, [x, y])
+                    if frame is not None:
+                        gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                        if gaze_vector[2] is not None:
+                            with threading.Lock():
+                                self._last_gaze_frame = gaze_vector[2].copy()
+                            left_eye = gaze_vector[0]
+                            right_eye = gaze_vector[1] 
+                            if left_eye is not None and right_eye is not None:
+                                gaze_input = [[
+                                    *left_eye,   # x, y, z coordinates for left eye
+                                    *right_eye   # x, y, z coordinates for right eye
+                                ]]
+                                predicted_coords = self._regressor.make_prediction(gaze_input)
+                                x, y = predicted_coords[0]  # Extract x,y from nested array
+                                x = int(x)
+                                y = int(y)
+                                timestamp = round(time.time() - self._start_time, 3)
+                                self._gaze_writer.write(timestamp, [x, y])
                         
                         # Sleep to maintain 30Hz sampling rate
                         time.sleep(0.033)  # ~30 FPS
