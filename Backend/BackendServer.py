@@ -7,7 +7,6 @@ import cv2
 import os
 import queue
 from contextlib import contextmanager
-from cryptography.fernet import Fernet
 import base64
 import json
 
