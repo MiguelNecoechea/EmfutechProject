@@ -249,10 +249,8 @@ class ApplicationManager {
         });
 
         ipcMain.on('update-participant-count', (event, data) => {
-            // Broadcast participant update to all windows
+            // Only broadcast participant update
             this.mainWindow.webContents.send('participant-update', data);
-            // Also trigger an experiment update to refresh the list
-            this.mainWindow.webContents.send('experiment-update');
         });
 
         // Add handler for opening participant window
