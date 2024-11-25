@@ -105,6 +105,7 @@ class BackendServer:
 
         # OpenCV video capture object
         self._camera = None
+        self._emotion_camera = None
         self._last_gaze_frame = None
         self._last_emotion = None
         self._viewing_camera = False
@@ -429,9 +430,12 @@ class BackendServer:
                 
                 # Emotion
                 if self._run_emotion:
-                    self.manage_camera(OPEN_CAMERA)
+                    self._emotion_camera = cv2.VideoCapture(DEFAULT_CAMERA_INDEX)
                     emotion_response = self.start_emotion_detection()
                     if emotion_response["status"] != STATUS_SUCCESS:
+                        self._emotion_camera.release()
+                        self._emotion_camera = None
+                        self.send_signal_update(SIGNAL_EMOTION, 'error')
                         raise Exception(emotion_response["message"])
                     
                     self._emotion_writer = EmotionPredictedWriter(self._path, f'{self._filename}{EMOTION_FILE_SUFFIX}')
@@ -448,7 +452,6 @@ class BackendServer:
                 
                 # Coordinate/Gaze
                 if self._run_gaze:
-                    print("Starting tracking") # TODO: Remove
                     self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
                     self._gaze_writer.create_new_file()
                     
@@ -842,8 +845,8 @@ class BackendServer:
             with self.thread_tracking(threading.current_thread()):
                 self.send_signal_update(SIGNAL_EMOTION, 'recording')
                 while True:
-                    if self._emotion_handler and self._camera:
-                        frame = self.get_frame()
+                    if self._emotion_handler and self._emotion_camera:
+                        _, frame = self._emotion_camera.read()
                         if frame is not None:
                             # Create a copy of the frame to avoid memory sharing
                             frame_copy = frame.copy()
@@ -858,6 +861,8 @@ class BackendServer:
                             del frame_copy
                     time.sleep(0.033)  # ~30 FPS
                     if not self._data_collection_active:
+                        self._emotion_camera.release()
+                        self._emotion_camera = None
                         break
         finally:
             if self._emotion_writer:
