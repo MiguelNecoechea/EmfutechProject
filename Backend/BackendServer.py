@@ -271,6 +271,17 @@ class BackendServer:
             self._pointer_tracker.stop_tracking()
             self._pointer_tracker.is_tracking = False
 
+        # Cleanup emotion handler
+        if self._emotion_handler:
+            self._emotion_handler.stop_processing()
+            self._emotion_handler = None
+
+        # Close camera properly
+        if self._camera is not None:
+            self._camera.release()
+            self._camera = None
+            cv2.destroyAllWindows()
+
         # Close all file writers
         writers = [
             self._aura_writer,
@@ -297,6 +308,15 @@ class BackendServer:
             self._socket.close(linger=0)
         if hasattr(self, '_context') and self._context:
             self._context.term()
+
+        # Clear all references
+        self._threads.clear()
+        self._aura_writer = None
+        self._emotion_writer = None
+        self._gaze_writer = None
+        self._pointer_writer = None
+        self._last_emotion = None
+        self._last_gaze_frame = None
 
         print("Cleanup completed")
 
@@ -542,61 +562,92 @@ class BackendServer:
 
     def stop_data_collection(self):
         """Stop all testing and data collection."""
-        self._data_collection_active = False
-        if self._pointer_tracker is not None:
-            self._pointer_tracker.stop_tracking()
-            self._pointer_tracker = None  
-            self._pointer_tracking_active = False 
-            if self._pointer_writer:
-                self._pointer_writer.close_file()
-            self._pointer_writer = None  # Clear reference
-        
-        # Join and clear all threads
-        with self._threads_lock:
-            threads_copy = self._threads.copy()
-        for thread in threads_copy:
-            if thread.is_alive():
-                thread.join(timeout=1.0)
-        
-        # Clear the threads list
-        with self._threads_lock:
-            self._threads = []
-        
-        # Reset thread references
-        if self._viewing_camera:
-            self._viewing_camera = False
-            cv2.destroyAllWindows()
+        try:
+            self._data_collection_active = False
+            self._training_data_collection_active = False
+            
+            # Stop pointer tracking
+            if self._pointer_tracker is not None:
+                self._pointer_tracker.stop_tracking()
+                self._pointer_tracker = None  
+                self._pointer_tracking_active = False 
+                if self._pointer_writer:
+                    self._pointer_writer.close_file()
+                self._pointer_writer = None
 
-        self.manage_camera(CLOSE_CAMERA)
-        self._aura_thread = None
-        self._emotion_thread = None
-        self._regressor_thread = None
-        self._screen_recording_thread = None
-        self._start_time = None
+            # Stop emotion detection
+            if self._emotion_handler:
+                self._emotion_handler.stop_processing()
+                self._emotion_handler = None
 
-        # Set signals to ready if they were active
-        if self._run_aura:
-            self.send_signal_update(SIGNAL_AURA, 'ready')
-        if self._run_gaze:
-            self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
-        if self._run_emotion:
-            self.send_signal_update(SIGNAL_EMOTION, 'ready')
-        if self._run_pointer:
-            self.send_signal_update(SIGNAL_POINTER, 'ready')
-        if self._run_screen:
-            self.send_signal_update(SIGNAL_SCREEN, 'ready')
-        if self._run_keyboard:
-            self.send_signal_update(SIGNAL_KEYBOARD, 'ready')
+            # Stop keyboard tracking
+            if self._keyboard_tracker is not None:
+                self._keyboard_tracker.stop_tracking()
+                self._keyboard_tracker = None
+                if self._keyboard_writer:
+                    self._keyboard_writer.close_file()
+                self._keyboard_writer = None
 
-        # Stop keyboard tracking
-        if self._keyboard_tracker is not None:
-            self._keyboard_tracker.stop_tracking()
-            self._keyboard_tracker = None
-            if self._keyboard_writer:
-                self._keyboard_writer.close_file()
-            self._keyboard_writer = None
+            # Join and clear all threads with timeout
+            with self._threads_lock:
+                threads_copy = self._threads.copy()
+            
+            for thread in threads_copy:
+                if thread and thread.is_alive():
+                    thread.join(timeout=1.0)
+            
+            # Clear the threads list
+            with self._threads_lock:
+                self._threads.clear()
+            
+            # Stop camera viewing and release camera
+            if self._viewing_camera:
+                self._viewing_camera = False
+                cv2.destroyAllWindows()
 
-        return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
+            self.manage_camera(CLOSE_CAMERA)
+
+            # Clear thread references
+            self._aura_thread = None
+            self._emotion_thread = None
+            self._regressor_thread = None
+            self._screen_recording_thread = None
+            self._start_time = None
+
+            # Close all writers
+            writers = [self._aura_writer, self._emotion_writer, 
+                      self._gaze_writer, self._pointer_writer]
+            for writer in writers:
+                if writer:
+                    try:
+                        writer.close_file()
+                    except Exception as e:
+                        print(f"Error closing writer: {e}")
+
+            # Clear writer references
+            self._aura_writer = None
+            self._emotion_writer = None
+            self._gaze_writer = None
+            self._pointer_writer = None
+
+            # Update signal statuses
+            signals = [
+                (self._run_aura, SIGNAL_AURA, 'ready'),
+                (self._run_gaze, SIGNAL_GAZE, 'need_calibration'),
+                (self._run_emotion, SIGNAL_EMOTION, 'ready'),
+                (self._run_pointer, SIGNAL_POINTER, 'ready'),
+                (self._run_screen, SIGNAL_SCREEN, 'ready'),
+                (self._run_keyboard, SIGNAL_KEYBOARD, 'ready')
+            ]
+            
+            for is_active, signal, status in signals:
+                if is_active:
+                    self.send_signal_update(signal, status)
+
+            return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
+        except Exception as e:
+            print(f"Error in stop_data_collection: {e}")
+            return {"status": STATUS_ERROR, "message": str(e)}
 
     def stop_training_data_collection(self):
         """Stop recording training data."""
@@ -786,31 +837,36 @@ class BackendServer:
     def _emotion_collection_loop(self):
         """
         Continuously collect and write emotion data in a loop.
-        
-        Uses the emotion_handler to recognize emotions and writes the dominant emotion
-        along with a timestamp to the emotion_writer. Runs until data_collection_active
-        is set to False.
-        Records at 30 samples per second.
         """
-        with self.thread_tracking(threading.current_thread()):
-            self.send_signal_update(SIGNAL_EMOTION, 'recording')
-            while True:
-                if self._emotion_handler and self._camera:
-                    frame = self.get_frame()
-                    emotion = self._emotion_handler.recognize_emotion(frame)
-                    with threading.Lock():
-                        self._last_emotion = emotion
-                    if emotion is not None:
-                        emotion = emotion[0]['dominant_emotion']
-
-                        timestamp = round(time.time() - self._start_time, 3)
-                        self._emotion_writer.write_data(timestamp, emotion)
-                time.sleep(0.033)  # ~30 FPS
-                if not self._data_collection_active:
-                    break
+        try:
+            with self.thread_tracking(threading.current_thread()):
+                self.send_signal_update(SIGNAL_EMOTION, 'recording')
+                while True:
+                    if self._emotion_handler and self._camera:
+                        frame = self.get_frame()
+                        if frame is not None:
+                            # Create a copy of the frame to avoid memory sharing
+                            frame_copy = frame.copy()
+                            emotion = self._emotion_handler.recognize_emotion(frame_copy)
+                            with threading.Lock():
+                                self._last_emotion = emotion
+                            if emotion is not None:
+                                emotion = emotion[0]['dominant_emotion']
+                                timestamp = round(time.time() - self._start_time, 3)
+                                self._emotion_writer.write_data(timestamp, emotion)
+                            # Explicitly delete the frame copy
+                            del frame_copy
+                    time.sleep(0.033)  # ~30 FPS
+                    if not self._data_collection_active:
+                        break
+        finally:
             if self._emotion_writer:
                 self._emotion_writer.close_file()
             self.send_signal_update(SIGNAL_EMOTION, 'ready')
+            # Explicitly cleanup emotion handler
+            if self._emotion_handler:
+                self._emotion_handler.stop_processing()
+                self._emotion_handler = None
 
     def _coordinate_regressor_loop(self):
         """
@@ -853,6 +909,7 @@ class BackendServer:
                         
                 if not self._data_collection_active:
                     break
+            self._eye_gaze_running = False
             self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
         
     def update_coordinates(self, x, y):
@@ -1103,9 +1160,7 @@ class BackendServer:
         return files
 
     def manage_camera(self, action='open'):
-        """
-        Open or close the camera.
-        """
+        """Open or close the camera."""
         try:
             if action == 'open':
                 if self._camera is None or not self._camera.isOpened():
@@ -1117,6 +1172,7 @@ class BackendServer:
                 if self._camera is not None:
                     self._camera.release()
                     self._camera = None
+                    cv2.destroyAllWindows()
                     return {"status": STATUS_SUCCESS, "message": "Camera closed successfully"}
             else:
                 return {"status": STATUS_ERROR, "message": f"Invalid action: {action}"}
@@ -1125,6 +1181,7 @@ class BackendServer:
             if self._camera is not None:
                 self._camera.release()
                 self._camera = None
+                cv2.destroyAllWindows()
             return {"status": STATUS_ERROR, "message": str(e)}
 
     def get_frame(self):
@@ -1137,9 +1194,7 @@ class BackendServer:
         return None
     
     def view_camera(self):
-        """
-        Capture frames from the camera and stream them to the frontend via ZMQ.
-        """
+        """Capture frames from the camera and stream them to the frontend via ZMQ."""
         if self._camera is None or not self._camera.isOpened():
             result = self.manage_camera(OPEN_CAMERA)
             if result["status"] == STATUS_ERROR:
@@ -1167,9 +1222,11 @@ class BackendServer:
                             })
 
                         # Process gaze frame if available
+                        gaze_frame = None
                         if hasattr(self, '_last_gaze_frame') and self._last_gaze_frame is not None:
                             with threading.Lock():
-                                gaze_frame = self._last_gaze_frame.copy()
+                                if self._last_gaze_frame is not None:
+                                    gaze_frame = self._last_gaze_frame.copy()
                         
                         if gaze_frame is not None:
                             gaze_frame = cv2.resize(gaze_frame, (640, 480))
@@ -1179,7 +1236,9 @@ class BackendServer:
                                 self._socket.send_json({
                                     'type': 'gaze_frame',
                                     'data': gaze_data
-                                })                    
+                                })
+                            del gaze_frame  # Explicitly delete the copy
+                        
                         time.sleep(0.033)  # ~30 FPS
                         
                     except Exception as e:
@@ -1195,7 +1254,8 @@ class BackendServer:
         if not self._viewing_camera:
             self._viewing_camera = True
             thread = threading.Thread(target=stream_frames, daemon=True)
-            thread.start()
+            with self.thread_tracking(thread):  # Add proper thread tracking
+                thread.start()
             return {"status": STATUS_SUCCESS, "message": "Camera streaming started"}
         else:
             return {"status": STATUS_ERROR, "message": "Camera is already streaming"}
