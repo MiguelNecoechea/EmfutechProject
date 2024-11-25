@@ -70,7 +70,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onStreamData: (callback) =>
         ipcRenderer.on('stream-data', (_event, data) => callback(data)),
     onSignalStatusUpdate: (callback) => {
-        ipcRenderer.on('signal-status-update', (_, data) => callback(data));
+        const listener = (_, data) => callback(data);
+        ipcRenderer.on('signal-status-update', listener);
+        
+        // Return a cleanup function
+        return () => {
+            ipcRenderer.removeListener('signal-status-update', listener);
+        };
     },
     onCalibrationStatus: (callback) => {
         ipcRenderer.on('calibration-status', (_, status) => callback(status));
