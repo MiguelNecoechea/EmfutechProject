@@ -103,8 +103,19 @@ class DataViewer {
         const dataType = document.getElementById('data-type-selector').value;
         console.log('Loading data for type:', dataType);
         
-        const visualizationArea = document.getElementById('visualization-area');
-        visualizationArea.innerHTML = '';
+        // Update the data-container structure with a side-by-side layout
+        const dataContainer = document.querySelector('.data-container');
+        dataContainer.innerHTML = `
+            <div class="visualization-section">
+                <div id="visualization-area"></div>
+            </div>
+            <div class="video-section">
+                <h3>Recording Playback</h3>
+                <div class="video-container">
+                    ${await this.getVideoElement()}
+                </div>
+            </div>
+        `;
         
         try {
             const response = await window.electronAPI.getParticipantData({
@@ -161,8 +172,46 @@ class DataViewer {
             this.createVisualization(dataType, structuredData);
         } catch (error) {
             console.error('Error loading data:', error);
+            const visualizationArea = document.getElementById('visualization-area');
             visualizationArea.innerHTML = `<p class="error">Error loading data: ${error.message}</p>`;
         }
+    }
+
+    async getVideoElement() {
+        // Check if video file exists
+        try {
+            const videoResponse = await window.electronAPI.getParticipantVideo({
+                folderPath: this.participantData.folderPath
+            });
+            
+            console.log('Video response:', videoResponse);
+
+            // Expected response format:
+            // {
+            //     status: 'success',
+            //     data: {
+            //         exists: true/false,
+            //         path: '/path/to/video/recording.mp4',
+            //         type: 'video/mp4'  // or other video type
+            //     }
+            // }
+
+            if (videoResponse.status === 'success' && videoResponse.data.exists) {
+                // If video exists, create video player
+                return `
+                    <video controls>
+                        <source src="file://${videoResponse.data.path}" type="${videoResponse.data.type}">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+            } else {
+                console.log('No video found or invalid response');
+            }
+        } catch (error) {
+            console.error('Error checking video:', error);
+        }
+        
+        return `<div class="no-video-message">No video recording available</div>`;
     }
 
     createVisualization(dataType, structuredData) {

@@ -28,13 +28,65 @@ header h1 {
 
 /* Data container styles */
 .data-container {
-    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
     background: white;
-    border: 2px solid #ccc;
     border-radius: 8px;
     padding: 20px;
+    height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+.visualization-section {
     overflow: auto;
-    margin-top: 20px;
+    padding-right: 20px;
+    border-right: 1px solid #dee2e6;
+}
+
+.video-section {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.video-section h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #333;
+    font-family: Arial, sans-serif;
+}
+
+.video-container {
+    flex: 1;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.no-video-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    color: #6c757d;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    gap: 10px;
 }
 
 /* Visualization controls */
@@ -92,42 +144,28 @@ header h1 {
 }
 
 /* Responsive design */
-@media screen and (max-width: 900px) {
-    .container {
-        padding: 15px;
-    }
-
-    #visualization-area {
-        gap: 15px;
-    }
-
-    #gaze-scatter,
-    #gaze-heatmap,
-    #pointer-combined,
-    #pointer-heatmap {
-        height: 300px !important;
+@media screen and (max-width: 1200px) {
+    .data-container {
+        grid-template-columns: 1fr 300px;
     }
 }
 
-@media screen and (max-width: 600px) {
-    .container {
-        padding: 10px;
+@media screen and (max-width: 900px) {
+    .data-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        height: auto;
     }
 
-    .visualization-controls {
-        flex-direction: column;
+    .visualization-section {
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+        padding-right: 0;
+        padding-bottom: 20px;
     }
 
-    #data-type-selector,
-    #refresh-data {
-        width: 100%;
-    }
-
-    #gaze-scatter,
-    #gaze-heatmap,
-    #pointer-combined,
-    #pointer-heatmap {
-        height: 250px !important;
+    .video-section {
+        height: 350px;
     }
 }
 
