@@ -786,17 +786,31 @@ class AppHandler {
                             this.hasConfirmed = true;
                         }
                         
-                        await this.handleParticipantClick(participant, participantElement);
-                        await this.sendCommandToBackend(COMMANDS.START);
-                        this.updateSignalStatesForRecording(true); 
-                        this.lockExperimentSelection(true);
-                        this.updateButtonStates(STATES.RECORDING);
+                        // Create and show countdown overlay
+                        const overlay = document.createElement('div');
+                        overlay.className = 'countdown-overlay';
+                        const countdownText = document.createElement('div');
+                        countdownText.className = 'countdown-text';
+                        overlay.appendChild(countdownText);
+                        document.body.appendChild(overlay);
+
+                        // Start countdown
+                        let countdown = 5;
+                        countdownText.textContent = `Recording will start in ${countdown} seconds`;
                         
-                        const lengthText = document.getElementById('study-length').textContent;
-                        const duration = parseInt(lengthText.split(' ')[0]);
-                        
-                        this.startExperimentTimer(duration);
-                        window.electronAPI.minimize();
+                        const countdownInterval = setInterval(() => {
+                            countdown--;
+                            if (countdown > 0) {
+                                countdownText.textContent = `Recording will start in ${countdown} seconds`;
+                            } else {
+                                // Clean up countdown
+                                clearInterval(countdownInterval);
+                                overlay.remove();
+                                
+                                // Start the actual recording
+                                this.startRecording(participant, participantElement);
+                            }
+                        }, 1000);
                     });
 
                     stopButton.addEventListener('click', async (e) => {
@@ -1360,6 +1374,20 @@ class AppHandler {
         console.log(`Updated signal states:`, this.signalStates);
     }
     
+    // Add new method to handle the actual recording start
+    async startRecording(participant, participantElement) {
+        await this.handleParticipantClick(participant, participantElement);
+        await this.sendCommandToBackend(COMMANDS.START);
+        this.updateSignalStatesForRecording(true); 
+        this.lockExperimentSelection(true);
+        this.updateButtonStates(STATES.RECORDING);
+        
+        const lengthText = document.getElementById('study-length').textContent;
+        const duration = parseInt(lengthText.split(' ')[0]);
+        
+        this.startExperimentTimer(duration);
+        window.electronAPI.minimize();
+    }
 
 }
 
