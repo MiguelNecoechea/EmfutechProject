@@ -81,9 +81,3 @@ class ScreenRecorder:
         if hasattr(self, 'record_thread'):  # Added thread joining
             self.record_thread.join()
         return True
-
-# TESTING
-# screen_recoreder = ScreenRecorder("/Users/mnecoea/PycharmProjects/AuraSignalProcessing/", "test.mp4")
-# screen_recoreder.start_recording()
-# time.sleep(5)
-# screen_recoreder.stop_recording()
