@@ -116,9 +116,14 @@ class ApplicationManager {
         });
 
         ipcMain.on('update-study-panel', (event, experimentData) => {
-            // Send the data to the main window
+            // Forward the update to the main window
             if (this.mainWindow) {
                 this.mainWindow.webContents.send('study-panel-update', experimentData);
+                
+                // Add a small delay before triggering experiment selection
+                setTimeout(() => {
+                    this.mainWindow.webContents.send('select-new-experiment', experimentData);
+                }, 100);
             }
         });
 

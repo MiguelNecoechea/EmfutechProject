@@ -94,4 +94,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('init-data-viewer', (event, data) => callback(data));
     },
     showItemInFolder: (path) => ipcRenderer.invoke('show-item-in-folder', path),
+    onSelectNewExperiment: (callback) =>
+        ipcRenderer.on('select-new-experiment', (_event, data) => callback(data)),
 });

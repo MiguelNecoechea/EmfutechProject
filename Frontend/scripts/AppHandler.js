@@ -144,6 +144,30 @@ class AppHandler {
                 window.electronAPI.showItemInFolder(folderPath);
             }
         });
+
+        // Add listener for new experiment selection
+        window.electronAPI.onSelectNewExperiment((experimentData) => {
+            const experimentsList = document.getElementById('experiments-list');
+            if (!experimentsList) return;
+
+            const experiments = experimentsList.querySelectorAll('.experiment-item');
+            experiments.forEach(element => {
+                const nameElement = element.querySelector('h3');
+                if (nameElement && nameElement.textContent === experimentData.name) {
+                    // Remove any existing selections
+                    document.querySelectorAll('.experiment-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    
+                    // Select the new experiment
+                    element.classList.add('selected');
+                    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Trigger the click event to update all UI elements
+                    element.click();
+                }
+            });
+        });
     }
 
     handleCalibrationComplete() {
@@ -278,14 +302,6 @@ class AppHandler {
             this.handleSignalStatusUpdate(data);
         });
 
-        // Add listener for study panel updates
-        window.electronAPI.onStudyPanelUpdate((experimentData) => {
-            // Update study panel elements
-            document.getElementById('study-name').textContent = experimentData.name;
-            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
-            document.getElementById('participant-count').textContent = '0'; // Reset participant count for new study
-        });
-
         // Update the participant update listener
         window.electronAPI.onParticipantUpdate(async (data) => {
             if (this.selectedExperimentId === data.experimentId) {
@@ -321,23 +337,32 @@ class AppHandler {
 
         // Update study panel listener to select new experiment
         window.electronAPI.onStudyPanelUpdate(async (experimentData) => {
-            document.getElementById('study-name').textContent = experimentData.name;
-            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
-            document.getElementById('participant-count').textContent = '0';
-            
-            // Refresh the experiments list
+            // First load experiments to ensure the list is updated
             await this.loadExperiments();
 
-            // Select the newly added experiment
-            const experimentsList = document.getElementById('experiments-list');
-            const experiments = experimentsList.querySelectorAll('.experiment-item');
-            experiments.forEach(element => {
-                const nameElement = element.querySelector('h3');
-                if (nameElement && nameElement.textContent === experimentData.name) {
-                    
-                    element.click();
-                }
-            });
+            // Wait for the DOM to update
+            setTimeout(() => {
+                // Find and select the newly added experiment
+                const experimentsList = document.getElementById('experiments-list');
+                if (!experimentsList) return;
+
+                const experiments = experimentsList.querySelectorAll('.experiment-item');
+                experiments.forEach(element => {
+                    const nameElement = element.querySelector('h3');
+                    const dateElement = element.querySelector('.experiment-details span:last-child');
+                    if (nameElement && dateElement) {
+                        const matchesName = nameElement.textContent === experimentData.name;
+                        const matchesDate = dateElement.textContent.includes(new Date(experimentData.createdAt).toLocaleDateString());
+                        
+                        if (matchesName && matchesDate) {
+                            // Call click handler instead of just adding the selected class
+                            element.click();
+                            // Scroll the experiment into view
+                            element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
+                });
+            }, 100); // Small delay to ensure DOM is updated
         });
 
         // Add listener for camera closed events
