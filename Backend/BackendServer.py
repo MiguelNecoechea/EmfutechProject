@@ -9,6 +9,7 @@ import queue
 from contextlib import contextmanager
 import base64
 import json
+import platform
 
 from mne_lsl.stream import StreamLSL as Stream
 from DataProcessing.LLMProcessor import DataAnalyzer
@@ -29,6 +30,7 @@ from IO.PointerTracking.PointerTracker import CursorTracker
 from IO.FileWriting.PointerWriter import PointerWriter
 from IO.FileWriting.KeyboardWriter import KeyboardWriter
 from IO.KeyboardTracking.KeyboardTracker import KeyboardTracker
+from IO.ScreenRecording.ScreenRecorder import ScreenRecorder
 
 # Constants
 DEFAULT_PORT = "5556"
@@ -46,6 +48,7 @@ POINTER_FILE_SUFFIX = '_pointer_data.csv'
 TRAINING_GAZE_FILE = 'training_gaze.csv'
 TRAINING_AURA_FILE = 'training_aura.csv'
 KEYBOARD_FILE_SUFFIX = '_keyboard.csv'
+SCREEN_FILE_SUFFIX = '_screen.mp4'
 
 # Collection types
 TRAINING_MODE = 'training'
@@ -120,6 +123,7 @@ class BackendServer:
         self._stream = None
         self._regressor = None
         self._pointer_tracker = None
+        self._screen_recorder = None
 
         # Boolean flags for deciding the experiments to run (Still building this out)
         self._run_aura = False
@@ -134,7 +138,6 @@ class BackendServer:
         self._emotion_thread = None
         self._regressor_thread = None
         self._start_time = None
-        self._screen_recording_thread = None
 
         # Path and file names for the data
         self._path = None
@@ -164,60 +167,6 @@ class BackendServer:
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-        # Set up OpenAI key from encrypted storage
-    #     self._setup_openai_key()
-
-    # def _setup_openai_key(self):
-    #     """Set up OpenAI API key from encrypted storage."""
-    #     try:
-    #         # Check if key files exist, if not create them
-    #         if not os.path.exists(KEY_FILE) or not os.path.exists(ENCRYPTED_API_KEY_FILE):
-    #             self._initialize_encryption()
-            
-    #         # Load the encryption key
-    #         with open(KEY_FILE, 'rb') as key_file:
-    #             key = key_file.read()
-            
-    #         # Create Fernet instance for decryption
-    #         f = Fernet(key)
-            
-    #         # Read and decrypt the API key
-    #         with open(ENCRYPTED_API_KEY_FILE, 'rb') as api_key_file:
-    #             encrypted_api_key = api_key_file.read()
-    #             decrypted_api_key = f.decrypt(encrypted_api_key).decode()
-            
-    #         # Set the environment variable
-    #         os.environ['OPENAI_API_KEY'] = decrypted_api_key
-    #         self._openai_available = True
-    #     except Exception as e:
-    #         print(f"Error setting up OpenAI key: {e}")
-    #         raise
-
-    # def _initialize_encryption(self):
-    #     """Initialize encryption key and encrypted API key storage."""
-    #     try:
-    #         # Generate encryption key
-    #         key = Fernet.generate_key()
-            
-    #         # Save encryption key
-    #         with open(KEY_FILE, 'wb') as key_file:
-    #             key_file.write(key)
-            
-    #         # Create Fernet instance
-    #         f = Fernet(key)
-            
-    #         # Get API key from user
-    #         api_key = input("Please enter your OpenAI API key: ").strip()
-            
-    #         # Encrypt and save API key
-    #         encrypted_api_key = f.encrypt(api_key.encode())
-    #         with open(ENCRYPTED_API_KEY_FILE, 'wb') as api_key_file:
-    #             api_key_file.write(encrypted_api_key)
-            
-    #     except Exception as e:
-    #         print(f"Error initializing encryption: {e}")
-    #         raise
-
         # Add keyboard tracking objects
         self._keyboard_tracker = None
         self._keyboard_writer = None
@@ -265,6 +214,14 @@ class BackendServer:
         self._running = False
         self._data_collection_active = False
         self._training_data_collection_active = False
+
+        # Stop screen recording if active
+        if hasattr(self, '_screen_recorder') and self._screen_recorder:
+            try:
+                self._screen_recorder.stop_recording()
+                self._screen_recorder = None
+            except Exception as e:
+                print(f"Error stopping screen recording: {e}")
 
         # Stop all data collection first
         if self._pointer_tracker:
@@ -491,7 +448,12 @@ class BackendServer:
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_KEYBOARD})
 
                 # TODO: Add screen recording
-
+                if self._run_screen:
+                    screen_response = self.start_screen_recording()
+                    if screen_response["status"] != STATUS_SUCCESS:
+                        self.send_signal_update(SIGNAL_SCREEN, 'error')
+                    else:
+                        self.send_signal_update(SIGNAL_SCREEN, 'recording')
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
                 return {"status": STATUS_ERROR, "message": "Data collection already started"}
@@ -580,7 +542,8 @@ class BackendServer:
 
             # Stop emotion detection
             if self._emotion_handler:
-                self._emotion_handler.stop_processing()
+                self._emotion_camera.release()
+                self._emotion_camera = None
                 self._emotion_handler = None
 
             # Stop keyboard tracking
@@ -590,6 +553,11 @@ class BackendServer:
                 if self._keyboard_writer:
                     self._keyboard_writer.close_file()
                 self._keyboard_writer = None
+            
+            # Stop screen recording
+            if self._screen_recorder is not None:
+                self._screen_recorder.stop_recording()
+                self._screen_recorder = None
 
             # Join and clear all threads with timeout
             with self._threads_lock:
@@ -1322,3 +1290,48 @@ class BackendServer:
             return {"status": STATUS_SUCCESS, "message": "Keyboard tracking started"}
         else:
             return {"status": STATUS_ERROR, "message": "Keyboard tracking already active"}
+    
+    def start_screen_recording(self):
+        """Initialize and start screen recording."""
+        try:
+            # Create output directory if it doesn't exist
+            if not os.path.exists(self._path):
+                os.makedirs(self._path)
+                
+            # Initialize recorder with default settings
+            self._screen_recorder = ScreenRecorder(
+                output_path=os.path.join(self._path, ''),  # Ensure path ends with separator
+                filename=f"{self._filename}{SCREEN_FILE_SUFFIX}"
+            )
+            
+            success = self._screen_recorder.start_recording(fps=30)
+            if not success:
+                self.send_signal_update(SIGNAL_SCREEN, 'error')
+                return {"status": STATUS_ERROR, "message": "Failed to start screen recording"}
+            
+            self.send_signal_update(SIGNAL_SCREEN, 'recording')    
+            return {"status": STATUS_SUCCESS, "message": "Screen recording started"}
+            
+        except Exception as e:
+            self.send_signal_update(SIGNAL_SCREEN, 'error')
+            return {"status": STATUS_ERROR, "message": str(e)}
+    
+    def stop_screen_recording(self):
+        """Stop screen recording."""
+        try:
+            if not hasattr(self, '_screen_recorder'):
+                self.send_signal_update(SIGNAL_SCREEN, 'error')
+                return {"status": STATUS_ERROR, "message": "No active screen recording found"}
+            
+            if self._screen_recorder:
+                success = self._screen_recorder.stop_recording()
+                if not success:
+                    self.send_signal_update(SIGNAL_SCREEN, 'error')
+                    return {"status": STATUS_ERROR, "message": "Failed to stop screen recording"}
+                
+            self.send_signal_update(SIGNAL_SCREEN, 'ready')
+            return {"status": STATUS_SUCCESS, "message": "Screen recording stopped"}
+            
+        except Exception as e:
+            self.send_signal_update(SIGNAL_SCREEN, 'error')
+            return {"status": STATUS_ERROR, "message": str(e)}
