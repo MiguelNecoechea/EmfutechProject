@@ -3,6 +3,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
 const fs = require('fs');
+const protocol = require('electron').protocol;
 
 class ApplicationManager {
     constructor() {
@@ -17,6 +18,12 @@ class ApplicationManager {
         this.streamSelectorWindow = null;
         this.dataViewerWindow = null;
         this.setupEventHandlers();
+        app.whenReady().then(() => {
+            protocol.registerFileProtocol('local-video', (request, callback) => {
+                const filePath = request.url.replace('local-video://', '');
+                callback(decodeURI(filePath));
+            });
+        });
     }
 
     setupEventHandlers() {
@@ -524,7 +531,7 @@ class ApplicationManager {
                 }
         
                 const files = fs.readdirSync(collectedFolder)
-                    .filter(file => file.endsWith('.csv'))
+                    .filter(file => file.endsWith('.csv') || file.toLowerCase().endsWith('.mp4'))
                     .map(filename => {
                         const type = filename.split('_').pop().replace('.csv', '');
                         return {
@@ -1068,7 +1075,8 @@ class ApplicationManager {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
-                devTools: true
+                devTools: true,
+                webSecurity: false
             }
         });
 

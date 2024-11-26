@@ -104,9 +104,7 @@ class DataViewer {
             </div>
             <div class="video-section">
                 <h3>Recording Playback</h3>
-                <div class="video-container">
-                    ${await this.getVideoElement()}
-                </div>
+                <div class="video-container"></div>
             </div>
         `;
         
@@ -120,12 +118,107 @@ class DataViewer {
                 throw new Error(response.message);
             }
 
+            // Debug logs for video loading
+            console.log('Response data files:', response.data.files);
+            
+            // Load video if available
+            const videoContainer = document.querySelector('.video-container');
+            const videoFiles = response.data.files.filter(f => f.name.toLowerCase().includes('_screen.mp4'));
+            console.log('Found video files:', videoFiles);
+            
+            if (videoFiles.length > 0) {
+                console.log('Loading video from path:', videoFiles[0].path);
+                
+                // Show loading indicator with file size information
+                const fileSizeMB = Math.round(videoFiles[0].size / (1024 * 1024));
+                videoContainer.innerHTML = `
+                    <div class="loading-message">
+                        Loading video (${fileSizeMB}MB)... This may take a moment for larger files.
+                        <div class="loading-spinner"></div>
+                        ${fileSizeMB > 100 ? '<div class="warning">Large file detected. If video fails to load, try converting it to a smaller file size.</div>' : ''}
+                    </div>
+                `;
+
+                const videoHtml = `
+                    <video controls width="100%" preload="metadata">
+                        <source src="local-video://${videoFiles[0].path}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+                
+                // Replace loading indicator with video element
+                setTimeout(() => {
+                    console.log('Setting video HTML:', videoHtml);
+                    videoContainer.innerHTML = videoHtml;
+                    
+                    const videoElement = videoContainer.querySelector('video');
+                    videoElement.addEventListener('error', (e) => {
+                        console.error('Video error:', e);
+                        const error = videoElement.error;
+                        if (error) {
+                            console.error('Error code:', error.code);
+                            console.error('Error message:', error.message);
+                            videoContainer.innerHTML = `
+                                <div class="error-message">
+                                    Error loading video (${fileSizeMB}MB file): ${error.message || 'Unknown error'}
+                                    <br>
+                                    <small>
+                                        Suggestions:
+                                        <ul>
+                                            <li>Convert the video to a smaller file size (recommended: under 100MB)</li>
+                                            <li>Try a different video format (e.g., WebM or compressed MP4)</li>
+                                            <li>Reduce the video resolution</li>
+                                        </ul>
+                                    </small>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    // Add loading state listeners with timeout handling
+                    let loadingTimeout;
+                    const TIMEOUT_DURATION = 45000; // 45 seconds
+
+                    videoElement.addEventListener('loadstart', () => {
+                        console.log('Video loading started');
+                        loadingTimeout = setTimeout(() => {
+                            if (videoElement.readyState < 3) { // HAVE_FUTURE_DATA
+                                console.error('Video loading timeout');
+                                videoContainer.innerHTML = `
+                                    <div class="error-message">
+                                        Video failed to load within 45 seconds. The file (${fileSizeMB}MB) might be too large.
+                                        <br>
+                                        <small>
+                                            Suggestions:
+                                            <ul>
+                                                <li>Convert the video to a smaller file size (recommended: under 100MB)</li>
+                                                <li>Try a different video format (e.g., WebM or compressed MP4)</li>
+                                                <li>Reduce the video resolution</li>
+                                            </ul>
+                                        </small>
+                                    </div>
+                                `;
+                            }
+                        }, TIMEOUT_DURATION);
+                    });
+
+                    videoElement.addEventListener('canplay', () => {
+                        console.log('Video can start playing');
+                        clearTimeout(loadingTimeout);
+                    });
+                    
+                }, 100); // Small delay to ensure loading indicator shows
+            } else {
+                console.log('No video files found');
+                videoContainer.innerHTML = `<div class="no-video-message">No video recording available</div>`;
+            }
+
             // Fix the file type mapping to match exactly what's in the file list
             const fileTypeMap = {
                 gaze: 'gaze',
-                emotion: 'emotions',  // Changed from emotion to emotions
+                emotion: 'emotions',
                 aura: 'aura',
-                pointer: 'data'      // Changed from pointer_data to data
+                pointer: 'data'
             };
 
             const fileType = fileTypeMap[dataType];
@@ -168,43 +261,6 @@ class DataViewer {
             const visualizationArea = document.getElementById('visualization-area');
             visualizationArea.innerHTML = `<p class="error">Error loading data: ${error.message}</p>`;
         }
-    }
-
-    async getVideoElement() {
-        // Check if video file exists
-        try {
-            const videoResponse = await window.electronAPI.getParticipantVideo({
-                folderPath: this.participantData.folderPath
-            });
-            
-            console.log('Video response:', videoResponse);
-
-            // Expected response format:
-            // {
-            //     status: 'success',
-            //     data: {
-            //         exists: true/false,
-            //         path: '/path/to/video/recording.mp4',
-            //         type: 'video/mp4'  // or other video type
-            //     }
-            // }
-
-            if (videoResponse.status === 'success' && videoResponse.data.exists) {
-                // If video exists, create video player
-                return `
-                    <video controls>
-                        <source src="file://${videoResponse.data.path}" type="${videoResponse.data.type}">
-                        Your browser does not support the video tag.
-                    </video>
-                `;
-            } else {
-                console.log('No video found or invalid response');
-            }
-        } catch (error) {
-            console.error('Error checking video:', error);
-        }
-        
-        return `<div class="no-video-message">No video recording available</div>`;
     }
 
     createVisualization(dataType, structuredData) {
