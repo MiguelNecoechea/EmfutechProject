@@ -443,9 +443,8 @@ class ApplicationManager {
                 const participantsPath = path.join(dataDir, 'participants.json');
 
                 // Read participants file
-                const participants = JSON.parse(fs.readFileSync(participantsPath, 'utf8'));
+                const participants = await this.readJSONSafely(participantsPath);
                 const participantToDelete = participants.find(p => p.createdAt === participantId);
-
                 if (!participantToDelete) {
                     return { status: 'error', message: 'Participant not found' };
                 }
@@ -457,10 +456,16 @@ class ApplicationManager {
 
                 // Remove participant from participants.json
                 const updatedParticipants = participants.filter(p => p.createdAt !== participantId);
-                fs.writeFileSync(participantsPath, JSON.stringify(updatedParticipants, null, 2));
+                await this.writeJSONSafely(participantsPath, updatedParticipants);
+
+                // Notify the main window about the participant deletion
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('participant-deleted', participantId);
+                }
 
                 return { status: 'success' };
             } catch (error) {
+                console.error('Error deleting participant:', error);
                 return { status: 'error', message: error.message };
             }
         });

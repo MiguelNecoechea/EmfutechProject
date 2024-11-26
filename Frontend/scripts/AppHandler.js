@@ -209,7 +209,7 @@ class AppHandler {
         }
 
         // Add menu action listener
-        window.electronAPI.onMenuAction((action, ...args) => {
+        window.electronAPI.onMenuAction(async (action, ...args) => {
             switch (action) {
                 case 'new-study':
                     window.electronAPI.openExperimentWindow();
@@ -219,7 +219,10 @@ class AppHandler {
                     window.electronAPI.openParticipantWindow(experimentId);
                     break;
                 case 'delete-study':
-                    this.handleDeleteStudy(args[0]);
+                    await this.handleDeleteStudy(args[0]);
+                    break;
+                case 'delete-participant':
+                    await this.handleDeleteParticipant(args[0]);
                     break;
             }
         });
@@ -673,6 +676,7 @@ class AppHandler {
                 response.data.forEach(participant => {
                     const participantElement = document.createElement('div');
                     participantElement.className = 'participant-item';
+                    participantElement.dataset.participantId = participant.createdAt;
                     
                     // Check if eye tracking is enabled for this experiment
                     const hasEyeTracking = experimentResponse.data.signals.eye;
@@ -1204,15 +1208,23 @@ class AppHandler {
         try {
             const response = await window.electronAPI.deleteParticipant(participantId);
             if (response.status === 'success') {
+                // Clear participant details if the deleted participant was selected
+                const selectedParticipant = document.querySelector('.participant-item.selected');
+                if (selectedParticipant && selectedParticipant.dataset.participantId === participantId) {
+                    this.clearParticipantDetails();
+                }
+                
                 // Reload the participants list
                 if (this.selectedExperimentId) {
                     await this.loadParticipants(this.selectedExperimentId);
                 }
             } else {
                 console.error('Error deleting participant:', response.message);
+                alert('Failed to delete participant: ' + response.message);
             }
         } catch (error) {
             console.error('Error handling participant deletion:', error);
+            alert('Failed to delete participant: ' + error.message);
         }
     }
 
