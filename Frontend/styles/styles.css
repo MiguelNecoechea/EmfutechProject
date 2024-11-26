@@ -14,9 +14,9 @@ body {
 
 .container {
     display: grid;
-    grid-template-columns: minmax(250px, 300px) minmax(650px, 1fr);
+    grid-template-columns: minmax(250px, 300px) minmax(500px, 1fr) minmax(250px, 300px);
     gap: 15px;
-    max-width: 1400px;
+    max-width: 1800px;
     width: 100%;
     margin: 0 auto;
     flex: 1;
@@ -278,8 +278,13 @@ body {
 }
 
 .right-panel {
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .right-panel h3 {
@@ -319,30 +324,92 @@ input[type="checkbox"] {
 
 .info-panels {
     display: flex;
+    flex-direction: column;
     gap: 20px;
-    flex: 1;
+    height: 100%;
+    overflow-y: auto;
 }
 
 .study-panel, .participant-info-panel {
-    flex: 1;
-    background: #f8f9fa;
+    flex: 0 0 auto;
+    background: white;
+    border: 1px solid #ccc;
     border-radius: 8px;
-    padding: 12px;
-    border: 1px solid #dee2e6;
+    padding: 20px;
 }
 
 .study-panel h3, .participant-info-panel h3 {
-    margin: 0 0 10px 0;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
     color: #333;
-    font-size: 1em;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
 }
 
-.study-details {
+.study-details, .participant-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 4px 0;
+}
+
+.detail-label {
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+    flex: 0 0 100px;
+}
+
+.detail-value {
+    font-weight: 400;
+    color: #333;
+    text-align: right;
+    word-break: break-all;
+    font-size: 14px;
+}
+
+.signals-grid {
+    margin-top: 15px;
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+.signals-grid h4 {
+    margin: 0 0 10px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.signal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.signal-label {
+    color: #666;
+    font-size: 14px;
+}
+
+.signal-value {
+    font-weight: 500;
+    color: #333;
+}
+
+.signal-value.true {
+    color: #28a745;
+}
+
+.signal-value.false {
+    color: #dc3545;
 }
 
 .action-buttons {
@@ -1096,12 +1163,13 @@ input[type="checkbox"]:disabled + label {
 /* Update existing info panels styles */
 .info-panels {
     display: flex;
+    flex-direction: column;
     gap: 20px;
-    margin-top: 15px;
+    height: 100%;
 }
 
 .study-panel, .participant-info-panel {
-    flex: 1;
+    flex: 0 0 auto;
     background: white;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -1266,50 +1334,6 @@ input[type="checkbox"]:disabled + label {
     }
 }
 
-/* Add media queries for larger screens */
-@media screen and (min-width: 1400px) {
-    .container {
-        grid-template-columns: minmax(300px, 350px) minmax(600px, 1fr);
-        gap: 20px;
-        max-width: 1800px;
-    }
-
-    .title {
-        font-size: 24px;
-    }
-
-    .participant-content {
-        padding: 16px;
-    }
-
-    .participant-controls .control-button {
-        padding: 8px 16px;
-        font-size: 1em;
-    }
-}
-
-@media screen and (min-width: 1800px) {
-    .container {
-        grid-template-columns: minmax(350px, 400px) minmax(800px, 1fr);
-        gap: 30px;
-        max-width: 2400px;
-    }
-
-    .title {
-        font-size: 28px;
-    }
-
-    .list-container {
-        padding: 15px;
-    }
-
-    .experiment-item,
-    .participant-item {
-        padding: 20px;
-        margin-bottom: 15px;
-    }
-}
-
 /* Add these styles after the participant-controls styles */
 
 .view-data-button {
@@ -1340,4 +1364,66 @@ input[type="checkbox"]:disabled + label {
 
 .view-data-button:active:not(:disabled) {
     transform: scale(0.98);
+}
+
+/* Update media queries for responsive layout */
+@media screen and (max-width: 1200px) {
+    .container {
+        grid-template-columns: minmax(250px, 300px) 1fr;
+    }
+
+    .right-panel {
+        grid-column: 1 / -1;
+        margin-top: 15px;
+    }
+
+    .info-panels {
+        flex-direction: row;
+    }
+
+    .study-panel, .participant-info-panel {
+        flex: 1;
+    }
+}
+
+/* Add styles for the folder button */
+.folder-link {
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.folder-link:hover {
+    background-color: #f0f0f0;
+}
+
+.folder-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    color: #0366d6;
+}
+
+.folder-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.folder-link:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.folder-link:disabled .folder-text {
+    color: #666;
 }

@@ -129,6 +129,21 @@ class AppHandler {
             // Clean up all stored listeners
             this.cleanupFunctions.forEach(cleanup => cleanup());
         });
+
+        // Add folder button click handlers
+        document.getElementById('study-folder-btn').addEventListener('click', (e) => {
+            const folderPath = document.getElementById('study-folder').textContent;
+            if (folderPath && folderPath !== '-') {
+                window.electronAPI.showItemInFolder(folderPath);
+            }
+        });
+
+        document.getElementById('participant-folder-btn').addEventListener('click', (e) => {
+            const folderPath = document.getElementById('current-participant-folder').textContent;
+            if (folderPath && folderPath !== '-') {
+                window.electronAPI.showItemInFolder(folderPath);
+            }
+        });
     }
 
     handleCalibrationComplete() {
@@ -561,10 +576,32 @@ class AppHandler {
                     experimentElement.addEventListener('click', async () => {
                         this.selectedExperimentId = experiment.createdAt;
                         
-                        // Update the study panel
+                        // Update all study panel information
                         document.getElementById('study-name').textContent = experiment.name;
+                        document.getElementById('study-description').textContent = experiment.description;
                         document.getElementById('study-length').textContent = `${experiment.length} minutes`;
+                        document.getElementById('study-created').textContent = new Date(experiment.createdAt).toLocaleString();
+                        document.getElementById('study-folder').textContent = experiment.folder;
                         
+                        // Update signal statuses in the study panel
+                        document.getElementById('signal-aura').textContent = experiment.signals.aura ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-aura').className = `signal-value ${experiment.signals.aura ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-eye').textContent = experiment.signals.eye ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-eye').className = `signal-value ${experiment.signals.eye ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-emotion').textContent = experiment.signals.emotion ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-emotion').className = `signal-value ${experiment.signals.emotion ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-pointer').textContent = experiment.signals.pointer ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-pointer').className = `signal-value ${experiment.signals.pointer ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-keyboard').textContent = experiment.signals.keyboard ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-keyboard').className = `signal-value ${experiment.signals.keyboard ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-screen').textContent = experiment.signals.screen ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-screen').className = `signal-value ${experiment.signals.screen ? 'true' : 'false'}`;
+
                         // Clear participant details when switching experiments
                         this.clearParticipantDetails();
                         
@@ -845,14 +882,24 @@ class AppHandler {
         });
     }
 
-    async handleParticipantClick(participant, element) {
+    async handleParticipantClick(participant, participantElement) {
         // Remove selected class from all participants
         document.querySelectorAll('.participant-item').forEach(item => {
             item.classList.remove('selected');
         });
         
         // Add selected class to clicked participant
-        element.classList.add('selected');
+        participantElement.classList.add('selected');
+        
+        // Update participant info panel with all details
+        document.getElementById('current-participant-name').textContent = participant.name;
+        document.getElementById('current-participant-age').textContent = participant.age;
+        document.getElementById('current-participant-gender').textContent = participant.gender;
+        document.getElementById('current-participant-birthday').textContent = participant.birthday;
+        document.getElementById('current-participant-created').textContent = new Date(participant.createdAt).toLocaleString();
+        document.getElementById('current-participant-folder').textContent = participant.folderPath;
+
+        this.selectedParticipantId = participant.createdAt;
         
         try {
             // Update participant name and folder path in backend
@@ -888,13 +935,12 @@ class AppHandler {
 
     // Add method to clear participant details
     clearParticipantDetails() {
-        if (this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-        // this.updateButtonStates(STATES.INITIAL);
         document.getElementById('current-participant-name').textContent = 'None';
         document.getElementById('current-participant-age').textContent = '-';
+        document.getElementById('current-participant-gender').textContent = '-';
+        document.getElementById('current-participant-birthday').textContent = '-';
+        document.getElementById('current-participant-created').textContent = '-';
+        document.getElementById('current-participant-folder').textContent = '-';
     }
 
     // Add this method to handle stopping experiment timer

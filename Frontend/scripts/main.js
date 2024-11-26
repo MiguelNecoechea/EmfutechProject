@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const zmq = require('zeromq');
@@ -538,6 +538,10 @@ class ApplicationManager {
                 console.error('Error in get-participant-data:', error);
                 return { status: 'error', message: error.message };
             }
+        });
+
+        ipcMain.handle('show-item-in-folder', (event, path) => {
+            shell.showItemInFolder(path);
         });
     }
 

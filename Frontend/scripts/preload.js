@@ -92,5 +92,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onInitDataViewer: (callback) => {
         ipcRenderer.on('init-data-viewer', (event, data) => callback(data));
-    }
+    },
+    showItemInFolder: (path) => ipcRenderer.invoke('show-item-in-folder', path),
 });
