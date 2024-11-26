@@ -723,16 +723,41 @@ input[type="checkbox"]:disabled + label {
 
 /* Update inactive state styles */
 .participant-item.inactive {
-    opacity: 0.6;
+    position: relative;
 }
 
-.participant-item.inactive .stop-button:not(:disabled) {
-    opacity: 1;
+/* Create semi-transparent overlay for inactive state */
+.participant-item.inactive::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    z-index: 1;
 }
 
-/* Keep buttons clickable */
-.participant-controls {
-    pointer-events: auto;
+/* Specific styles for the stop button during recording */
+.participant-item.inactive .participant-controls .stop-button {
+    position: relative;
+    z-index: 2;
+    opacity: 1 !important;
+    background-color: transparent !important;
+    color: #dc3545 !important;
+    border: 1px solid #dc3545 !important;
+    pointer-events: auto !important;
+}
+
+.participant-item.inactive .participant-controls .stop-button:hover:not(:disabled) {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+/* Ensure other controls remain dimmed */
+.participant-item.inactive .participant-controls .control-button:not(.stop-button) {
+    z-index: 0;
 }
 
 .detail-row {

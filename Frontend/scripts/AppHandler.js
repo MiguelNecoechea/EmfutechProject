@@ -489,10 +489,10 @@ class AppHandler {
                 addParticipantBtn.disabled = this.DISABLED;
                 newStudyBtn.disabled = this.DISABLED;
                 this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
-                this.lockUIForCalibration(true);
                 this.updateParticipantButtonStates('stop', this.DISABLED);
                 this.updateParticipantButtonStates('start', this.DISABLED);
                 this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
+                this.lockUIForCalibration(true);
                 break;
             case STATES.READY:
                 addParticipantBtn.disabled = !this.selectedExperimentId;
@@ -1278,21 +1278,81 @@ class AppHandler {
         const studyPanel = document.querySelector('.study-panel');
         const studyDetails = document.querySelector('.study-details');
 
-        // Lock/unlock UI elements
-        experimentsList.style.pointerEvents = lock ? 'none' : 'auto';
-        participantsList.style.pointerEvents = lock ? 'none' : 'auto';
-        studyPanel.style.pointerEvents = lock ? 'none' : 'auto';
-        addParticipantBtn.disabled = lock;
-        newStudyBtn.disabled = lock;
+        // Prevent context menu handler
+        const preventContextMenu = (e) => e.preventDefault();
 
-        // Add visual feedback for locked state
         if (lock) {
+            // Disable scrolling and selection for experiments list
             experimentsList.style.opacity = '0.6';
-            participantsList.style.opacity = '0.6';
+            experimentsList.style.overflow = 'hidden';
+            experimentsList.style.pointerEvents = 'none';
+
+            // Lock participants list but keep the selected participant's stop button accessible
+            participantsList.style.overflow = 'hidden';
+            
+            // Disable all context menus during recording
+            document.addEventListener('contextmenu', preventContextMenu);
+            
+            // Handle participant items
+            document.querySelectorAll('.participant-item').forEach(item => {
+                item.style.pointerEvents = 'none';
+                
+                if (!item.classList.contains('selected')) {
+                    item.style.opacity = '0.6';
+                } else {
+                    const controls = item.querySelectorAll('.participant-controls .control-button:not(.stop-button)');
+                    const info = item.querySelector('.participant-info');
+                    
+                    controls.forEach(control => {
+                        control.style.opacity = '0.6';
+                        control.style.pointerEvents = 'none';
+                    });
+                    
+                    if (info) {
+                        info.style.opacity = '0.6';
+                        info.style.pointerEvents = 'none';
+                    }
+
+                    // Ensure stop button remains active
+                    const stopButton = item.querySelector('.stop-button');
+                    if (stopButton) {
+                        stopButton.style.opacity = '1';
+                        stopButton.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+
+            // Disable buttons
+            addParticipantBtn.disabled = true;
+            newStudyBtn.disabled = true;
+            studyPanel.style.pointerEvents = 'none';
             studyDetails.style.opacity = '0.6';
+            
         } else {
+            // Reset all styles when unlocking
             experimentsList.style.opacity = '1';
-            participantsList.style.opacity = '1';
+            experimentsList.style.overflow = 'auto';
+            experimentsList.style.pointerEvents = 'auto';
+            participantsList.style.overflow = 'auto';
+            
+            // Remove global context menu prevention
+            document.removeEventListener('contextmenu', preventContextMenu);
+            
+            document.querySelectorAll('.participant-item').forEach(item => {
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+                
+                // Reset all child elements
+                item.querySelectorAll('*').forEach(el => {
+                    el.style.opacity = '1';
+                    el.style.pointerEvents = 'auto';
+                });
+            });
+            
+            // Re-enable buttons
+            addParticipantBtn.disabled = false;
+            newStudyBtn.disabled = false;
+            studyPanel.style.pointerEvents = 'auto';
             studyDetails.style.opacity = '1';
         }
     }
