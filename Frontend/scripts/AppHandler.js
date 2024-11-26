@@ -1173,58 +1173,60 @@ class AppHandler {
         try {
             const response = await window.electronAPI.deleteExperiment(experimentId);
             if (response.status === 'success') {
-                // Clear participant details if the deleted study was selected
-                if (this.selectedExperimentId === experimentId) {
-                    // Clear participant details and list
-                    this.clearParticipantDetails();
-                    this.selectedExperimentId = null;
-                    
-                    // Clear the participants list
-                    const participantsList = document.getElementById('participants-list');
-                    if (participantsList) {
-                        participantsList.innerHTML = '';
+                // Clear all study panel information
+                const elements = {
+                    name: document.getElementById('study-name'),
+                    description: document.getElementById('study-description'),
+                    length: document.getElementById('study-length'),
+                    created: document.getElementById('study-created'),
+                    folder: document.getElementById('study-folder'),
+                    signalAura: document.getElementById('signal-aura'),
+                    signalEye: document.getElementById('signal-eye'),
+                    signalEmotion: document.getElementById('signal-emotion'),
+                    signalPointer: document.getElementById('signal-pointer'),
+                    signalKeyboard: document.getElementById('signal-keyboard'),
+                    signalScreen: document.getElementById('signal-screen')
+                };
+
+                // Reset all study panel elements
+                if (elements.name) elements.name.textContent = 'No study selected';
+                if (elements.description) elements.description.textContent = '-';
+                if (elements.length) elements.length.textContent = '-';
+                if (elements.created) elements.created.textContent = '-';
+                if (elements.folder) elements.folder.textContent = '-';
+
+                // Reset all signal values
+                Object.entries({
+                    aura: elements.signalAura,
+                    eye: elements.signalEye,
+                    emotion: elements.signalEmotion,
+                    pointer: elements.signalPointer,
+                    keyboard: elements.signalKeyboard,
+                    screen: elements.signalScreen
+                }).forEach(([_, element]) => {
+                    if (element) {
+                        element.textContent = '-';
+                        element.className = 'signal-value';
                     }
-                    
-                    // Reset participant count
-                    const participantCount = document.getElementById('participant-count');
-                    if (participantCount) {
-                        participantCount.textContent = '0';
-                    }
-                    
-                    // Clear study details
-                    document.getElementById('study-name').textContent = 'None';
-                    document.getElementById('study-length').textContent = '-';
-                    
-                    // Reset signal status labels to inactive
-                    const statusElements = [
-                        'status-aura',
-                        'status-eye',
-                        'status-emotion',
-                        'status-pointer',
-                        'status-screen',
-                        'status-keyboard'
-                    ];
-                    statusElements.forEach(elementId => {
-                        const element = document.getElementById(elementId);
-                        if (element) {
-                            element.textContent = 'Inactive';
-                            element.className = 'signal-status';
-                        }
-                    });
-                    
-                    // Disable add participant button
-                    const addParticipantBtn = document.getElementById('add-participant');
-                    if (addParticipantBtn) {
-                        addParticipantBtn.disabled = true;
-                    }
+                });
+
+                // Clear participants list
+                const participantsList = document.getElementById('participants-list');
+                if (participantsList) {
+                    participantsList.innerHTML = '';
                 }
-                // Reload the experiments list
+
+                // Disable add participant button
+                const addParticipantBtn = document.getElementById('add-participant');
+                if (addParticipantBtn) {
+                    addParticipantBtn.disabled = true;
+                }
+
+                // Reload experiments list
                 await this.loadExperiments();
-            } else {
-                console.error('Error deleting study:', response.message);
             }
         } catch (error) {
-            console.error('Error handling study deletion:', error);
+            console.error('Error deleting experiment:', error);
         }
     }
 
