@@ -1,4 +1,9 @@
 /* Main container styles */
+body {
+    font-family: Arial, sans-serif;
+    
+}
+
 .container {
     display: flex;
     flex-direction: column;
@@ -29,7 +34,7 @@ header h1 {
 /* Data container styles */
 .data-container {
     display: grid;
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: 3fr 1fr;
     gap: 20px;
     background: white;
     border-radius: 8px;
@@ -38,97 +43,47 @@ header h1 {
     overflow: hidden;
 }
 
-.visualization-section {
-    overflow: auto;
-    padding-right: 20px;
-    border-right: 1px solid #dee2e6;
-}
-
+/* Video section styles */
 .video-section {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.video-section h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 500;
-    color: #333;
-    font-family: Arial, sans-serif;
-}
-
-.video-container {
-    flex: 1;
+    position: relative;
+    height: 100%;
     background: #000;
     border-radius: 8px;
     overflow: hidden;
-    position: relative;
 }
 
-.video-container video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.no-video-message {
+.video-container {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    background: #f8f9fa;
+    align-items: center;
+}
+
+.no-video-message {
     color: #6c757d;
     font-family: Arial, sans-serif;
     font-size: 14px;
-    gap: 10px;
+    text-align: center;
 }
 
-/* Visualization controls */
-.visualization-controls {
+/* Visualization section styles */
+.visualization-section {
+    overflow: auto;
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    margin: 20px 0;
-    padding: 10px;
-    border-top: 1px solid #ddd;
+    flex-direction: column;
+    align-items: center;
 }
 
-#data-type-selector {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: white;
-    color: #333;
-    font-size: 14px;
-}
-
-#refresh-data {
-    padding: 8px 16px;
-    background-color: transparent;
-    color: #2196F3;
-    border: 1px solid #2196F3;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-#refresh-data:hover {
-    background-color: #2196F3;
-    color: white;
-}
-
-/* Visualization area styles */
 #visualization-area {
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 20px;
-    min-height: 400px;
+    align-items: center;
 }
 
 /* Plot container styles */
@@ -207,7 +162,14 @@ header h1 {
 }
 
 #participant-info {
-    margin: 20px 0;
+    text-align: center;
+    margin: 10px 0;
+}
+
+#participant-info h2 {
+    font-size: 24px;
+    color: #333;
+    margin: 0 0 15px 0;
 }
 
 .data-container {

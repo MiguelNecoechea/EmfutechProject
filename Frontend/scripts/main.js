@@ -1054,9 +1054,9 @@ class ApplicationManager {
         console.log('Creating data viewer with participant data:', participantData);
 
         this.dataViewerWindow = new BrowserWindow({
-            width: 1000,
+            width: 1200,
             height: 800,
-            minWidth: 800,
+            minWidth: 1100,
             minHeight: 600,
             show: false,  // Don't show window until it's ready
             webPreferences: {

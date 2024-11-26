@@ -1367,7 +1367,7 @@ input[type="checkbox"]:disabled + label {
 }
 
 /* Update media queries for responsive layout */
-@media screen and (max-width: 1200px) {
+@media screen and (max-width: 1100px) {
     .container {
         grid-template-columns: minmax(250px, 300px) 1fr;
     }

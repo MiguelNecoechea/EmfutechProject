@@ -29,7 +29,6 @@ class DataViewer {
     }
 
     displayParticipantInfo() {
-        console.log('Displaying participant info:', this.participantData);
         if (!this.participantData) {
             console.error('No participant data available');
             return;
@@ -41,13 +40,9 @@ class DataViewer {
             return;
         }
 
-        // Create a formatted display with only name and folder path
+        // Only show the participant name
         const participantDetails = `
-            <h2>Participant Details</h2>
-            <div class="participant-details">
-                <p><strong>Name:</strong> ${this.participantData.name}</p>
-                <p><strong>Folder Path:</strong> ${this.participantData.folderPath}</p>
-            </div>
+            <h2>${this.participantData.name}</h2>
             <div class="visualization-controls">
                 <select id="data-type-selector">
                     <option value="gaze">Eye Tracking</option>
@@ -60,8 +55,6 @@ class DataViewer {
         `;
 
         infoDiv.innerHTML = participantDetails;
-
-        // Set up event listeners after creating the elements
         this.setupEventListeners();
     }
 
