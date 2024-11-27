@@ -339,7 +339,7 @@ class AppHandler {
         window.electronAPI.onStudyPanelUpdate(async (experimentData) => {
             // First load experiments to ensure the list is updated
             await this.loadExperiments();
-
+            
             // Wait for the DOM to update
             setTimeout(() => {
                 // Find and select the newly added experiment
@@ -355,10 +355,54 @@ class AppHandler {
                         const matchesDate = dateElement.textContent.includes(new Date(experimentData.createdAt).toLocaleDateString());
                         
                         if (matchesName && matchesDate) {
-                            // Call click handler instead of just adding the selected class
-                            element.click();
+                            // Remove any existing selections
+                            document.querySelectorAll('.experiment-item').forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            
+                            // Add selected class
+                            element.classList.add('selected');
+                            
                             // Scroll the experiment into view
                             element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            
+                            // Update the selected experiment ID
+                            this.selectedExperimentId = experimentData.createdAt;
+                            
+                            // Update study panel information
+                            document.getElementById('study-name').textContent = experimentData.name;
+                            document.getElementById('study-description').textContent = experimentData.description;
+                            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
+                            document.getElementById('study-created').textContent = new Date(experimentData.createdAt).toLocaleString();
+                            document.getElementById('study-folder').textContent = experimentData.folder;
+                            
+                            // Update signal statuses
+                            document.getElementById('signal-aura').textContent = experimentData.signals.aura ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-aura').className = `signal-value ${experimentData.signals.aura ? 'true' : 'false'}`;
+                            
+                            document.getElementById('signal-eye').textContent = experimentData.signals.eye ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-eye').className = `signal-value ${experimentData.signals.eye ? 'true' : 'false'}`;
+                            
+                            document.getElementById('signal-emotion').textContent = experimentData.signals.emotion ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-emotion').className = `signal-value ${experimentData.signals.emotion ? 'true' : 'false'}`;
+                            
+                            document.getElementById('signal-pointer').textContent = experimentData.signals.pointer ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-pointer').className = `signal-value ${experimentData.signals.pointer ? 'true' : 'false'}`;
+                            
+                            document.getElementById('signal-keyboard').textContent = experimentData.signals.keyboard ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-keyboard').className = `signal-value ${experimentData.signals.keyboard ? 'true' : 'false'}`;
+                            
+                            document.getElementById('signal-screen').textContent = experimentData.signals.screen ? 'Enabled' : 'Disabled';
+                            document.getElementById('signal-screen').className = `signal-value ${experimentData.signals.screen ? 'true' : 'false'}`;
+                            
+                            // Enable add participant button
+                            const addParticipantBtn = document.getElementById('add-participant');
+                            if (addParticipantBtn) {
+                                addParticipantBtn.disabled = false;
+                            }
+                            
+                            // Load participants for this experiment
+                            this.loadParticipants(experimentData.createdAt);
                         }
                     }
                 });
