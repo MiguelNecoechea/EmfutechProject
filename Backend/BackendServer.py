@@ -559,10 +559,15 @@ class BackendServer:
                     self._keyboard_writer.close_file()
                 self._keyboard_writer = None
             
-            # Stop screen recording
+            # Stop screen recording - moved earlier in the cleanup process
             if self._screen_recorder is not None:
-                self._screen_recorder.stop_recording()
-                self._screen_recorder = None
+                try:
+                    self._screen_recorder.stop_recording()
+                except Exception as e:
+                    print(f"Error stopping screen recording: {e}")
+                finally:
+                    self._screen_recorder = None
+                    self.send_signal_update(SIGNAL_SCREEN, 'ready')
 
             # Join and clear all threads with timeout
             with self._threads_lock:
@@ -585,8 +590,6 @@ class BackendServer:
 
             if self._run_aura:
                 process_concentration_data(self._aura_file, self._aura_training_file)
-            
-            self.stop_screen_recording()
 
             # Clear thread references
             self._aura_thread = None
@@ -618,7 +621,8 @@ class BackendServer:
                 (self._run_emotion, SIGNAL_EMOTION, 'ready'),
                 (self._run_pointer, SIGNAL_POINTER, 'ready'),
                 (self._run_screen, SIGNAL_SCREEN, 'ready'),
-                (self._run_keyboard, SIGNAL_KEYBOARD, 'ready')
+                (self._run_keyboard, SIGNAL_KEYBOARD, 'ready'),
+                (self._screen_recorder, SIGNAL_SCREEN, 'ready')
             ]
             
             for is_active, signal, status in signals:
@@ -629,6 +633,9 @@ class BackendServer:
         except Exception as e:
             print(f"Error in stop_data_collection: {e}")
             return {"status": STATUS_ERROR, "message": str(e)}
+        finally:
+            # Ensure screen recorder is cleaned up even if an error occurs
+            self._screen_recorder = None
 
     def stop_training_data_collection(self):
         """Stop recording training data."""
@@ -1330,7 +1337,7 @@ class BackendServer:
     def stop_screen_recording(self):
         """Stop screen recording."""
         try:
-            if not hasattr(self, '_screen_recorder'):
+            if not hasattr(self, '_screen_recorder') or self._screen_recorder is None:
                 self.send_signal_update(SIGNAL_SCREEN, 'error')
                 return {"status": STATUS_ERROR, "message": "No active screen recording found"}
             
@@ -1340,9 +1347,16 @@ class BackendServer:
                     self.send_signal_update(SIGNAL_SCREEN, 'error')
                     return {"status": STATUS_ERROR, "message": "Failed to stop screen recording"}
                 
+                # Properly cleanup the screen recorder
+                self._screen_recorder = None
+                    
             self.send_signal_update(SIGNAL_SCREEN, 'ready')
             return {"status": STATUS_SUCCESS, "message": "Screen recording stopped"}
             
         except Exception as e:
+            print(f"Error stopping screen recording: {e}")
             self.send_signal_update(SIGNAL_SCREEN, 'error')
             return {"status": STATUS_ERROR, "message": str(e)}
+        finally:
+            # Ensure screen recorder is cleaned up even if an error occurs
+            self._screen_recorder = None
