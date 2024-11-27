@@ -31,7 +31,7 @@ from IO.FileWriting.PointerWriter import PointerWriter
 from IO.FileWriting.KeyboardWriter import KeyboardWriter
 from IO.KeyboardTracking.KeyboardTracker import KeyboardTracker
 from IO.ScreenRecording.ScreenRecorder import ScreenRecorder
-
+from DataProcessing.ProcessAuraData import process_concentration_data
 # Constants
 DEFAULT_PORT = "5556"
 DEFAULT_AURA_STREAM_ID = 'filtered'
@@ -167,9 +167,14 @@ class BackendServer:
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
+
         # Add keyboard tracking objects
         self._keyboard_tracker = None
         self._keyboard_writer = None
+
+        # Aura files
+        self._aura_file = None
+        self._aura_training_file = None
 
     @contextmanager
     def thread_tracking(self, thread):
@@ -369,6 +374,7 @@ class BackendServer:
                         raise Exception(aura_response["message"])
                     try:
                         channels_names = ['timestamp'] + list(self._stream.info['ch_names'])
+                        self._aura_file = os.path.join(self._path, f'{self._filename}{AURA_FILE_SUFFIX}')
                         self._aura_writer = AuraDataWriter(self._path, f'{self._filename}{AURA_FILE_SUFFIX}', channels_names)
                         self._aura_writer.create_new_file()
                         
@@ -447,7 +453,6 @@ class BackendServer:
                     self.send_signal_update(SIGNAL_KEYBOARD, 'recording')
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_KEYBOARD})
 
-                # TODO: Add screen recording
                 if self._run_screen:
                     screen_response = self.start_screen_recording()
                     if screen_response["status"] != STATUS_SUCCESS:
@@ -577,6 +582,11 @@ class BackendServer:
                 cv2.destroyAllWindows()
 
             self.manage_camera(CLOSE_CAMERA)
+
+            if self._run_aura:
+                process_concentration_data(self._aura_file, self._aura_training_file)
+            
+            self.stop_screen_recording()
 
             # Clear thread references
             self._aura_thread = None
@@ -774,6 +784,7 @@ class BackendServer:
             aura_writer_training = None
             if collection_type == TRAINING_MODE:
                 channels_names = ['timestamp'] + self._stream.info['ch_names']
+                self._aura_training_file = os.path.join(self._training_path, TRAINING_AURA_FILE)
                 aura_writer_training = AuraDataWriter(self._training_path, TRAINING_AURA_FILE, channels_names)
                 aura_writer_training.create_new_file()
             self.send_signal_update(SIGNAL_AURA, 'recording')

@@ -443,12 +443,15 @@ class DataViewer {
         const validData = data
             .filter(d => d && d.timestamp)
             .map(d => {
-                const parsed = { timestamp: parseFloat(d.timestamp) };
-                Object.keys(d).forEach(key => {
-                    if (key !== 'timestamp') {
-                        parsed[key] = parseFloat(d[key]);
-                    }
-                });
+                const parsed = { 
+                    timestamp: parseFloat(d.timestamp),
+                    ...Object.keys(d)
+                        .filter(key => key.startsWith('ConcentrationIndex_'))
+                        .reduce((obj, key) => {
+                            obj[key] = parseFloat(d[key]);
+                            return obj;
+                        }, {})
+                };
                 return parsed;
             })
             .filter(d => !isNaN(d.timestamp));
@@ -462,76 +465,72 @@ class DataViewer {
         // Set up visualization area
         const visualizationArea = document.getElementById('visualization-area');
         visualizationArea.innerHTML = `
-            <div id="aura-signals" style="height: 600px;"></div>
-            <div id="aura-heatmap" style="height: 400px; margin-top: 20px;"></div>
+            <div id="concentration-timeline" style="height: 600px;"></div>
         `;
 
-        // Group signals by type
-        const signalGroups = {
-            Delta: Object.keys(validData[0]).filter(k => k.startsWith('Delta_')),
-            Theta: Object.keys(validData[0]).filter(k => k.startsWith('Theta_')),
-            Alpha: Object.keys(validData[0]).filter(k => k.startsWith('Alpha_')),
-            Beta: Object.keys(validData[0]).filter(k => k.startsWith('Beta_')),
-            Gamma: Object.keys(validData[0]).filter(k => k.startsWith('Gamma_'))
-        };
+        // Create traces for each concentration index with distinct colors
+        const colors = [
+            '#1f77b4', // blue
+            '#ff7f0e', // orange
+            '#2ca02c', // green
+            '#d62728', // red
+            '#9467bd', // purple
+            '#8c564b', // brown
+            '#e377c2', // pink
+            '#7f7f7f'  // gray
+        ];
 
-        // Create traces for each signal
-        const traces = [];
-        Object.entries(signalGroups).forEach(([group, signals]) => {
-            signals.forEach(signal => {
-                traces.push({
-                    x: validData.map(d => d.timestamp),
-                    y: validData.map(d => d[signal]),
-                    name: signal,
-                    type: 'scatter',
-                    mode: 'lines',
-                    legendgroup: group,
-                    line: { width: 1 }
-                });
-            });
-        });
-
-        // Create heatmap data
-        const signalNames = Object.values(signalGroups).flat();
-        const heatmapData = validData.map(d => 
-            signalNames.map(signal => d[signal])
-        );
-
-        const heatmapTrace = {
-            z: heatmapData,
+        const concentrationChannels = Object.keys(validData[0])
+            .filter(key => key.startsWith('ConcentrationIndex_'));
+        
+        const traces = concentrationChannels.map((channel, index) => ({
             x: validData.map(d => d.timestamp),
-            y: signalNames,
-            type: 'heatmap',
-            colorscale: 'Viridis'
+            y: validData.map(d => d[channel]),
+            name: channel.replace('ConcentrationIndex_', ''),
+            type: 'scatter',
+            mode: 'lines',
+            line: { 
+                width: 2.5,
+                color: colors[index % colors.length],
+                shape: 'spline' // Makes the lines smoother
+            }
+        }));
+
+        // Add reference line at y=1
+        const referenceLine = {
+            x: [Math.min(...validData.map(d => d.timestamp)), 
+                Math.max(...validData.map(d => d.timestamp))],
+            y: [1, 1],
+            mode: 'lines',
+            name: 'Reference Level',
+            line: {
+                color: 'rgba(128, 128, 128, 0.5)',
+                width: 2,
+                dash: 'dash'
+            },
+            hoverinfo: 'none'
         };
 
-        // Create plots
-        Plotly.newPlot('aura-signals', traces, {
-            title: 'AURA Signals Over Time',
+        // Create plot with improved styling
+        Plotly.newPlot('concentration-timeline', [...traces, referenceLine], {
+            title: {
+                text: 'Concentration Indices Over Time',
+                font: { size: 24 }
+            },
             xaxis: { 
                 title: 'Time (seconds)',
-                tickformat: '.1f'
+                tickformat: '.1f',
+                gridcolor: 'rgba(128, 128, 128, 0.2)'
             },
             yaxis: { 
-                title: 'Signal Value'
+                title: 'Concentration Index',
+                range: [0, Math.max(2, ...traces.flatMap(t => t.y))] // Set range from 0 to max value or 2
             },
             showlegend: true,
             legend: {
-                groupclick: 'toggleitem'
+                title: { text: 'Channels' }
             },
             margin: { l: 50, r: 50, t: 50, b: 50 }
-        });
-
-        Plotly.newPlot('aura-heatmap', [heatmapTrace], {
-            title: 'AURA Signal Heatmap',
-            xaxis: { 
-                title: 'Time (seconds)',
-                tickformat: '.1f'
-            },
-            yaxis: { 
-                title: 'Signal'
-            },
-            margin: { l: 100, r: 50, t: 50, b: 50 }
         });
     }
 
