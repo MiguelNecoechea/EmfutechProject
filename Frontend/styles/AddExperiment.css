@@ -201,6 +201,8 @@ body {
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: #f8f9fa;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .tracking-signals h3 {
