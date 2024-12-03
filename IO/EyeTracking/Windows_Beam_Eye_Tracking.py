@@ -14,9 +14,21 @@ import sys
 import time
 import zmq
 import json
-from API.python.eyeware.client import TrackerClient
 import numpy as np
+import os
+from pathlib import Path
 
+# Add the parent directory of the API folder to sys.path
+api_path = Path(__file__).parent.parent.parent
+sys.path.append(str(api_path))
+
+try:
+    from API.python.eyeware.client import TrackerClient
+except ImportError as e:
+    print(f"Error importing TrackerClient: {e}")
+    print(f"Current sys.path: {sys.path}")
+    print(f"Looking for API at: {api_path}")
+    raise
 
 class EyeTracker:
     """Class to handle eye tracking functionality using Beam SDK."""
