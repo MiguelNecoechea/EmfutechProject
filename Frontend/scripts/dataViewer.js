@@ -28,7 +28,7 @@ class DataViewer {
         console.log('Initializing UI');
     }
 
-    displayParticipantInfo() {
+    async displayParticipantInfo() {
         if (!this.participantData) {
             console.error('No participant data available');
             return;
@@ -40,22 +40,68 @@ class DataViewer {
             return;
         }
 
-        // Only show the participant name
-        const participantDetails = `
-            <h2>${this.participantData.name}</h2>
-            <div class="visualization-controls">
-                <select id="data-type-selector">
-                    <option value="gaze">Eye Tracking</option>
-                    <option value="emotion">Emotion</option>
-                    <option value="aura">AURA</option>
-                    <option value="pointer">Mouse/Keyboard</option>
-                </select>
-                <button id="refresh-data">Refresh</button>
-            </div>
-        `;
+        try {
+            // Get available data files first
+            const response = await window.electronAPI.getParticipantData({
+                folderPath: this.participantData.folderPath,
+                dataType: 'all' // Get all available files
+            });
 
-        infoDiv.innerHTML = participantDetails;
-        this.setupEventListeners();
+            if (response.status !== 'success') {
+                throw new Error(response.message);
+            }
+
+            // Map file types to display names
+            const fileTypeMap = {
+                'gaze': 'Eye Tracking',
+                'emotions': 'Emotion',
+                'aura': 'AURA',
+                'data': 'Mouse/Keyboard'
+            };
+
+            // Create options only for available data types
+            const availableTypes = response.data.files
+                .filter(file => file.type in fileTypeMap)
+                .map(file => `<option value="${file.type === 'emotions' ? 'emotion' : 
+                                   file.type === 'data' ? 'pointer' : 
+                                   file.type}">${fileTypeMap[file.type]}</option>`)
+                .join('');
+
+            if (!availableTypes) {
+                infoDiv.innerHTML = `
+                    <h2>${this.participantData.name}</h2>
+                    <div class="no-data-message">No data files available for this participant</div>
+                `;
+                return;
+            }
+
+            // Display participant info with only available data types
+            const participantDetails = `
+                <h2>${this.participantData.name}</h2>
+                <div class="visualization-controls">
+                    <select id="data-type-selector">
+                        ${availableTypes}
+                    </select>
+                    <button id="refresh-data">Refresh</button>
+                </div>
+            `;
+
+            infoDiv.innerHTML = participantDetails;
+            
+            // Load initial data for the first available type
+            const selector = document.getElementById('data-type-selector');
+            if (selector && selector.value) {
+                this.setupEventListeners();
+                await this.loadData();
+            }
+
+        } catch (error) {
+            console.error('Error loading available data types:', error);
+            infoDiv.innerHTML = `
+                <h2>${this.participantData.name}</h2>
+                <div class="error-message">Error loading data: ${error.message}</div>
+            `;
+        }
     }
 
     setupEventListeners() {
