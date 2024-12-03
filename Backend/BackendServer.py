@@ -385,8 +385,8 @@ class BackendServer:
             # Start the Beam eye tracking process
             self._eye_tracking_process = subprocess.Popen(
                 [conda_env_path, str(script_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stdout=sys.stdout,  # Redirect stdout to console
+                stderr=sys.stderr   # Redirect stderr to console
             )
 
             # Wait for initial connection
