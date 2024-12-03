@@ -380,7 +380,7 @@ class BackendServer:
                     raise Exception("Conda environment 'eyetracking_env' not found")
 
             # Get the absolute path to the eye tracking script
-            script_path = Path(__file__).parent.parent / "IO" / "EyeTracking" / "Windows_Beam_Eye_Tracking.py"
+            script_path = Path(__file__).parent.parent / "API" / "Windows_Beam_Eye_Tracking.py"
             
             # Start the Beam eye tracking process
             self._eye_tracking_process = subprocess.Popen(
