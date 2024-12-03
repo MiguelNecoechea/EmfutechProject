@@ -32,6 +32,11 @@ from IO.FileWriting.KeyboardWriter import KeyboardWriter
 from IO.KeyboardTracking.KeyboardTracker import KeyboardTracker
 from IO.ScreenRecording.ScreenRecorder import ScreenRecorder
 from DataProcessing.ProcessAuraData import process_concentration_data
+
+import subprocess
+import sys
+from pathlib import Path
+
 # Constants
 DEFAULT_PORT = "5556"
 DEFAULT_AURA_STREAM_ID = 'filtered'
@@ -101,6 +106,13 @@ class BackendServer:
         # Training points coordinates for calibration
         self._current_x_coordinate = 0
         self._current_y_coordinate = 0
+
+        # Add ZMQ socket for eye tracking communication
+        self._eye_tracking_socket = self._context.socket(zmq.PAIR)
+        self._eye_tracking_socket.bind("tcp://*:5557")
+    
+        # Add eye tracking process reference
+        self._eye_tracking_process = None
 
         # Flags for the server status.
         self._running = False
@@ -271,6 +283,17 @@ class BackendServer:
         if hasattr(self, '_context') and self._context:
             self._context.term()
 
+        # Stop the eye tracking process if running
+        if self._eye_tracking_process:
+            try:
+                self._eye_tracking_socket.send_json({"command": "stop"})
+                self._eye_tracking_process.terminate()
+                self._eye_tracking_process.wait(timeout=5)
+            except Exception as e:
+                print(f"Error stopping eye tracking process: {e}")
+            finally:
+                self._eye_tracking_process = None
+
         # Clear all references
         self._threads.clear()
         self._aura_writer = None
@@ -330,33 +353,83 @@ class BackendServer:
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
-        self.manage_camera(OPEN_CAMERA)
-        self._create_directories()
-        self._eye_gaze = GazeProcessor()
-        def eye_gaze_task():
-            with self.thread_tracking(threading.current_thread()):
-                self.send_signal_update(SIGNAL_GAZE, 'connecting')
-                while True:
-                    if self._camera:
-                        frame = self.get_frame()
-                        if frame is not None:   
-                            gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                            if gaze_data[2] is not None:
-                                with threading.Lock():
-                                    self._last_gaze_frame = gaze_data[2].copy()
-                        
-                        if gaze_data[0] is not None and gaze_data[1] is not None:
-                            break
-                self._eye_gaze_running = True
-                self._fitting_eye_gaze = False
-                self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+        try:
+            # Get Conda environment path
+            if platform.system() == 'Windows':
+                # Try to find Conda environment with Python 3.6
+                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'beam_env', 'python.exe')
+                if not os.path.exists(conda_env_path):
+                    # Try user's home directory if CONDA_PREFIX is not set
+                    home = os.path.expanduser('~')
+                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'beam_env', 'python.exe')
+                    if not os.path.exists(conda_env_path):
+                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'beam_env', 'python.exe')
+                
+                if not os.path.exists(conda_env_path):
+                    raise Exception("Conda environment 'beam_env' not found")
+            else:
+                # For Unix-based systems
+                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'beam_env', 'bin', 'python')
+                if not os.path.exists(conda_env_path):
+                    home = os.path.expanduser('~')
+                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'beam_env', 'bin', 'python')
+                    if not os.path.exists(conda_env_path):
+                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'beam_env', 'bin', 'python')
+                
+                if not os.path.exists(conda_env_path):
+                    raise Exception("Conda environment 'beam_env' not found")
 
-        if not self._fitting_eye_gaze and not self._eye_gaze_running:
-            local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
-            local_thread.start()
-            return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
-        else:
-            return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
+            # Get the absolute path to the eye tracking script
+            script_path = Path(__file__).parent.parent / "IO" / "EyeTracking" / "Windows_Beam_Eye_Tracking.py"
+            
+            # Start the Beam eye tracking process
+            self._eye_tracking_process = subprocess.Popen(
+                [conda_env_path, str(script_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            # Wait for initial connection
+            try:
+                self._eye_tracking_socket.recv_json(timeout=5000)  # 5 second timeout
+                self.send_signal_update(SIGNAL_GAZE, 'connecting')
+                return {"status": STATUS_SUCCESS, "message": "Eye tracking started"}
+            except zmq.error.Again:
+                print("Failed to connect to Beam eye tracker, falling back to webcam tracking")
+                self.stop_eye_tracking()
+                raise Exception("Failed to init external Eye tracker")
+
+        except Exception as e:
+            print(f"Falling back to webcam eye tracking: {str(e)}")
+            # Fallback to webcam-based eye tracking
+            self.manage_camera(OPEN_CAMERA)
+            self._create_directories()
+            self._eye_gaze = GazeProcessor()
+            
+            def eye_gaze_task():
+                with self.thread_tracking(threading.current_thread()):
+                    self.send_signal_update(SIGNAL_GAZE, 'connecting')
+                    while True:
+                        if self._camera:
+                            frame = self.get_frame()
+                            if frame is not None:   
+                                gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                                if gaze_data[2] is not None:
+                                    with threading.Lock():
+                                        self._last_gaze_frame = gaze_data[2].copy()
+                            
+                            if gaze_data[0] is not None and gaze_data[1] is not None:
+                                break
+                    self._eye_gaze_running = True
+                    self._fitting_eye_gaze = False
+                    self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+
+            if not self._fitting_eye_gaze and not self._eye_gaze_running:
+                local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
+                local_thread.start()
+                return {"status": STATUS_SUCCESS, "message": "Webcam eye tracking started"}
+            else:
+                return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
 
     def start_data_collection(self):
         """Start all active data collection threads."""
@@ -418,14 +491,37 @@ class BackendServer:
                     self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
                     self._gaze_writer.create_new_file()
                     
-                    if self._regressor_thread is None or not self._regressor_thread.is_alive():
+                    if self._eye_tracking_process is not None:
+                        # Using Beam eye tracking
+                        def beam_gaze_collection_loop():
+                            with self.thread_tracking(threading.current_thread()):
+                                while self._data_collection_active:
+                                    try:
+                                        message = self._eye_tracking_socket.recv_json(flags=zmq.NOBLOCK)
+                                        if message.get("type") == "gaze_coordinates":
+                                            gaze_data = message["data"]
+                                            timestamp = round(time.time() - self._start_time, 3)
+                                            self._gaze_writer.write(timestamp, [gaze_data["x"], gaze_data["y"]])
+                                    except zmq.error.Again:
+                                        time.sleep(0.001)  # Brief sleep when no message
+                                    except Exception as e:
+                                        print(f"Error in beam gaze collection: {e}")
+                                        break
+                        
+                        self._regressor_thread = threading.Thread(
+                            target=beam_gaze_collection_loop,
+                            daemon=True
+                        )
+                    else:
+                        # Using webcam-based tracking
                         self._regressor_thread = threading.Thread(
                             target=self._coordinate_regressor_loop,
                             daemon=True
                         )
-                        with self.thread_tracking(self._regressor_thread):
-                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
-                            self._regressor_thread.start()
+                    
+                    with self.thread_tracking(self._regressor_thread):
+                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
+                        self._regressor_thread.start()
                 
                 # Pointer
                 if self._run_pointer:
@@ -1360,3 +1456,15 @@ class BackendServer:
         finally:
             # Ensure screen recorder is cleaned up even if an error occurs
             self._screen_recorder = None
+
+    def stop_eye_tracking(self):
+        """Stop the eye tracking process."""
+        try:
+            if self._eye_tracking_process:
+                self._eye_tracking_socket.send_json({"command": "stop"})
+                self._eye_tracking_process.terminate()
+                self._eye_tracking_process.wait(timeout=5)
+                self._eye_tracking_process = None
+                return {"status": STATUS_SUCCESS, "message": "Eye tracking stopped"}
+        except Exception as e:
+            return {"status": STATUS_ERROR, "message": f"Failed to stop eye tracking: {str(e)}"}
