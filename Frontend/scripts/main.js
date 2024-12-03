@@ -883,10 +883,10 @@ class ApplicationManager {
     async createExperimentWindow() {
         const experimentWindow = new BrowserWindow({
             width: 600,
-            height: 950,
+            height: 600,
             modal: true,
             parent: this.mainWindow,
-            resizable: false,
+            resizable: true,
             webPreferences: {
                 nodeIntegration: true,
                 contextIsolation: true,
