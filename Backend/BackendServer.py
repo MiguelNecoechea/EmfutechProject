@@ -357,27 +357,27 @@ class BackendServer:
             # Get Conda environment path
             if platform.system() == 'Windows':
                 # Try to find Conda environment with Python 3.6
-                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'beam_env', 'python.exe')
+                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'python.exe')
                 if not os.path.exists(conda_env_path):
                     # Try user's home directory if CONDA_PREFIX is not set
                     home = os.path.expanduser('~')
-                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'beam_env', 'python.exe')
+                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'eyetracking_env', 'python.exe')
                     if not os.path.exists(conda_env_path):
-                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'beam_env', 'python.exe')
+                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'eyetracking_env', 'python.exe')
                 
                 if not os.path.exists(conda_env_path):
                     raise Exception("Conda environment 'beam_env' not found")
             else:
                 # For Unix-based systems
-                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'beam_env', 'bin', 'python')
+                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'bin', 'python')
                 if not os.path.exists(conda_env_path):
                     home = os.path.expanduser('~')
-                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'beam_env', 'bin', 'python')
+                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'eyetracking_env', 'bin', 'python')
                     if not os.path.exists(conda_env_path):
-                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'beam_env', 'bin', 'python')
+                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'eyetracking_env', 'bin', 'python')
                 
                 if not os.path.exists(conda_env_path):
-                    raise Exception("Conda environment 'beam_env' not found")
+                    raise Exception("Conda environment 'eyetracking_env' not found")
 
             # Get the absolute path to the eye tracking script
             script_path = Path(__file__).parent.parent / "IO" / "EyeTracking" / "Windows_Beam_Eye_Tracking.py"

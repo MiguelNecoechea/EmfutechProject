@@ -75,6 +75,7 @@ class EyeTracker:
                             "type": "gaze_coordinates",
                             "data": {"x": x, "y": y}
                         }
+                        print(f"x: {x}, y: {y}")
                         self.socket.send_json(message)
                     time.sleep(1 / self.update_rate)
                 else:
