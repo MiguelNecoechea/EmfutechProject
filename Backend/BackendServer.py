@@ -393,6 +393,11 @@ class BackendServer:
             try:
                 self._eye_tracking_socket.recv_json(timeout=5000)  # 5 second timeout
                 self.send_signal_update(SIGNAL_GAZE, 'connecting')
+                # Send explicit calibration complete message
+                self._socket.send_json({
+                "type": "calibration_status",
+                    "message": CALIBRATION_COMPLETE_MSG
+                })
                 return {"status": STATUS_SUCCESS, "message": "Eye tracking started"}
             except zmq.error.Again:
                 print("Failed to connect to Beam eye tracker, falling back to webcam tracking")
