@@ -756,6 +756,12 @@ class ApplicationManager {
             this.mainWindow = null;
         }
 
+        // Close the data viewer window
+        if (this.dataViewerWindow) {
+            this.dataViewerWindow.destroy();
+            this.dataViewerWindow = null;
+        }
+
         // Terminate Python process last
         if (this.pythonProcess) {
             try {
