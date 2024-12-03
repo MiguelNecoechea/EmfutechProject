@@ -14,13 +14,13 @@ body {
     border: 2px solid #ccc;
     border-radius: 8px;
     padding: 25px;
+    width: 100%;
     max-width: 800px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    max-height: calc(100vh - 40px);
-    min-height: min-content;
+    gap: 15px;
+    height: calc(100vh - 40px);
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -30,8 +30,8 @@ body {
     display: flex;
     flex-direction: row;
     gap: 10px;
-    padding: 20px 0;
-    margin-top: 20px;
+    padding: 15px 0;
+    margin-top: 10px;
     background: white;
     z-index: 1;
 }
@@ -70,8 +70,8 @@ body {
 }
 
 .title {
-    margin: 0 0 20px 0;
-    font-size: 24px;
+    margin: 0 0 15px 0;
+    font-size: 20px;
     color: #333;
 }
 
@@ -79,12 +79,13 @@ body {
 .input-group {
     display: flex;
     align-items: flex-start;
-    gap: 15px;
+    gap: 10px;
     width: 100%;
+    min-height: fit-content;
 }
 
 .input-group label {
-    min-width: 180px;
+    min-width: 150px;
     padding-top: 8px;
     color: #333;
     font-weight: 500;
@@ -92,14 +93,17 @@ body {
 
 .input-group input[type="text"],
 .input-group input[type="number"],
-.input-group textarea {
+.input-group textarea,
+#participantForm select,
+#participantForm input[type="date"] {
     flex: 1;
-    padding: 8px 12px;
+    padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 14px;
     width: 100%;
     max-width: 400px;
+    min-width: 0;
 }
 
 .input-group textarea {
@@ -192,16 +196,16 @@ body {
 
 /* Add these styles to your existing AddExperiment.css */
 .tracking-signals {
-    margin: 20px 0;
-    padding: 15px;
+    margin: 10px 0;
+    padding: 12px;
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: #f8f9fa;
 }
 
 .tracking-signals h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.1em;
+    margin: 0 0 10px 0;
+    font-size: 1em;
     color: #333;
 }
 
@@ -211,7 +215,7 @@ body {
     margin: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 15px;
     justify-content: start;
 }
 
@@ -230,4 +234,39 @@ body {
 
 .tracking-signals input[type="checkbox"] {
     margin: 0;
+}
+
+/* Media queries for smaller screens */
+@media screen and (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    #experimentForm, #participantForm {
+        padding: 15px;
+        gap: 10px;
+        height: calc(100vh - 20px);
+    }
+
+    .input-group {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .input-group label {
+        min-width: unset;
+        padding-top: 0;
+    }
+
+    .input-group input[type="text"],
+    .input-group input[type="number"],
+    .input-group textarea,
+    #participantForm select,
+    #participantForm input[type="date"] {
+        max-width: 100%;
+    }
+
+    .tracking-signals ul {
+        gap: 10px;
+    }
 }
