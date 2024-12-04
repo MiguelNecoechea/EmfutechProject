@@ -7,6 +7,22 @@ class DataViewer {
             return;
         }
         this.participantData = null;
+        
+        // Create initial structure
+        const dataContainer = document.querySelector('.data-container');
+        dataContainer.innerHTML = `
+            <div class="video-section">
+                <div class="video-container"></div>
+            </div>
+            <div class="visualization-section">
+                <div class="visualization-controls">
+                    <select id="data-type-selector"></select>
+                    <button id="refresh-data">Refresh</button>
+                </div>
+                <div id="visualization-area"></div>
+            </div>
+        `;
+        
         this.initializeUI();
         
         if (!window.electronAPI) {
@@ -20,7 +36,6 @@ class DataViewer {
             console.log('Received participant data in DataViewer:', data);
             this.participantData = data;
             this.displayParticipantInfo();
-            this.loadInitialData();
         });
     }
 
@@ -34,17 +49,11 @@ class DataViewer {
             return;
         }
 
-        const infoDiv = document.getElementById('participant-info');
-        if (!infoDiv) {
-            console.error('participant-info element not found');
-            return;
-        }
-
         try {
             // Get available data files first
             const response = await window.electronAPI.getParticipantData({
                 folderPath: this.participantData.folderPath,
-                dataType: 'all' // Get all available files
+                dataType: 'all'
             });
 
             if (response.status !== 'success') {
@@ -68,39 +77,23 @@ class DataViewer {
                 .join('');
 
             if (!availableTypes) {
-                infoDiv.innerHTML = `
-                    <h2>${this.participantData.name}</h2>
-                    <div class="no-data-message">No data files available for this participant</div>
-                `;
+                const visualizationArea = document.getElementById('visualization-area');
+                visualizationArea.innerHTML = `<div class="no-data-message">No data files available</div>`;
                 return;
             }
 
-            // Display participant info with only available data types
-            const participantDetails = `
-                <h2>${this.participantData.name}</h2>
-                <div class="visualization-controls">
-                    <select id="data-type-selector">
-                        ${availableTypes}
-                    </select>
-                    <button id="refresh-data">Refresh</button>
-                </div>
-            `;
-
-            infoDiv.innerHTML = participantDetails;
-            
-            // Load initial data for the first available type
+            // Update the selector with available options
             const selector = document.getElementById('data-type-selector');
-            if (selector && selector.value) {
+            if (selector) {
+                selector.innerHTML = availableTypes;
                 this.setupEventListeners();
                 await this.loadData();
             }
 
         } catch (error) {
             console.error('Error loading available data types:', error);
-            infoDiv.innerHTML = `
-                <h2>${this.participantData.name}</h2>
-                <div class="error-message">Error loading data: ${error.message}</div>
-            `;
+            const visualizationArea = document.getElementById('visualization-area');
+            visualizationArea.innerHTML = `<div class="error-message">Error loading data: ${error.message}</div>`;
         }
     }
 
@@ -135,24 +128,39 @@ class DataViewer {
     }
 
     async loadInitialData() {
-        await this.loadData();
+        const selector = document.getElementById('data-type-selector');
+        if (selector && selector.value) {
+            await this.loadData();
+        }
     }
 
     async loadData() {
-        const dataType = document.getElementById('data-type-selector').value;
+        const selector = document.getElementById('data-type-selector');
+        const dataType = selector.value;
         console.log('Loading data for type:', dataType);
+        
+        // Store the current options HTML before rebuilding
+        const currentOptions = selector.innerHTML;
         
         // Update the data-container structure with top-bottom layout
         const dataContainer = document.querySelector('.data-container');
         dataContainer.innerHTML = `
             <div class="video-section">
-                <h3>Recording Playback</h3>
                 <div class="video-container"></div>
             </div>
             <div class="visualization-section">
+                <div class="visualization-controls">
+                    <select id="data-type-selector">${currentOptions}</select>
+                    <button id="refresh-data">Refresh</button>
+                </div>
                 <div id="visualization-area"></div>
             </div>
         `;
+        
+        // Restore the selected value and event listeners
+        const newSelector = document.getElementById('data-type-selector');
+        newSelector.value = dataType;
+        this.setupEventListeners();
         
         try {
             const response = await window.electronAPI.getParticipantData({
