@@ -96,4 +96,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showItemInFolder: (path) => ipcRenderer.invoke('show-item-in-folder', path),
     onSelectNewExperiment: (callback) =>
         ipcRenderer.on('select-new-experiment', (_event, data) => callback(data)),
+    sendWindowControl: (command) => {
+        ipcRenderer.send('window-control', command);
+    },
 });

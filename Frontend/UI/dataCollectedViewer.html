@@ -3,8 +3,45 @@
 <head>
     <title>Data Viewer</title>
     <link rel="stylesheet" href="../styles/dataViewer.css">
+    <style>
+        /* Add this CSS */
+        .window-controls {
+            display: none; /* Hidden by default, shown only on Windows */
+            position: fixed;
+            top: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+        }
+
+        .window-controls button {
+            background: none;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .window-controls button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Show controls only on Windows */
+        .windows .window-controls {
+            display: flex;
+        }
+    </style>
 </head>
 <body>
+    <div class="window-controls">
+        <button id="minimize-btn">─</button>
+        <button id="maximize-btn">□</button>
+        <button id="exit-fullscreen-btn">❐</button>
+        <button id="close-btn">✕</button>
+    </div>
+
     <div class="container">
         <div class="data-container">
             <!-- Remove the nested structure here and let JavaScript handle it -->
@@ -19,6 +56,30 @@
             console.error('Error: ' + msg + '\nurl: ' + url + '\nline: ' + line);
             return false;
         };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Only setup controls for Windows
+            if (navigator.platform.includes('Win')) {
+                document.body.classList.add('windows');
+                
+                // Setup window control buttons
+                document.getElementById('minimize-btn').addEventListener('click', () => {
+                    window.electronAPI.sendWindowControl('minimize');
+                });
+                
+                document.getElementById('maximize-btn').addEventListener('click', () => {
+                    window.electronAPI.sendWindowControl('maximize');
+                });
+                
+                document.getElementById('exit-fullscreen-btn').addEventListener('click', () => {
+                    window.electronAPI.sendWindowControl('exit-fullscreen');
+                });
+                
+                document.getElementById('close-btn').addEventListener('click', () => {
+                    window.electronAPI.sendWindowControl('close');
+                });
+            }
+        });
     </script>
 </body>
 </html>

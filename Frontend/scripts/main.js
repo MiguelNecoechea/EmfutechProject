@@ -1078,6 +1078,7 @@ class ApplicationManager {
             minHeight: 600,
             show: false,  // Don't show window until it's ready
             fullscreen: true,
+            frame: process.platform !== 'win32', // Use native frame on macOS, custom frame on Windows
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -1086,6 +1087,30 @@ class ApplicationManager {
                 webSecurity: false
             }
         });
+
+        // Add window controls for Windows
+        if (process.platform === 'win32') {
+            // Listen for window control events from the renderer
+            ipcMain.on('window-control', (event, command) => {
+                const win = BrowserWindow.fromWebContents(event.sender);
+                if (!win) return;
+
+                switch (command) {
+                    case 'minimize':
+                        win.minimize();
+                        break;
+                    case 'maximize':
+                        win.isMaximized() ? win.unmaximize() : win.maximize();
+                        break;
+                    case 'close':
+                        win.close();
+                        break;
+                    case 'exit-fullscreen':
+                        win.setFullScreen(false);
+                        break;
+                }
+            });
+        }
 
         // Load the HTML file
         await this.dataViewerWindow.loadFile('Frontend/UI/dataCollectedViewer.html');
