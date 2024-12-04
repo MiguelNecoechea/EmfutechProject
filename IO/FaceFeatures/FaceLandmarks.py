@@ -19,7 +19,6 @@ class FaceLandmarksDetector:
 
     def __init__(self):
         # Initialize MediaPipe Face Mesh
-        self._start_time = time.time()
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             min_detection_confidence=0.5,
@@ -46,7 +45,6 @@ class FaceLandmarksDetector:
         # Draw selected face landmarks if detected
         row = []
         if results.multi_face_landmarks:
-            row = [time.time() - self._start_time]
             for face_landmarks in results.multi_face_landmarks:
                 for idx in self.SELECTED_LANDMARKS:
                     x = int(face_landmarks.landmark[idx].x * frame.shape[1])

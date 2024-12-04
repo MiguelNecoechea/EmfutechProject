@@ -22,7 +22,7 @@ class FaceLandmarksWriter(Writer):
                 [f"landmark_{i}_y" for i in self.SELECTED_LANDMARKS]
         super().__init__(file_path, file_name, header)
 
-    def write(self, timestamp, landmarks):
+    def write(self, timestamp, landmarks_row):
         """
         Writes the facial landmark data to the file.
         
@@ -32,16 +32,11 @@ class FaceLandmarksWriter(Writer):
         if not self._is_writer_opened:
             self.create_new_file()
 
-        if landmarks is None:
+        if landmarks_row is None:
             raise ValueError("Landmarks cannot be None")
 
         # Extract x and y coordinates for each selected landmark
-        row = [round(timestamp, 3)]
-        for idx in self.SELECTED_LANDMARKS:
-            x = landmarks.landmark[idx].x
-            y = landmarks.landmark[idx].y
-            row.extend([x, y])
+        row = [round(timestamp, 3)] + landmarks_row
 
         self._csv_writer.writerow(row)
         self._csv_file.flush()
-        
