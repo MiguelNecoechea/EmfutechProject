@@ -1,9 +1,6 @@
 """
 Copyright (c) 2021 Eyeware Tech SA http://www.eyeware.tech
 
-This file provides an example on how to receive head and eye tracking data
-from Beam SDK using an Object-Oriented approach.
-
 Dependencies:
 - Python 3.6
 - NumPy
