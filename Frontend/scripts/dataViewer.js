@@ -199,7 +199,7 @@ class DataViewer {
                 `;
 
                 const videoHtml = `
-                    <video controls width="100%" preload="metadata">
+                    <video controls width="100%" preload="metadata" id="data-video">
                         <source src="file://${encodeURI(videoFile.path)}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
@@ -210,42 +210,31 @@ class DataViewer {
                     console.log('Setting video HTML:', videoHtml);
                     videoContainer.innerHTML = videoHtml;
                     
-                    const videoElement = videoContainer.querySelector('video');
-                    videoElement.addEventListener('error', (e) => {
-                        console.error('Video error:', e);
-                        const error = videoElement.error;
-                        if (error) {
-                            console.error('Error code:', error.code);
-                            console.error('Error message:', error.message);
-                            videoContainer.innerHTML = `
-                                <div class="error-message">
-                                    Error loading video (${fileSizeMB}MB file): ${error.message || 'Unknown error'}
-                                    <br>
-                                    <small>
-                                        Suggestions:
-                                        <ul>
-                                            <li>Convert the video to a smaller file size (recommended: under 100MB)</li>
-                                            <li>Try a different video format (e.g., WebM or compressed MP4)</li>
-                                            <li>Reduce the video resolution</li>
-                                        </ul>
-                                    </small>
-                                </div>
-                            `;
+                    const videoElement = document.getElementById('data-video');
+                    if (videoElement) {
+                        // Add time update listener for emotion plots if they exist
+                        if (this.emotionPlots) {
+                            videoElement.addEventListener('timeupdate', () => {
+                                const currentTime = videoElement.currentTime;
+                                this.updateEmotionTimeLine(currentTime);
+                            });
+
+                            videoElement.addEventListener('seeking', () => {
+                                const currentTime = videoElement.currentTime;
+                                this.updateEmotionTimeLine(currentTime);
+                            });
                         }
-                    });
 
-                    // Add loading state listeners with timeout handling
-                    let loadingTimeout;
-                    const TIMEOUT_DURATION = 45000; // 45 seconds
-
-                    videoElement.addEventListener('loadstart', () => {
-                        console.log('Video loading started');
-                        loadingTimeout = setTimeout(() => {
-                            if (videoElement.readyState < 3) { // HAVE_FUTURE_DATA
-                                console.error('Video loading timeout');
+                        // Add error handler
+                        videoElement.addEventListener('error', (e) => {
+                            console.error('Video error:', e);
+                            const error = videoElement.error;
+                            if (error) {
+                                console.error('Error code:', error.code);
+                                console.error('Error message:', error.message);
                                 videoContainer.innerHTML = `
                                     <div class="error-message">
-                                        Video failed to load within 45 seconds. The file (${fileSizeMB}MB) might be too large.
+                                        Error loading video (${fileSizeMB}MB file): ${error.message || 'Unknown error'}
                                         <br>
                                         <small>
                                             Suggestions:
@@ -258,14 +247,8 @@ class DataViewer {
                                     </div>
                                 `;
                             }
-                        }, TIMEOUT_DURATION);
-                    });
-
-                    videoElement.addEventListener('canplay', () => {
-                        console.log('Video can start playing');
-                        clearTimeout(loadingTimeout);
-                    });
-                    
+                        });
+                    }
                 }, 100); // Small delay to ensure loading indicator shows
             } else {
                 console.log('No video files found');
@@ -464,11 +447,14 @@ class DataViewer {
         // Get unique emotions and sort them
         const uniqueEmotions = [...new Set(data.map(d => d['Emotion Predicted']))].sort();
         
-        // Set up visualization area
+        // Set up visualization area with full width
         const visualizationArea = document.getElementById('visualization-area');
         visualizationArea.innerHTML = uniqueEmotions.map(emotion => 
-            `<div id="emotion-${emotion.toLowerCase()}" style="height: 300px; margin-bottom: 20px;"></div>`
+            `<div id="emotion-${emotion.toLowerCase()}" style="width: 100%; height: 300px; margin-bottom: 20px;"></div>`
         ).join('');
+
+        // Store plot references for updating
+        this.emotionPlots = {};
 
         // Create individual plots for each emotion
         uniqueEmotions.forEach(emotion => {
@@ -485,6 +471,20 @@ class DataViewer {
                 fill: 'tozeroy'
             };
 
+            // Add vertical line trace
+            const timeLine = {
+                x: [0, 0],
+                y: [-0.1, 1.1],
+                mode: 'lines',
+                name: 'Current Time',
+                line: {
+                    color: 'red',
+                    width: 2,
+                    dash: 'dot'
+                },
+                hoverinfo: 'none'
+            };
+
             const layout = {
                 title: `${emotion} Timeline`,
                 xaxis: {
@@ -497,10 +497,43 @@ class DataViewer {
                     tickvals: [0, 1],
                     ticktext: ['No', 'Yes']
                 },
-                margin: { l: 50, r: 50, t: 50, b: 50 }
+                margin: { l: 50, r: 30, t: 50, b: 50 },
+                autosize: true,
+                showlegend: false
             };
 
-            Plotly.newPlot(`emotion-${emotion.toLowerCase()}`, [trace], layout);
+            const config = {
+                responsive: true,
+                displayModeBar: false
+            };
+
+            Plotly.newPlot(`emotion-${emotion.toLowerCase()}`, [trace, timeLine], layout, config);
+            this.emotionPlots[emotion] = document.getElementById(`emotion-${emotion.toLowerCase()}`);
+        });
+
+        // Add video time update listener
+        const video = document.querySelector('video');
+        if (video) {
+            video.addEventListener('timeupdate', () => {
+                const currentTime = video.currentTime;
+                this.updateEmotionTimeLine(currentTime);
+            });
+
+            // Add seeking listener for smooth updates while dragging
+            video.addEventListener('seeking', () => {
+                const currentTime = video.currentTime;
+                this.updateEmotionTimeLine(currentTime);
+            });
+        }
+    }
+
+    updateEmotionTimeLine(currentTime) {
+        // Update the vertical line position in all emotion plots
+        Object.values(this.emotionPlots).forEach(plot => {
+            const update = {
+                'x': [[currentTime, currentTime]]  // Update x coordinates of the line
+            };
+            Plotly.update(plot, update, {}, [1]);  // Update only the second trace (the time line)
         });
     }
 
