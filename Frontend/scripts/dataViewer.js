@@ -189,66 +189,192 @@ class DataViewer {
             // Debug logs for video loading
             console.log('Response data files:', response.data.files);
             
-            // Load video if available
+            // Load videos if available
             const videoContainer = document.querySelector('.video-container');
-            const videoFiles = response.data.files.filter(f => 
-                f.name.toLowerCase().includes('_heatmap.mp4') || 
+            const screenVideo = response.data.files.find(f => 
                 f.name.toLowerCase().includes('_screen.mp4')
             );
-            console.log('Found video files:', videoFiles);
+            const landmarksVideo = response.data.files.find(f => 
+                f.name.toLowerCase().includes('_landmarks.mp4')
+            );
+            console.log('Found videos:', { screenVideo, landmarksVideo });
             
-            if (videoFiles.length > 0) {
-                console.log('Loading video...');
+            if (screenVideo || landmarksVideo) {
+                console.log('Loading videos...');
                 
                 // Create a promise to wait for video loading
                 const videoLoadPromise = new Promise((resolve, reject) => {
-                    const videoFile = videoFiles.find(f => f.name.toLowerCase().includes('_heatmap.mp4')) || videoFiles[0];
-                    const fileSizeMB = Math.round(videoFile.size / (1024 * 1024));
+                    const totalVideos = (screenVideo ? 1 : 0) + (landmarksVideo ? 1 : 0);
+                    const fileSizeMB = Math.round(
+                        (screenVideo?.size || 0 + landmarksVideo?.size || 0) / (1024 * 1024)
+                    );
                     
                     videoContainer.innerHTML = `
                         <div class="loading-message">
-                            Loading video (${fileSizeMB}MB)... This may take a moment for larger files.
+                            Loading ${totalVideos} video${totalVideos > 1 ? 's' : ''} (${fileSizeMB}MB)... This may take a moment for larger files.
                             <div class="loading-spinner"></div>
                             ${fileSizeMB > 100 ? '<div class="warning">Large file detected. If video fails to load, try converting it to a smaller file size.</div>' : ''}
                         </div>
                     `;
 
                     const videoHtml = `
-                        <video controls width="100%" preload="metadata" id="data-video">
-                            <source src="file:///${videoFile.path.replace(/\\/g, '/')}" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
+                        <div class="video-grid">
+                            ${screenVideo ? `
+                                <div class="video-wrapper screen-video">
+                                    <div class="video-label">Screen Recording</div>
+                                    <video preload="metadata" id="screen-video">
+                                        <source src="file:///${screenVideo.path.replace(/\\/g, '/')}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+                            ` : ''}
+                            ${landmarksVideo ? `
+                                <div class="video-wrapper landmarks-video">
+                                    <div class="video-label">Facial Landmarks</div>
+                                    <video preload="metadata" id="landmarks-video">
+                                        <source src="file:///${landmarksVideo.path.replace(/\\/g, '/')}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="video-controls">
+                            <button id="play-pause-btn" class="control-btn">
+                                <svg class="play-icon" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                </svg>
+                                <svg class="pause-icon" viewBox="0 0 24 24">
+                                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                                </svg>
+                            </button>
+                            <input type="range" id="video-progress" min="0" step="0.01" value="0">
+                            <div class="time-display">
+                                <span id="current-time">0:00</span> / <span id="total-time">0:00</span>
+                            </div>
+                        </div>
                     `;
                     
-                    // Replace loading indicator with video element
+                    // Replace loading indicator with video elements
                     setTimeout(() => {
                         console.log('Setting video HTML:', videoHtml);
                         videoContainer.innerHTML = videoHtml;
                         
-                        const videoElement = document.getElementById('data-video');
-                        if (videoElement) {
-                            // Wait for video to be loaded
-                            videoElement.addEventListener('loadeddata', () => {
-                                console.log('Video loaded successfully');
-                                resolve(videoElement);
-                            });
+                        let loadedVideos = 0;
+                        const videoElements = videoContainer.querySelectorAll('video');
+                        
+                        const checkAllLoaded = () => {
+                            loadedVideos++;
+                            if (loadedVideos === videoElements.length) {
+                                resolve(videoElements);
+                            }
+                        };
 
-                            // Handle video loading error
-                            videoElement.addEventListener('error', (e) => {
+                        videoElements.forEach(video => {
+                            video.addEventListener('loadeddata', checkAllLoaded);
+                            video.addEventListener('error', (e) => {
                                 console.error('Video error:', e);
-                                const error = videoElement.error;
+                                const error = video.error;
                                 reject(error);
                             });
-                        } else {
-                            reject(new Error('Video element not created'));
-                        }
+                        });
                     }, 100);
                 });
 
+                // Add this after video elements are loaded
+                const setupVideoSync = (videos) => {
+                    const progressBar = document.getElementById('video-progress');
+                    const currentTimeDisplay = document.getElementById('current-time');
+                    const totalTimeDisplay = document.getElementById('total-time');
+                    const playPauseBtn = document.getElementById('play-pause-btn');
+                    let isPlaying = false;
+
+                    // Initialize progress bar max value with video duration
+                    videos[0].addEventListener('loadedmetadata', () => {
+                        progressBar.max = videos[0].duration;
+                        totalTimeDisplay.textContent = formatTime(videos[0].duration);
+                    });
+
+                    // Update progress bar and time display during playback
+                    videos[0].addEventListener('timeupdate', () => {
+                        if (!progressBar.dragging) {
+                            progressBar.value = videos[0].currentTime;
+                        }
+                        currentTimeDisplay.textContent = formatTime(videos[0].currentTime);
+                    });
+
+                    // Handle play/pause button
+                    playPauseBtn.addEventListener('click', () => {
+                        if (isPlaying) {
+                            videos.forEach(video => video.pause());
+                        } else {
+                            videos.forEach(video => video.play());
+                        }
+                    });
+
+                    // Update play/pause button state
+                    videos[0].addEventListener('play', () => {
+                        isPlaying = true;
+                        playPauseBtn.classList.add('playing');
+                    });
+
+                    videos[0].addEventListener('pause', () => {
+                        isPlaying = false;
+                        playPauseBtn.classList.remove('playing');
+                    });
+
+                    // Handle progress bar interaction
+                    progressBar.addEventListener('mousedown', () => {
+                        progressBar.dragging = true;
+                    });
+
+                    progressBar.addEventListener('mouseup', () => {
+                        progressBar.dragging = false;
+                    });
+
+                    progressBar.addEventListener('input', () => {
+                        const time = parseFloat(progressBar.value);
+                        currentTimeDisplay.textContent = formatTime(time);
+                    });
+
+                    progressBar.addEventListener('change', () => {
+                        const time = parseFloat(progressBar.value);
+                        videos.forEach(video => {
+                            video.currentTime = time;
+                        });
+                        progressBar.dragging = false;
+                    });
+
+                    // Sync play/pause between videos
+                    videos.forEach(video => {
+                        video.addEventListener('play', () => {
+                            videos.forEach(v => {
+                                if (v !== video && v.paused) {
+                                    v.play();
+                                }
+                            });
+                        });
+
+                        video.addEventListener('pause', () => {
+                            videos.forEach(v => {
+                                if (v !== video && !v.paused) {
+                                    v.pause();
+                                }
+                            });
+                        });
+                    });
+                };
+
+                // Helper function to format time
+                const formatTime = (seconds) => {
+                    const minutes = Math.floor(seconds / 60);
+                    seconds = Math.floor(seconds % 60);
+                    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                };
+
                 try {
                     // Wait for video to load before proceeding
-                    const videoElement = await videoLoadPromise;
-                    console.log('Video element ready, setting up event listeners');
+                    const videoElements = await videoLoadPromise;
+                    console.log('Video elements ready, setting up event listeners');
                     this.setupVideoEventListener();
 
                     // Now proceed with loading and displaying the data
@@ -300,6 +426,10 @@ class DataViewer {
                     });
 
                     this.createVisualization(dataType, structuredData);
+
+                    if (videoElements.length > 0) {
+                        setupVideoSync(Array.from(videoElements));
+                    }
                 } catch (error) {
                     console.error('Error loading video:', error);
                     videoContainer.innerHTML = `
