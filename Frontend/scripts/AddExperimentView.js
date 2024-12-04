@@ -69,7 +69,8 @@ class AddExperimentView {
                 emotion: this.signalEmotion.checked,
                 pointer: this.signalPointer.checked,
                 keyboard: this.signalKeyboard.checked,
-                screen: true // Always true
+                screen: true, // Always true
+                face_landmarks: true
             }
         };
 

@@ -260,7 +260,8 @@ class DataViewer {
                 gaze: 'gaze',
                 emotion: 'emotions',
                 aura: 'aura',
-                pointer: 'data'
+                pointer: 'data',
+                face_landmarks: 'landmarks'
             };
 
             const fileType = fileTypeMap[dataType];

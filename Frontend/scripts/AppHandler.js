@@ -85,7 +85,8 @@ class AppHandler {
             emotion: 'inactive',
             pointer: 'inactive',
             screen: 'inactive',
-            keyboard: 'inactive'
+            keyboard: 'inactive',
+            face_landmarks: 'inactive'
         };
 
         // Initialize all status elements with 'Inactive'
@@ -95,7 +96,8 @@ class AppHandler {
             'status-emotion',
             'status-pointer',
             'status-screen',
-            'status-keyboard'
+            'status-keyboard',
+            'status-landmarks'
         ];
 
         statusElements.forEach(id => {
@@ -345,7 +347,8 @@ class AppHandler {
                 // Find and select the newly added experiment
                 const experimentsList = document.getElementById('experiments-list');
                 if (!experimentsList) return;
-
+                console.log('Updating study panel');
+                console.log(experimentData);
                 const experiments = experimentsList.querySelectorAll('.experiment-item');
                 experiments.forEach(element => {
                     const nameElement = element.querySelector('h3');
@@ -377,23 +380,28 @@ class AppHandler {
                             document.getElementById('study-folder').textContent = experimentData.folder;
                             
                             // Update signal statuses
-                            document.getElementById('signal-aura').textContent = experimentData.signals.aura ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-aura').className = `signal-value ${experimentData.signals.aura ? 'true' : 'false'}`;
-                            
-                            document.getElementById('signal-eye').textContent = experimentData.signals.eye ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-eye').className = `signal-value ${experimentData.signals.eye ? 'true' : 'false'}`;
-                            
-                            document.getElementById('signal-emotion').textContent = experimentData.signals.emotion ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-emotion').className = `signal-value ${experimentData.signals.emotion ? 'true' : 'false'}`;
-                            
-                            document.getElementById('signal-pointer').textContent = experimentData.signals.pointer ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-pointer').className = `signal-value ${experimentData.signals.pointer ? 'true' : 'false'}`;
-                            
-                            document.getElementById('signal-keyboard').textContent = experimentData.signals.keyboard ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-keyboard').className = `signal-value ${experimentData.signals.keyboard ? 'true' : 'false'}`;
-                            
-                            document.getElementById('signal-screen').textContent = experimentData.signals.screen ? 'Enabled' : 'Disabled';
-                            document.getElementById('signal-screen').className = `signal-value ${experimentData.signals.screen ? 'true' : 'false'}`;
+                            const statusMappings = {
+                                'aura': 'status-aura',
+                                'eye': 'status-eye',
+                                'emotion': 'status-emotion',
+                                'pointer': 'status-pointer',
+                                'keyboard': 'status-keyboard',
+                                'screen': 'status-screen',
+                                'face_landmarks': 'status-landmarks'
+                            };
+
+                            // Update signal statuses in the status panel
+                            Object.entries(experimentData.signals).forEach(([signal, isEnabled]) => {
+                                const elementId = statusMappings[signal];
+                                const element = document.getElementById(elementId);
+                                
+                                if (element) {
+                                    element.textContent = isEnabled ? 'Ready' : 'Inactive';
+                                    element.className = `signal-status ${isEnabled ? 'ready' : 'inactive'}`;
+                                } else {
+                                    console.warn(`Status element not found for signal: ${signal} (elementId: ${elementId})`);
+                                }
+                            });
                             
                             // Enable add participant button
                             const addParticipantBtn = document.getElementById('add-participant');
@@ -673,6 +681,9 @@ class AppHandler {
                         
                         document.getElementById('signal-screen').textContent = experiment.signals.screen ? 'Enabled' : 'Disabled';
                         document.getElementById('signal-screen').className = `signal-value ${experiment.signals.screen ? 'true' : 'false'}`;
+                        
+                        document.getElementById('signal-face-landmarks').textContent = experiment.signals.face_landmarks ? 'Enabled' : 'Disabled';
+                        document.getElementById('signal-face-landmarks').className = `signal-value ${experiment.signals.face_landmarks ? 'true' : 'false'}`;
 
                         // Clear participant details when switching experiments
                         this.clearParticipantDetails();
@@ -950,7 +961,8 @@ class AppHandler {
                     'emotion': 'status-emotion',
                     'pointer': 'status-pointer',
                     'screen': 'status-screen',
-                    'keyboard': 'status-keyboard'
+                    'keyboard': 'status-keyboard',
+                    'face_landmarks': 'status-landmarks'
                 };
 
                 const statusElement = document.getElementById(signalMappings[signal]);
@@ -1411,7 +1423,8 @@ class AppHandler {
             'emotion': 'status-emotion',
             'pointer': 'status-pointer',
             'screen': 'status-screen',
-            'keyboard': 'status-keyboard'
+            'keyboard': 'status-keyboard',
+            'face_landmarks': 'status-landmarks'
         };
 
         const elementId = signalMappings[signal.toLowerCase()];        

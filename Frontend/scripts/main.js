@@ -149,6 +149,10 @@ class ApplicationManager {
                 // Update the folder path in experimentData
                 const experimentWithUpdatedPath = {
                     ...experimentData,
+                    signals: {
+                        ...experimentData.signals,
+                        face_landmarks: true
+                    },
                     folder: experimentFolder,
                     createdAt: new Date().toISOString()
                 };
