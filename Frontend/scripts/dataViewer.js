@@ -200,7 +200,7 @@ class DataViewer {
 
                 const videoHtml = `
                     <video controls width="100%" preload="metadata" id="data-video">
-                        <source src="file://${encodeURI(videoFile.path)}" type="video/mp4">
+                        <source src="file:///${videoFile.path.replace(/\\/g, '/')}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 `;
@@ -273,7 +273,11 @@ class DataViewer {
                 throw new Error(`No ${dataType} data found`);
             }
 
-            const csvData = await fetch(`file://${file.path}`);
+            // Normalize file path for Windows
+            const normalizedPath = file.path.replace(/\\/g, '/');
+            console.log('Normalized file path:', normalizedPath);
+            
+            const csvData = await fetch(`file:///${normalizedPath}`);
             const csvText = await csvData.text();
             
             // Parse CSV and create structured data
@@ -301,7 +305,10 @@ class DataViewer {
         } catch (error) {
             console.error('Error loading data:', error);
             const visualizationArea = document.getElementById('visualization-area');
-            visualizationArea.innerHTML = `<p class="error">Error loading data: ${error.message}</p>`;
+            visualizationArea.innerHTML = `
+                <p class="error">Error loading data: ${error.message}</p>
+                <p class="error-details">File path: ${file?.path}</p>
+            `;
         }
     }
 
