@@ -130,8 +130,6 @@ class BackendServer:
         self._shutdown = False
 
         # OpenCV video capture object
-        self._camera = None
-        self._emotion_camera = None
         self._last_gaze_frame = None
         self._last_emotion = None
         self._viewing_camera = False
@@ -205,6 +203,28 @@ class BackendServer:
         # Initialize FaceLandmarksDetector and FaceLandmarksWriter
         self._face_landmarks_detector = FaceLandmarksDetector()
         self._face_landmarks_writer = None  # Will be initialized when starting data collection
+
+        self._message_handlers = {
+            'update_signal': self.handle_update_signal_status,
+            'start_eye_gaze': self.start_eye_gaze,
+            'start': self.start_data_collection,
+            'stop': self.stop_data_collection,
+            'start_recording_training_data': self.start_training_data_collection,
+            'stop_recording_training_data': self.stop_training_data_collection,
+            'set_coordinates': self.update_coordinates,
+            'update_output_path': self.update_output_path,
+            'update_participant_name': self.update_participant_name,
+            'new_participant': self.handle_new_participant,
+            'generate_report': self.generate_report,
+            'get_aura_streams': self.get_aura_streams,
+            'set_aura_stream': self.set_aura_stream,
+            'shutdown': self.cleanup,
+        }
+
+        # Initialize thread management
+        self._threads_lock = threading.Lock()
+        self._active_threads = set()
+        self._shutdown = False
 
     def _setup_signal_handlers(self):
         """Set up signal handlers for graceful shutdown."""
@@ -315,9 +335,6 @@ class BackendServer:
             # Final cleanup of resources
             self._last_gaze_frame = None
             self._last_emotion = None
-            self._camera = None
-            self._emotion_camera = None
-
             # Force garbage collection
             import gc
             gc.collect()
@@ -420,15 +437,16 @@ class BackendServer:
                             self._add_thread(threading.current_thread())
                             self.send_signal_update(SIGNAL_GAZE, 'connecting')
                             while True:
-                                frame = self._camera_manager.get_frame()
-                                if frame is not None:   
-                                    gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                                    if gaze_data[2] is not None:
-                                        with threading.Lock():
-                                            self._last_gaze_frame = gaze_data[2].copy()
+                                if self._camera_manager:
+                                    frame = self._camera_manager.get_frame()
+                                    if frame is not None:   
+                                        gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                                        if gaze_data[2] is not None:
+                                            with threading.Lock():
+                                                self._last_gaze_frame = gaze_data[2].copy()
                                 
-                                    if gaze_data[0] is not None and gaze_data[1] is not None:
-                                        break
+                                        if gaze_data[0] is not None and gaze_data[1] is not None:
+                                            break
                             self._eye_gaze_running = True
                             self._fitting_eye_gaze = False
                             self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
@@ -481,13 +499,11 @@ class BackendServer:
                 
                 # Emotion
                 if self._run_emotion:
-                    self._emotion_camera = cv2.VideoCapture(DEFAULT_CAMERA_INDEX)
-                    emotion_response = self.start_emotion_detection()
-                    if emotion_response["status"] != STATUS_SUCCESS:
-                        self._emotion_camera.release()
-                        self._emotion_camera = None
-                        self.send_signal_update(SIGNAL_EMOTION, 'error')
-                        raise Exception(emotion_response["message"])
+                    if self._camera_manager.register_user('emotion'):
+                        emotion_response = self.start_emotion_detection()
+                        if emotion_response["status"] != STATUS_SUCCESS:
+                            self.send_signal_update(SIGNAL_EMOTION, 'error')
+                            raise Exception(emotion_response["message"])
                     
                     self._emotion_writer = EmotionPredictedWriter(self._path, f'{self._filename}{EMOTION_FILE_SUFFIX}')
                     self._emotion_writer.create_new_file()
@@ -697,15 +713,15 @@ class BackendServer:
 
             # Join and clear all threads with timeout
             with self._threads_lock:
-                threads_copy = self._threads.copy()
+                active_threads = {t() for t in self._active_threads if t() is not None}
             
-            for thread in threads_copy:
+            for thread in active_threads:
                 if thread and thread.is_alive():
                     thread.join(timeout=1.0)
             
-            # Clear the threads list
+            # Clear the threads set
             with self._threads_lock:
-                self._threads.clear()
+                self._active_threads.clear()
             
             # Stop camera viewing
             if self._viewing_camera:
@@ -715,7 +731,7 @@ class BackendServer:
             # Unregister all camera users and cleanup camera
             for user in ['eye_gaze', 'emotion', 'viewer']:
                 self._camera_manager.unregister_user(user)
-            self._camera_manager.cleanup_camera()  # Explicitly cleanup the camera
+            self._camera_manager.cleanup_camera()
 
             if self._run_aura:
                 process_concentration_data(self._aura_file, self._aura_training_file)
@@ -751,7 +767,8 @@ class BackendServer:
                 (self._run_pointer, SIGNAL_POINTER, 'ready'),
                 (self._run_screen, SIGNAL_SCREEN, 'ready'),
                 (self._run_keyboard, SIGNAL_KEYBOARD, 'ready'),
-                (self._screen_recorder, SIGNAL_SCREEN, 'ready')
+                (self._screen_recorder, SIGNAL_SCREEN, 'ready'),
+                (self._run_face_landmarks, SIGNAL_FACE_LANDMARKS, 'ready')
             ]
             
             for is_active, signal, status in signals:
@@ -801,7 +818,7 @@ class BackendServer:
         
         # Validate signal type
         valid_signals = [SIGNAL_AURA, SIGNAL_GAZE, SIGNAL_EMOTION, 
-                        SIGNAL_POINTER, SIGNAL_SCREEN, SIGNAL_KEYBOARD]
+                        SIGNAL_POINTER, SIGNAL_SCREEN, SIGNAL_KEYBOARD, SIGNAL_FACE_LANDMARKS]
         if signal not in valid_signals:
             return {"status": STATUS_ERROR, "message": f"Invalid signal type: {signal}"}
 
@@ -969,10 +986,9 @@ class BackendServer:
             self._add_thread(threading.current_thread())
             self.send_signal_update(SIGNAL_EMOTION, 'recording')
             while not self._shutdown and self._data_collection_active:
-                if self._emotion_handler and self._emotion_camera:
-                    _, frame = self._emotion_camera.read()
-                    if frame is not None:
-                        # Create a copy of the frame to avoid memory sharing
+                frame = self._camera_manager.get_frame()
+                if frame is not None:
+                    # Create a copy of the frame to avoid memory sharing
                         frame_copy = frame.copy()
                         try:
                             emotion = self._emotion_handler.recognize_emotion(frame_copy)
@@ -989,9 +1005,6 @@ class BackendServer:
         finally:
             if self._emotion_writer:
                 self._emotion_writer.close_file()
-            if self._emotion_camera:
-                self._emotion_camera.release()
-                self._emotion_camera = None
             if self._emotion_handler:
                 self._emotion_handler.stop_processing()
                 self._emotion_handler = None
@@ -1551,3 +1564,37 @@ class BackendServer:
         # Clear the threads set
         with self._threads_lock:
             self._active_threads.clear()
+    
+    def _post_process_eye_gaze(self):
+        """Post-process eye gaze data to generate heatmap visualization."""
+        if not (self._run_gaze and hasattr(self, '_screen_recorder')):
+            return
+
+        try:
+            video_file = self._screen_recording_file
+            gaze_file = os.path.join(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
+            heatmap_output = os.path.join(self._path, f'{self._filename}_heatmap.mp4')
+
+            if os.path.exists(video_file) and os.path.exists(gaze_file):
+                print("Processing gaze heatmap...")
+                from DataProcessing.VideoProcessing import GazeHeatmapProcessor
+                GazeHeatmapProcessor.process_video(
+                    video_file=video_file,
+                    csv_file=gaze_file,
+                output_file=heatmap_output
+                )
+                print("Heatmap processing complete")
+        except Exception as e:
+            print(f"Error processing heatmap: {e}")
+
+
+    def _add_thread(self, thread):
+        """Add a thread to the active threads set."""
+        with self._threads_lock:
+            self._active_threads.add(weakref.ref(thread))
+
+    def _remove_thread(self, thread):
+        """Remove a thread from the active threads set."""
+        with self._threads_lock:
+            # Remove the weak reference to the thread
+            self._active_threads = {t for t in self._active_threads if t() is not thread}
