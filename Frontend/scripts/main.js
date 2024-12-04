@@ -1077,6 +1077,7 @@ class ApplicationManager {
             minWidth: 1100,
             minHeight: 600,
             show: false,  // Don't show window until it's ready
+            fullscreen: true,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
