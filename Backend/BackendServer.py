@@ -37,6 +37,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from Backend.CameraManager import CameraManager
+
 # Constants
 DEFAULT_PORT = "5556"
 DEFAULT_AURA_STREAM_ID = 'filtered'
@@ -191,6 +193,8 @@ class BackendServer:
         # Screen recording file
         self._screen_recording_file = None
 
+        self._camera_manager = CameraManager()
+
     @contextmanager
     def thread_tracking(self, thread):
         """
@@ -306,6 +310,8 @@ class BackendServer:
         self._last_emotion = None
         self._last_gaze_frame = None
 
+        self._camera_manager.cleanup_camera()
+
         print("Cleanup completed")
 
     def signal_handler(self, signum, frame):
@@ -356,33 +362,40 @@ class BackendServer:
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
-        self.manage_camera(OPEN_CAMERA)
-        self._create_directories()
-        self._eye_gaze = GazeProcessor()
-        def eye_gaze_task():
-            with self.thread_tracking(threading.current_thread()):
-                self.send_signal_update(SIGNAL_GAZE, 'connecting')
-                while True:
-                    if self._camera:
-                        frame = self.get_frame()
-                        if frame is not None:   
-                            gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                            if gaze_data[2] is not None:
-                                with threading.Lock():
-                                    self._last_gaze_frame = gaze_data[2].copy()
-                        
-                        if gaze_data[0] is not None and gaze_data[1] is not None:
-                            break
-                self._eye_gaze_running = True
-                self._fitting_eye_gaze = False
-                self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+        try:
+            if not self._fitting_eye_gaze and not self._eye_gaze_running:
+                if self._camera_manager.register_user('eye_gaze'):
+                    self._create_directories()
+                    self._eye_gaze = GazeProcessor()
+                    
+                    def eye_gaze_task():
+                        with self.thread_tracking(threading.current_thread()):
+                            self.send_signal_update(SIGNAL_GAZE, 'connecting')
+                            while True:
+                                frame = self._camera_manager.get_frame()
+                                if frame is not None:   
+                                    gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                                    if gaze_data[2] is not None:
+                                        with threading.Lock():
+                                            self._last_gaze_frame = gaze_data[2].copy()
+                                
+                                    if gaze_data[0] is not None and gaze_data[1] is not None:
+                                        break
+                            self._eye_gaze_running = True
+                            self._fitting_eye_gaze = False
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
 
-        if not self._fitting_eye_gaze and not self._eye_gaze_running:
-            local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
-            local_thread.start()
-            return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
-        else:
-            return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
+                    local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
+                    local_thread.start()
+                    return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
+                else:
+                    raise Exception("Failed to initialize camera for eye tracking")
+            else:
+                return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
+        except Exception as e:
+            self._camera_manager.unregister_user('eye_gaze')
+            print(f"Error starting eye gaze: {e}")
+            return {"status": STATUS_ERROR, "message": str(e)}
 
     def start_data_collection(self):
         """Start all active data collection threads."""
@@ -596,8 +609,6 @@ class BackendServer:
 
             # Stop emotion detection
             if self._emotion_handler:
-                self._emotion_camera.release()
-                self._emotion_camera = None
                 self._emotion_handler = None
 
             # Stop keyboard tracking
@@ -630,12 +641,15 @@ class BackendServer:
             with self._threads_lock:
                 self._threads.clear()
             
-            # Stop camera viewing and release camera
+            # Stop camera viewing
             if self._viewing_camera:
                 self._viewing_camera = False
                 cv2.destroyAllWindows()
 
-            self.manage_camera(CLOSE_CAMERA)
+            # Unregister all camera users and cleanup camera
+            for user in ['eye_gaze', 'emotion', 'viewer']:
+                self._camera_manager.unregister_user(user)
+            self._camera_manager.cleanup_camera()  # Explicitly cleanup the camera
 
             if self._run_aura:
                 process_concentration_data(self._aura_file, self._aura_training_file)
@@ -817,16 +831,21 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": str(e)}
 
     def start_emotion_detection(self):
-        """
-        Initialize and start emotion recognition.
-        """
+        """Initialize and start emotion recognition."""
         try:
-            self.send_signal_update(SIGNAL_EMOTION, 'active')
-            self._emotion_handler = EmotionRecognizer('opencv')
-            self._emotion_thread = threading.Thread(target=self._emotion_collection_loop, daemon=True)
-            self.send_signal_update(SIGNAL_EMOTION, 'active')
-            return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
+            if self._camera_manager.register_user('emotion'):
+                self.send_signal_update(SIGNAL_EMOTION, 'active')
+                self._emotion_handler = EmotionRecognizer('opencv')
+                self._emotion_thread = threading.Thread(
+                    target=self._emotion_collection_loop, 
+                    daemon=True
+                )
+                self.send_signal_update(SIGNAL_EMOTION, 'active')
+                return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
+            else:
+                raise Exception("Failed to initialize camera")
         except Exception as e:
+            self._camera_manager.unregister_user('emotion')
             self.send_signal_update(SIGNAL_EMOTION, 'error')
             return {"status": STATUS_ERROR, "message": str(e)}
     
@@ -912,47 +931,34 @@ class BackendServer:
                 self._emotion_handler = None
 
     def _coordinate_regressor_loop(self):
-        """
-        Continuously collect eye gaze data and predict screen coordinates in a loop.
-        
-        Gets gaze vectors for both eyes from the eye tracker, uses the regressor to
-        predict x,y screen coordinates, and writes the predictions with timestamps
-        to the coordinate writer. Runs until data_collection_active is set to False.
-        
-        The gaze input consists of x,y,z coordinates for both left and right eyes.
-        Predictions are rounded to integer screen coordinates before writing.
-        Records at 30 samples per second.
-        """
+        """Continuously collect eye gaze data and predict screen coordinates."""
         with self.thread_tracking(threading.current_thread()):
             self.send_signal_update(SIGNAL_GAZE, 'recording')
-            while True:
-                if self._camera:
-                    frame = self.get_frame()
-                    if frame is not None:
-                        gaze_vector = self._eye_gaze.get_gaze_vector(frame)
-                        if gaze_vector[2] is not None:
-                            with threading.Lock():
-                                self._last_gaze_frame = gaze_vector[2].copy()
-                            left_eye = gaze_vector[0]
-                            right_eye = gaze_vector[1] 
-                            if left_eye is not None and right_eye is not None:
-                                gaze_input = [[
-                                    *left_eye,   # x, y, z coordinates for left eye
-                                    *right_eye   # x, y, z coordinates for right eye
-                                ]]
-                                predicted_coords = self._regressor.make_prediction(gaze_input)
-                                x, y = predicted_coords[0]  # Extract x,y from nested array
-                                x = int(x)
-                                y = int(y)
-                                timestamp = round(time.time() - self._start_time, 3)
-                                self._gaze_writer.write(timestamp, [x, y])
-                        
-                        # Sleep to maintain 30Hz sampling rate
-                        time.sleep(0.033)  # ~30 FPS
-                        
-                if not self._data_collection_active:
-                    break
+            while self._data_collection_active:
+                frame = self._camera_manager.get_frame()
+                if frame is not None:
+                    gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                    if gaze_vector[2] is not None:
+                        with threading.Lock():
+                            self._last_gaze_frame = gaze_vector[2].copy()
+                        left_eye = gaze_vector[0]
+                        right_eye = gaze_vector[1] 
+                        if left_eye is not None and right_eye is not None:
+                            gaze_input = [[
+                                *left_eye,   # x, y, z coordinates for left eye
+                                *right_eye   # x, y, z coordinates for right eye
+                            ]]
+                            predicted_coords = self._regressor.make_prediction(gaze_input)
+                            x, y = predicted_coords[0]  # Extract x,y from nested array
+                            x = int(x)
+                            y = int(y)
+                            timestamp = round(time.time() - self._start_time, 3)
+                            self._gaze_writer.write(timestamp, [x, y])
+                
+                time.sleep(0.033)  # ~30 FPS
+                
             self._eye_gaze_running = False
+            self._camera_manager.unregister_user('eye_gaze')
             self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
         
     def update_coordinates(self, x, y):
@@ -1228,14 +1234,9 @@ class BackendServer:
             return {"status": STATUS_ERROR, "message": str(e)}
 
     def get_frame(self):
-        """
-        Get the current frame from the video capture object.
-        """
-        if self._camera is not None:
-            _, frame = self._camera.read()
-            return frame
-        return None
-    
+        """Get the latest frame from the camera manager."""
+        return self._camera_manager.get_frame()
+
     def view_camera(self):
         """Capture frames from the camera and stream them to the frontend via ZMQ."""
         if self._camera is None or not self._camera.isOpened():
