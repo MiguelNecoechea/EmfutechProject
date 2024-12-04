@@ -288,18 +288,65 @@ class DataViewer {
                     const playPauseBtn = document.getElementById('play-pause-btn');
                     let isPlaying = false;
 
-                    // Initialize progress bar max value with video duration
-                    videos[0].addEventListener('loadedmetadata', () => {
-                        progressBar.max = videos[0].duration;
-                        totalTimeDisplay.textContent = formatTime(videos[0].duration);
+                    // Wait for all videos to be ready before setting up controls
+                    Promise.all(videos.map(video => new Promise(resolve => {
+                        if (video.readyState >= 2) {
+                            resolve();
+                        } else {
+                            video.addEventListener('loadeddata', resolve);
+                        }
+                    }))).then(() => {
+                        const duration = videos[0].duration;
+                        console.log('Setting up video controls with duration:', duration);
+                        
+                        // Initialize progress bar
+                        progressBar.min = 0;
+                        progressBar.max = duration;
+                        progressBar.value = 0;
+                        progressBar.step = 0.01;
+                        
+                        // Initialize time displays
+                        currentTimeDisplay.textContent = '0:00';
+                        totalTimeDisplay.textContent = formatTime(duration);
                     });
 
                     // Update progress bar and time display during playback
                     videos[0].addEventListener('timeupdate', () => {
                         if (!progressBar.dragging) {
-                            progressBar.value = videos[0].currentTime;
+                            const currentTime = videos[0].currentTime;
+                            const duration = videos[0].duration;
+                            
+                            // Ensure we stay within bounds
+                            if (currentTime <= duration) {
+                                progressBar.value = currentTime;
+                                currentTimeDisplay.textContent = formatTime(currentTime);
+                                
+                                // Update progress bar visual fill
+                                const progress = (currentTime / duration) * 100;
+                                progressBar.style.setProperty('--progress', `${progress}%`);
+                            }
                         }
-                        currentTimeDisplay.textContent = formatTime(videos[0].currentTime);
+                    });
+
+                    // Handle progress bar interaction
+                    progressBar.addEventListener('input', (e) => {
+                        const duration = videos[0].duration;
+                        let time = parseFloat(e.target.value);
+                        
+                        // Constrain the value
+                        time = Math.max(0, Math.min(time, duration));
+                        progressBar.value = time;
+                        
+                        currentTimeDisplay.textContent = formatTime(time);
+                        
+                        // Update progress bar visual fill
+                        const progress = (time / duration) * 100;
+                        progressBar.style.setProperty('--progress', `${progress}%`);
+                        
+                        // Update video times
+                        videos.forEach(video => {
+                            video.currentTime = time;
+                        });
                     });
 
                     // Handle play/pause button
@@ -322,28 +369,6 @@ class DataViewer {
                         playPauseBtn.classList.remove('playing');
                     });
 
-                    // Handle progress bar interaction
-                    progressBar.addEventListener('mousedown', () => {
-                        progressBar.dragging = true;
-                    });
-
-                    progressBar.addEventListener('mouseup', () => {
-                        progressBar.dragging = false;
-                    });
-
-                    progressBar.addEventListener('input', () => {
-                        const time = parseFloat(progressBar.value);
-                        currentTimeDisplay.textContent = formatTime(time);
-                    });
-
-                    progressBar.addEventListener('change', () => {
-                        const time = parseFloat(progressBar.value);
-                        videos.forEach(video => {
-                            video.currentTime = time;
-                        });
-                        progressBar.dragging = false;
-                    });
-
                     // Sync play/pause between videos
                     videos.forEach(video => {
                         video.addEventListener('play', () => {
@@ -361,14 +386,22 @@ class DataViewer {
                                 }
                             });
                         });
+
+                        // Add ended event handler
+                        video.addEventListener('ended', () => {
+                            progressBar.value = video.duration;
+                            currentTimeDisplay.textContent = formatTime(video.duration);
+                            playPauseBtn.classList.remove('playing');
+                            isPlaying = false;
+                        });
                     });
                 };
 
                 // Helper function to format time
                 const formatTime = (seconds) => {
                     const minutes = Math.floor(seconds / 60);
-                    seconds = Math.floor(seconds % 60);
-                    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    const remainingSeconds = Math.floor(seconds % 60);
+                    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
                 };
 
                 try {
