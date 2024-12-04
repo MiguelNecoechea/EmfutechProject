@@ -42,8 +42,21 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
         
         if process.returncode == 0:
             if input_file == output_file:
-                # If we're overwriting the input file, use the temp file
-                os.replace(temp_file, output_file)
+                try:
+                    # First try to remove the original file
+                    if os.path.exists(input_file):
+                        os.remove(input_file)
+                    # Then rename the temp file
+                    os.rename(temp_file, output_file)
+                except Exception as e:
+                    print(f"Error during file replacement: {str(e)}")
+                    # If rename fails, try an alternative approach
+                    try:
+                        import shutil
+                        shutil.move(temp_file, output_file)
+                    except Exception as e2:
+                        print(f"Error during file move: {str(e2)}")
+                        return False
             elif remove_input and input_file != output_file:
                 # If we're not overwriting and remove_input is True, delete the input
                 os.remove(input_file)
