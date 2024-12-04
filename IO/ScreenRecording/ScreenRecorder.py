@@ -1,12 +1,11 @@
 import time
-import subprocess
 import os
-
 import cv2
 import numpy as np
 import mss
 import screeninfo
 import threading
+from DataProcessing.ffmpegPostProcessing import post_process_video
 
 class ScreenRecorder:
     """
@@ -100,7 +99,7 @@ class ScreenRecorder:
         Stops the recording of the screen and converts the video to a web-compatible format.
         :return: A boolean indicating if the recording was successfully stopped and converted.
         """
-        # First stop the recording as before
+        # First stop the recording
         self.is_recording_active = False
         if hasattr(self, 'record_thread'):
             self.record_thread.join()
@@ -108,46 +107,8 @@ class ScreenRecorder:
         if self.video_data_writer:
             self.video_data_writer.release()
         
-        # Now convert the video to web-compatible format
+        # Get file paths
         original_file = self.output_path + self.filename
-        temp_file = original_file + '.temp.mp4'
         
-        try:
-            # FFmpeg command for converting to web-compatible format
-            command = [
-                'ffmpeg',
-                '-i', original_file,  # Input file
-                '-c:v', 'h264',       # Video codec
-                '-preset', 'medium',   # Encoding preset
-                '-profile:v', 'baseline',  # Maximum compatibility
-                '-level', '3.0',
-                '-movflags', '+faststart',  # Web playback optimization
-                '-pix_fmt', 'yuv420p',      # Ensure pixel format compatibility
-                '-f', 'mp4',                # Force MP4 format
-                temp_file
-            ]
-            
-            # Run the conversion
-            process = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            if process.returncode == 0:
-                # If conversion was successful, replace the original file
-                os.replace(temp_file, original_file)
-                print("Video successfully converted to web-compatible format")
-                return True
-            else:
-                error_message = process.stderr.decode()
-                print(f"Error converting video: {error_message}")
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-                return False
-                
-        except Exception as e:
-            print(f"Error during video conversion: {str(e)}")
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-            return False
+        # Post-process the video using the shared function
+        return post_process_video(original_file, original_file)
