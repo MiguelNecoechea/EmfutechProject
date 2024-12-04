@@ -16,6 +16,9 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
     """
     try:
         print("Post-processing video with FFmpeg...")
+        # Create a temporary output file if input and output are the same
+        temp_file = output_file + '.temp.mp4' if input_file == output_file else output_file
+        
         command = [
             'ffmpeg',
             '-i', input_file,      # Input file
@@ -26,7 +29,8 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
             '-movflags', '+faststart',  # Web playback optimization
             '-pix_fmt', 'yuv420p',      # Ensure pixel format compatibility
             '-f', 'mp4',                # Force MP4 format
-            output_file
+            '-y',                       # Overwrite output file if it exists
+            temp_file
         ]
         
         # Run the conversion
@@ -37,21 +41,26 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
         )
         
         if process.returncode == 0:
+            if input_file == output_file:
+                # If we're overwriting the input file, use the temp file
+                os.replace(temp_file, output_file)
+            elif remove_input and input_file != output_file:
+                # If we're not overwriting and remove_input is True, delete the input
+                os.remove(input_file)
+                
             print(f"Video successfully converted to web-compatible format: {output_file}")
-            if remove_input and input_file != output_file:
-                os.remove(input_file)  # Clean up input file
             return True
         else:
             error_message = process.stderr.decode()
             print(f"Error converting video: {error_message}")
-            # If FFmpeg fails and input is different from output, use input as fallback
-            if input_file != output_file:
-                os.replace(input_file, output_file)
+            # Clean up temp file if it exists
+            if os.path.exists(temp_file) and temp_file != output_file:
+                os.remove(temp_file)
             return False
             
     except Exception as e:
         print(f"Error during video conversion: {str(e)}")
-        # If FFmpeg processing fails and input is different from output, use input as fallback
-        if input_file != output_file:
-            os.replace(input_file, output_file)
+        # Clean up temp file if it exists
+        if 'temp_file' in locals() and os.path.exists(temp_file) and temp_file != output_file:
+            os.remove(temp_file)
         return False
