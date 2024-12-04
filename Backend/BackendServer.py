@@ -99,6 +99,9 @@ class BackendServer:
         Args:
             port (str): Port number for ZMQ communication. Defaults to DEFAULT_PORT.
         """
+        # Add signal handlers first thing
+        self._setup_signal_handlers()
+        
         # Server setup
         self._aura_training_thread = None
         self._context = zmq.Context()
@@ -195,22 +198,18 @@ class BackendServer:
 
         self._camera_manager = CameraManager()
 
-    @contextmanager
-    def thread_tracking(self, thread):
-        """
-        Context manager to track active threads.
+    def _setup_signal_handlers(self):
+        """Set up signal handlers for graceful shutdown."""
+        def handle_signal(signum, frame):
+            print(f"\nReceived signal {signum}, initiating graceful shutdown...")
+            self.cleanup()
+            # Use os._exit instead of sys.exit to avoid threading issues
+            import os
+            os._exit(0)
 
-        Args:
-            thread: Thread object to track
-        """
-        with self._threads_lock:
-            self._threads.append(thread)
-        try:
-            yield thread
-        finally:
-            with self._threads_lock:
-                if thread in self._threads:
-                    self._threads.remove(thread)
+        # Handle both SIGTERM and SIGINT
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
 
     def start(self):
         """Start the backend server and begin processing messages."""
@@ -234,85 +233,116 @@ class BackendServer:
 
     def cleanup(self):
         """Clean up resources before shutting down the server."""
-        print("Cleaning up resources...")
+        print("\n=== Starting BackendServer cleanup ===")
+        
+        # Set flags first to stop all operations
         self._running = False
         self._data_collection_active = False
         self._training_data_collection_active = False
+        self._shutdown = True  # Add a shutdown flag
 
-        # Stop screen recording if active
-        if hasattr(self, '_screen_recorder') and self._screen_recorder:
-            try:
-                self._screen_recorder.stop_recording()
-                self._screen_recorder = None
-            except Exception as e:
-                print(f"Error stopping screen recording: {e}")
-
-        # Stop all data collection first
-        if self._pointer_tracker:
-            self._pointer_tracker.stop_tracking()
-            self._pointer_tracker.is_tracking = False
-
-        # Cleanup emotion handler
-        if self._emotion_handler:
-            self._emotion_handler.stop_processing()
-            self._emotion_handler = None
-
-        # Close camera properly
-        if self._camera is not None:
-            self._camera.release()
-            self._camera = None
-            cv2.destroyAllWindows()
-
-        # Close all file writers
-        writers = [
-            self._aura_writer,
-            self._emotion_writer,
-            self._gaze_writer,
-            self._pointer_writer
-        ]
-        for writer in writers:
-            if writer:
+        try:
+            # Stop all active processes first
+            print("Stopping all active processes...")
+            if self._eye_tracking_process:
                 try:
-                    writer.close_file()
+                    print("Stopping eye tracking process...")
+                    self._eye_tracking_socket.send_json({"command": "stop"})
+                    self._eye_tracking_process.terminate()
+                    self._eye_tracking_process.wait(timeout=5)
+                    self._eye_tracking_process.close()
+                    print("Eye tracking process stopped")
                 except Exception as e:
-                    print(f"Error closing writer: {e}")
+                    print(f"Error stopping eye tracking process: {e}")
+                finally:
+                    self._eye_tracking_process = None
 
-        # Wait for all threads to complete
-        with self._threads_lock:
-            threads_copy = self._threads.copy()
-        for thread in threads_copy:
-            if thread and thread.is_alive():
-                thread.join(timeout=1.0)
+            # Clean up camera resources
+            print("Cleaning up camera manager...")
+            if hasattr(self, '_camera_manager'):
+                for user in ['eye_gaze', 'emotion', 'viewer']:
+                    print(f"Unregistering camera user: {user}")
+                    self._camera_manager.unregister_user(user)
+                print("Shutting down camera manager...")
+                self._camera_manager.shutdown()
+                print("Camera manager shutdown complete")
 
-        # Clean up ZMQ resources
-        if hasattr(self, '_socket') and self._socket:
-            self._socket.close(linger=0)
-        if hasattr(self, '_context') and self._context:
-            self._context.term()
+            # Clean up other resources
+            print("Cleaning up other resources...")
+            resources_to_cleanup = [
+                (self._pointer_tracker, 'stop_tracking'),
+                (self._emotion_handler, 'stop_processing'),
+                (self._screen_recorder, 'stop_recording')
+            ]
+            
+            for resource, cleanup_method in resources_to_cleanup:
+                if resource:
+                    try:
+                        getattr(resource, cleanup_method)()
+                    except Exception as e:
+                        print(f"Error cleaning up resource {resource}: {e}")
 
-        # Stop the eye tracking process if running
-        if self._eye_tracking_process:
+            # Close all writers
+            print("Closing file writers...")
+            writers = [self._aura_writer, self._emotion_writer, 
+                      self._gaze_writer, self._pointer_writer]
+            for writer in writers:
+                if writer:
+                    try:
+                        writer.close_file()
+                    except Exception as e:
+                        print(f"Error closing writer: {e}")
+
+            # Wait for threads with timeout
+            print("Waiting for threads to complete...")
+            with self._threads_lock:
+                for thread in self._threads:
+                    if thread and thread.is_alive():
+                        thread.join(timeout=1.0)
+                self._threads.clear()
+
+            # Clean up ZMQ resources
+            print("Cleaning up ZMQ resources...")
+            if hasattr(self, '_socket') and self._socket:
+                self._socket.close(linger=0)
+            if hasattr(self, '_context') and self._context:
+                self._context.term()
+
+            # Final multiprocessing cleanup
             try:
-                self._eye_tracking_socket.send_json({"command": "stop"})
-                self._eye_tracking_process.terminate()
-                self._eye_tracking_process.wait(timeout=5)
+                print("\n=== Final multiprocessing cleanup ===")
+                import multiprocessing
+                
+                # Access trackers through main module
+                if hasattr(multiprocessing, '_resource_tracker'):
+                    tracker = getattr(multiprocessing._resource_tracker, '_resource_tracker', None)
+                    if tracker:
+                        tracker._cleanup()
+                
+                if hasattr(multiprocessing, '_semaphore_tracker'):
+                    tracker = getattr(multiprocessing._semaphore_tracker, '_semaphore_tracker', None)
+                    if tracker:
+                        tracker._cleanup()
+                
             except Exception as e:
-                print(f"Error stopping eye tracking process: {e}")
-            finally:
-                self._eye_tracking_process = None
+                print(f"Error in final multiprocessing cleanup: {str(e)}")
 
-        # Clear all references
-        self._threads.clear()
-        self._aura_writer = None
-        self._emotion_writer = None
-        self._gaze_writer = None
-        self._pointer_writer = None
-        self._last_emotion = None
-        self._last_gaze_frame = None
+            print("\n=== Cleanup completed ===")
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        finally:
+            # Ensure these are always cleared
+            self._threads = []
+            self._aura_writer = None
+            self._emotion_writer = None
+            self._gaze_writer = None
+            self._pointer_writer = None
+            self._last_emotion = None
+            self._last_gaze_frame = None
 
-        self._camera_manager.cleanup_camera()
-
-        print("Cleanup completed")
+    def __del__(self):
+        """Ensure cleanup is called when the object is deleted."""
+        self.cleanup()
 
     def signal_handler(self, signum, frame):
         """Handle system signals for graceful shutdown."""
@@ -607,9 +637,11 @@ class BackendServer:
                     self._pointer_writer.close_file()
                 self._pointer_writer = None
 
-            # Stop emotion detection
+            # Stop emotion detection and unregister from camera
             if self._emotion_handler:
+                self._emotion_handler.stop_processing()
                 self._emotion_handler = None
+                self._camera_manager.unregister_user('emotion')
 
             # Stop keyboard tracking
             if self._keyboard_tracker is not None:
@@ -834,13 +866,12 @@ class BackendServer:
         """Initialize and start emotion recognition."""
         try:
             if self._camera_manager.register_user('emotion'):
-                self.send_signal_update(SIGNAL_EMOTION, 'active')
                 self._emotion_handler = EmotionRecognizer('opencv')
                 self._emotion_thread = threading.Thread(
                     target=self._emotion_collection_loop, 
                     daemon=True
                 )
-                self.send_signal_update(SIGNAL_EMOTION, 'active')
+                self.send_signal_update(SIGNAL_EMOTION, 'recording')
                 return {"status": STATUS_SUCCESS, "message": "Emotion recognition started"}
             else:
                 raise Exception("Failed to initialize camera")
@@ -1449,3 +1480,20 @@ class BackendServer:
                 print("Heatmap processing complete")
         except Exception as e:
             print(f"Error processing heatmap: {e}")
+
+    # @contextmanager
+    # def thread_tracking(self, thread):
+    #     """
+    #     Context manager to track active threads.
+        
+    #     Args:
+    #         thread: Thread object to track
+    #     """
+    #     with self._threads_lock:
+    #         self._threads.append(thread)
+    #     try:
+    #         yield thread
+    #     finally:
+    #         with self._threads_lock:
+    #             if thread in self._threads:
+    #                 self._threads.remove(thread)
