@@ -282,6 +282,17 @@ class DataViewer {
 
                 // Add this after video elements are loaded
                 const setupVideoSync = (videos) => {
+                    const videoSection = document.querySelector('.video-section');
+                    const videoControls = document.querySelector('.video-controls');
+
+                    videoSection.addEventListener('mouseenter', () => {
+                        videoControls.style.opacity = '1';
+                    });
+
+                    videoSection.addEventListener('mouseleave', () => {
+                        videoControls.style.opacity = '0';
+                    });
+
                     const progressBar = document.getElementById('video-progress');
                     const currentTimeDisplay = document.getElementById('current-time');
                     const totalTimeDisplay = document.getElementById('total-time');
