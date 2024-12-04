@@ -328,7 +328,6 @@ class BackendServer:
                 print("\n=== Final multiprocessing cleanup ===")
                 import multiprocessing
                 import multiprocessing.resource_tracker
-                import multiprocessing.semaphore_tracker
                 
                 # Ensure all processes are done before cleaning up resources
                 multiprocessing.active_children()
@@ -336,12 +335,6 @@ class BackendServer:
                 # Clean up resource tracker
                 if hasattr(multiprocessing.resource_tracker, '_resource_tracker'):
                     tracker = multiprocessing.resource_tracker._resource_tracker
-                    if tracker:
-                        tracker._cleanup()
-                
-                # Clean up semaphore tracker
-                if hasattr(multiprocessing.semaphore_tracker, '_semaphore_tracker'):
-                    tracker = multiprocessing.semaphore_tracker._semaphore_tracker
                     if tracker:
                         tracker._cleanup()
                 
@@ -605,11 +598,10 @@ class BackendServer:
                 self._add_thread(threading.current_thread())
                 while True:
                     # Make prediction and write to file
-                    if self._camera:
-                        frame = self.get_frame()
-                        gaze_vector = self._eye_gaze.get_gaze_vector(frame)
-                        if gaze_vector[2] is not None:
-                            with threading.Lock():
+                    frame = self._camera_manager.get_frame()
+                    gaze_vector = self._eye_gaze.get_gaze_vector(frame)
+                    if gaze_vector[2] is not None:
+                        with threading.Lock():
                                 self._last_gaze_frame = gaze_vector[2].copy()
                         if gaze_vector[0] is not None and gaze_vector[1] is not None:
                             data = []
@@ -1474,70 +1466,3 @@ class BackendServer:
         finally:
             # Ensure screen recorder is cleaned up even if an error occurs
             self._screen_recorder = None
-    def stop_eye_tracking(self):
-        """Stop the eye tracking process."""
-        try:
-            if self._eye_tracking_process:
-                self._eye_tracking_socket.send_json({"command": "stop"})
-                self._eye_tracking_process.terminate()
-                self._eye_tracking_process.wait(timeout=5)
-                self._eye_tracking_process = None
-                return {"status": STATUS_SUCCESS, "message": "Eye tracking stopped"}
-        except Exception as e:
-            return {"status": STATUS_ERROR, "message": f"Failed to stop eye tracking: {str(e)}"}
-
-    def _post_process_eye_gaze(self):
-        """Post-process eye gaze data to generate heatmap visualization."""
-        if not (self._run_gaze and hasattr(self, '_screen_recorder')):
-            return
-
-        try:
-            video_file = self._screen_recording_file
-            gaze_file = os.path.join(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
-            heatmap_output = os.path.join(self._path, f'{self._filename}_heatmap.mp4')
-
-            if os.path.exists(video_file) and os.path.exists(gaze_file):
-                print("Processing gaze heatmap...")
-                from DataProcessing.VideoProcessing import GazeHeatmapProcessor
-                GazeHeatmapProcessor.process_video(
-                    video_file=video_file,
-                    csv_file=gaze_file,
-                    output_file=heatmap_output
-                )
-                print("Heatmap processing complete")
-        except Exception as e:
-            print(f"Error processing heatmap: {e}")
-
-    def _add_thread(self, thread: threading.Thread) -> None:
-        """Add a thread to the active threads set using a weak reference."""
-        if not isinstance(thread, threading.Thread):
-            return
-        
-        def cleanup(ref):
-            with self._threads_lock:
-                self._active_threads.discard(ref)
-        
-        with self._threads_lock:
-            thread_ref = weakref.ref(thread, cleanup)
-            self._active_threads.add(thread_ref)
-
-    def _remove_thread(self, thread: threading.Thread) -> None:
-        """Remove a thread from the active threads set."""
-        with self._threads_lock:
-            for thread_ref in list(self._active_threads):
-                if thread_ref() is thread:
-                    self._active_threads.discard(thread_ref)
-                    break
-
-    def _cleanup_threads(self, timeout: float = 1.0) -> None:
-        """Clean up all active threads with a timeout."""
-        with self._threads_lock:
-            active_threads = [ref() for ref in list(self._active_threads) if ref() is not None]
-            
-        for thread in active_threads:
-            if thread.is_alive():
-                thread.join(timeout=timeout)
-        
-        with self._threads_lock:
-            self._active_threads.clear()
-
