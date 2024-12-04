@@ -357,58 +357,93 @@ class BackendServer:
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
         try:
-            # Get Conda environment path
+            # First, let's verify the conda environment exists and get its path
+            print("Attempting to locate eyetracking_env conda environment...")
+            conda_env_path = None
+            possible_paths = []
+
             if platform.system() == 'Windows':
-                # Try to find Conda environment with Python 3.6
-                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'python.exe')
-                if not os.path.exists(conda_env_path):
-                    # Try user's home directory if CONDA_PREFIX is not set
-                    home = os.path.expanduser('~')
-                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'eyetracking_env', 'python.exe')
-                    if not os.path.exists(conda_env_path):
-                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'eyetracking_env', 'python.exe')
-                
-                if not os.path.exists(conda_env_path):
-                    raise Exception("Conda environment 'beam_env' not found")
+                # Windows paths
+                possible_paths = [
+                    os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'python.exe'),
+                    os.path.join(os.path.expanduser('~'), 'anaconda3', 'envs', 'eyetracking_env', 'python.exe'),
+                    os.path.join(os.path.expanduser('~'), 'miniconda3', 'envs', 'eyetracking_env', 'python.exe')
+                ]
             else:
-                # For Unix-based systems
-                conda_env_path = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'bin', 'python')
-                if not os.path.exists(conda_env_path):
-                    home = os.path.expanduser('~')
-                    conda_env_path = os.path.join(home, 'anaconda3', 'envs', 'eyetracking_env', 'bin', 'python')
-                    if not os.path.exists(conda_env_path):
-                        conda_env_path = os.path.join(home, 'miniconda3', 'envs', 'eyetracking_env', 'bin', 'python')
-                
-                if not os.path.exists(conda_env_path):
-                    raise Exception("Conda environment 'eyetracking_env' not found")
+                # Unix paths
+                possible_paths = [
+                    os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'bin', 'python'),
+                    os.path.join(os.path.expanduser('~'), 'anaconda3', 'envs', 'eyetracking_env', 'bin', 'python'),
+                    os.path.join(os.path.expanduser('~'), 'miniconda3', 'envs', 'eyetracking_env', 'bin', 'python')
+                ]
+
+            # Try each path and use the first one that exists
+            for path in possible_paths:
+                print(f"Checking path: {path}")
+                if os.path.exists(path):
+                    conda_env_path = path
+                    print(f"Found conda environment at: {conda_env_path}")
+                    break
+
+            if not conda_env_path:
+                raise Exception("Could not find eyetracking_env conda environment. Please ensure it's properly installed.")
 
             # Get the absolute path to the eye tracking script
             script_path = Path(__file__).parent.parent / "API" / "Windows_Beam_Eye_Tracking.py"
+            if not script_path.exists():
+                raise Exception(f"Eye tracking script not found at: {script_path}")
             
-            # Start the Beam eye tracking process
-            self._eye_tracking_process = subprocess.Popen(
-                [conda_env_path, str(script_path)],
-                stdout=sys.stdout,  # Redirect stdout to console
-                stderr=sys.stderr   # Redirect stderr to console
-            )
+            print(f"Using script path: {script_path}")
 
-            # Wait for initial connection
+            # Start the Beam eye tracking process with detailed logging
+            print("Starting eye tracking subprocess...")
+            
+            # Create a log file for the subprocess
+            log_dir = Path(__file__).parent.parent / "logs"
+            log_dir.mkdir(exist_ok=True)
+            log_file = log_dir / "eye_tracking.log"
+            
+            with open(log_file, 'w') as f:
+                self._eye_tracking_process = subprocess.Popen(
+                    [conda_env_path, str(script_path)],
+                    stdout=f,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+
+            print(f"Subprocess started with PID: {self._eye_tracking_process.pid}")
+
+            # Wait for initial connection with timeout
+            print("Waiting for eye tracking connection...")
             try:
-                self._eye_tracking_socket.recv_json(timeout=5000)  # 5 second timeout
+                connection_msg = self._eye_tracking_socket.recv_json(timeout=5000)
+                print(f"Received initial connection message: {connection_msg}")
                 self.send_signal_update(SIGNAL_GAZE, 'connecting')
+                
                 # Send explicit calibration complete message
                 self._socket.send_json({
-                "type": "calibration_status",
+                    "type": "calibration_status",
                     "message": CALIBRATION_COMPLETE_MSG
                 })
                 return {"status": STATUS_SUCCESS, "message": "Eye tracking started"}
+                
             except zmq.error.Again:
-                print("Failed to connect to Beam eye tracker, falling back to webcam tracking")
+                print("Timeout waiting for eye tracking connection")
+                # Check if process is still running
+                if self._eye_tracking_process.poll() is not None:
+                    print(f"Process exited with code: {self._eye_tracking_process.poll()}")
+                    # Read the log file for error details
+                    with open(log_file, 'r') as f:
+                        log_content = f.read()
+                    print(f"Process log:\n{log_content}")
+                
                 self.stop_eye_tracking()
-                raise Exception("Failed to init external Eye tracker")
+                raise Exception("Failed to establish connection with eye tracker")
 
         except Exception as e:
-            print(f"Falling back to webcam eye tracking: {str(e)}")
+            print(f"Error starting eye tracking: {str(e)}")
+            print("Falling back to webcam eye tracking...")
             # Fallback to webcam-based eye tracking
             self.manage_camera(OPEN_CAMERA)
             self._create_directories()
