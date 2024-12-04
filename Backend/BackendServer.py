@@ -33,13 +33,16 @@ from IO.FileWriting.PointerWriter import PointerWriter
 from IO.FileWriting.KeyboardWriter import KeyboardWriter
 from IO.KeyboardTracking.KeyboardTracker import KeyboardTracker
 from IO.ScreenRecording.ScreenRecorder import ScreenRecorder
+from IO.FaceFeatures.FaceLandmarks import FaceLandmarksDetector
+from IO.FileWriting.FaceLandmarksWriter import FaceLandmarksWriter
 from DataProcessing.ProcessAuraData import process_concentration_data
-
+from DataProcessing.ffmpegPostProcessing import post_process_video
 import subprocess
 import sys
 from pathlib import Path
 
 from Backend.CameraManager import CameraManager
+
 
 # Constants
 DEFAULT_PORT = "5556"
@@ -70,6 +73,7 @@ SIGNAL_EMOTION = 'emotion'
 SIGNAL_POINTER = 'pointer'
 SIGNAL_SCREEN = 'screen'
 SIGNAL_KEYBOARD = 'keyboard'
+SIGNAL_FACE_LANDMARKS = 'face_landmarks'
 OPEN_CAMERA = 'open'
 CLOSE_CAMERA = 'close'
 
@@ -152,6 +156,7 @@ class BackendServer:
         self._run_pointer = False
         self._run_screen = False
         self._run_keyboard = False
+        self._run_face_landmarks = False
 
         # Active threads set using weak references to avoid memory leaks
         self._active_threads: Set[weakref.ref] = set()
@@ -196,6 +201,10 @@ class BackendServer:
         self._screen_recording_file = None
 
         self._camera_manager = CameraManager()
+
+        # Initialize FaceLandmarksDetector and FaceLandmarksWriter
+        self._face_landmarks_detector = FaceLandmarksDetector()
+        self._face_landmarks_writer = None  # Will be initialized when starting data collection
 
     def _setup_signal_handlers(self):
         """Set up signal handlers for graceful shutdown."""
@@ -259,7 +268,7 @@ class BackendServer:
 
             # Clean up threads first
             print("Cleaning up threads...")
-            self._cleanup_threads(timeout=2.0)
+            self._cleanup_threads()
 
             # Clean up other resources that might hold semaphores
             resources_to_cleanup = [
@@ -279,7 +288,7 @@ class BackendServer:
 
             # Close all writers
             writers = [self._aura_writer, self._emotion_writer, 
-                      self._gaze_writer, self._pointer_writer]
+                      self._gaze_writer, self._pointer_writer, self._face_landmarks_writer]
             for writer in writers:
                 if writer:
                     try:
@@ -322,6 +331,7 @@ class BackendServer:
             self._emotion_writer = None
             self._gaze_writer = None
             self._pointer_writer = None
+            self._face_landmarks_writer = None
             
             # Final multiprocessing cleanup
             try:
@@ -343,6 +353,7 @@ class BackendServer:
                 
             except Exception as e:
                 print(f"Error in final multiprocessing cleanup: {str(e)}")
+
 
     def __del__(self):
         """Ensure cleanup is called when the object is deleted."""
@@ -560,6 +571,20 @@ class BackendServer:
                         self.send_signal_update(SIGNAL_SCREEN, 'error')
                     else:
                         self.send_signal_update(SIGNAL_SCREEN, 'recording')
+
+                # Face Landmarks
+                if self._run_face_landmarks:
+                    self._face_landmarks_writer = FaceLandmarksWriter(self._path, f'{self._filename}_face_landmarks.csv')
+                    self._face_landmarks_writer.create_new_file()
+                    
+                    if self._face_landmarks_thread is None or not self._face_landmarks_thread.is_alive():
+                        self._face_landmarks_thread = threading.Thread(
+                            target=self._face_landmarks_collection_loop,
+                            daemon=True
+                        )
+                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": "face_landmarks"})
+                        self._face_landmarks_thread.start()
+
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
                 return {"status": STATUS_ERROR, "message": "Data collection already started"}
@@ -799,6 +824,9 @@ class BackendServer:
             signal_updated = True
         elif signal == SIGNAL_KEYBOARD:
             self._run_keyboard = status
+            signal_updated = True
+        elif signal == SIGNAL_FACE_LANDMARKS:
+            self._run_face_landmarks = status
             signal_updated = True
 
         if not signal_updated:
@@ -1466,3 +1494,60 @@ class BackendServer:
         finally:
             # Ensure screen recorder is cleaned up even if an error occurs
             self._screen_recorder = None
+
+    def _face_landmarks_collection_loop(self):
+        """Continuously collect and write face landmark data in a loop."""
+        try:
+            self._add_thread(threading.current_thread())
+            self.send_signal_update("face_landmarks", 'recording')
+            
+            # Initialize video writer
+            height, width = self._camera_manager.get_frame_dimensions()
+            video_path = os.path.join(self._path, f"{self._filename}_landmarks.mp4")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (width, height))
+            
+            while not self._shutdown and self._data_collection_active:
+                frame = self._camera_manager.get_frame()
+                if frame is not None:
+                    processed_frame, landmarks = self._face_landmarks_detector.process_frame(frame)
+                    if landmarks:
+                        timestamp = round(time.time() - self._start_time, 3)
+                        self._face_landmarks_writer.write(timestamp, landmarks)
+                        
+                    # Write the processed frame to video
+                    if processed_frame is not None:
+                        video_writer.write(processed_frame)
+                        
+                time.sleep(0.033)  # ~30 FPS
+            
+        finally:
+            if self._face_landmarks_writer:
+                self._face_landmarks_writer.close_file()
+            if video_writer:
+                video_writer.release()
+            
+            # Post-process the video file
+            if os.path.exists(video_path):
+                self.send_signal_update("face_landmarks", 'processing')
+                success = post_process_video(video_path, video_path)
+                if not success:
+                    self.send_signal_update("face_landmarks", 'error')
+                else:
+                    self.send_signal_update("face_landmarks", 'ready')
+            
+            self._remove_thread(threading.current_thread())
+
+    def _cleanup_threads(self, timeout=2.0):
+        """Join and clean up all active threads."""
+        with self._threads_lock:
+            threads_copy = self._active_threads.copy()
+        
+        for thread_ref in threads_copy:
+            thread = thread_ref()
+            if thread and thread.is_alive():
+                thread.join(timeout=timeout)
+        
+        # Clear the threads set
+        with self._threads_lock:
+            self._active_threads.clear()
