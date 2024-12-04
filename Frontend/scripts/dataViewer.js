@@ -37,6 +37,19 @@ class DataViewer {
             this.participantData = data;
             this.displayParticipantInfo();
         });
+
+        // Add GESTURES as a class property
+        this.GESTURES = {
+            "Brow Furrow": [105, 334],
+            "Smiling": [14, 308],
+            "Opening Mouth": [14, 0],
+            "Cheek Raise": [6, 440],
+            "Eye Closure": [159, 145, 386, 374],
+            "Eye Widen": [33, 362],
+            "Lip Stretch": [61, 291]
+        };
+
+        this.setupVideoEventListener();
     }
 
     initializeUI() {
@@ -65,7 +78,8 @@ class DataViewer {
                 'gaze': 'Eye Tracking',
                 'emotions': 'Emotion',
                 'aura': 'AURA',
-                'data': 'Mouse/Keyboard'
+                'data': 'Mouse/Keyboard',
+                'landmarks': 'Facial Landmarks'
             };
 
             // Create options only for available data types
@@ -186,123 +200,128 @@ class DataViewer {
             if (videoFiles.length > 0) {
                 console.log('Loading video...');
                 
-                // Prefer heatmap video if available
-                const videoFile = videoFiles.find(f => f.name.toLowerCase().includes('_heatmap.mp4')) || videoFiles[0];
-                const fileSizeMB = Math.round(videoFile.size / (1024 * 1024));
-                
-                videoContainer.innerHTML = `
-                    <div class="loading-message">
-                        Loading video (${fileSizeMB}MB)... This may take a moment for larger files.
-                        <div class="loading-spinner"></div>
-                        ${fileSizeMB > 100 ? '<div class="warning">Large file detected. If video fails to load, try converting it to a smaller file size.</div>' : ''}
-                    </div>
-                `;
-
-                const videoHtml = `
-                    <video controls width="100%" preload="metadata" id="data-video">
-                        <source src="file:///${videoFile.path.replace(/\\/g, '/')}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                `;
-                
-                // Replace loading indicator with video element
-                setTimeout(() => {
-                    console.log('Setting video HTML:', videoHtml);
-                    videoContainer.innerHTML = videoHtml;
+                // Create a promise to wait for video loading
+                const videoLoadPromise = new Promise((resolve, reject) => {
+                    const videoFile = videoFiles.find(f => f.name.toLowerCase().includes('_heatmap.mp4')) || videoFiles[0];
+                    const fileSizeMB = Math.round(videoFile.size / (1024 * 1024));
                     
-                    const videoElement = document.getElementById('data-video');
-                    if (videoElement) {
-                        // Add time update listener for emotion plots if they exist
-                        if (this.emotionPlots) {
-                            videoElement.addEventListener('timeupdate', () => {
-                                const currentTime = videoElement.currentTime;
-                                this.updateEmotionTimeLine(currentTime);
+                    videoContainer.innerHTML = `
+                        <div class="loading-message">
+                            Loading video (${fileSizeMB}MB)... This may take a moment for larger files.
+                            <div class="loading-spinner"></div>
+                            ${fileSizeMB > 100 ? '<div class="warning">Large file detected. If video fails to load, try converting it to a smaller file size.</div>' : ''}
+                        </div>
+                    `;
+
+                    const videoHtml = `
+                        <video controls width="100%" preload="metadata" id="data-video">
+                            <source src="file:///${videoFile.path.replace(/\\/g, '/')}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                    
+                    // Replace loading indicator with video element
+                    setTimeout(() => {
+                        console.log('Setting video HTML:', videoHtml);
+                        videoContainer.innerHTML = videoHtml;
+                        
+                        const videoElement = document.getElementById('data-video');
+                        if (videoElement) {
+                            // Wait for video to be loaded
+                            videoElement.addEventListener('loadeddata', () => {
+                                console.log('Video loaded successfully');
+                                resolve(videoElement);
                             });
 
-                            videoElement.addEventListener('seeking', () => {
-                                const currentTime = videoElement.currentTime;
-                                this.updateEmotionTimeLine(currentTime);
+                            // Handle video loading error
+                            videoElement.addEventListener('error', (e) => {
+                                console.error('Video error:', e);
+                                const error = videoElement.error;
+                                reject(error);
                             });
+                        } else {
+                            reject(new Error('Video element not created'));
                         }
+                    }, 100);
+                });
 
-                        // Add error handler
-                        videoElement.addEventListener('error', (e) => {
-                            console.error('Video error:', e);
-                            const error = videoElement.error;
-                            if (error) {
-                                console.error('Error code:', error.code);
-                                console.error('Error message:', error.message);
-                                videoContainer.innerHTML = `
-                                    <div class="error-message">
-                                        Error loading video (${fileSizeMB}MB file): ${error.message || 'Unknown error'}
-                                        <br>
-                                        <small>
-                                            Suggestions:
-                                            <ul>
-                                                <li>Convert the video to a smaller file size (recommended: under 100MB)</li>
-                                                <li>Try a different video format (e.g., WebM or compressed MP4)</li>
-                                                <li>Reduce the video resolution</li>
-                                            </ul>
-                                        </small>
-                                    </div>
-                                `;
-                            }
-                        });
+                try {
+                    // Wait for video to load before proceeding
+                    const videoElement = await videoLoadPromise;
+                    console.log('Video element ready, setting up event listeners');
+                    this.setupVideoEventListener();
+
+                    // Now proceed with loading and displaying the data
+                    // ... rest of your data loading code ...
+                    const fileTypeMap = {
+                        gaze: 'gaze',
+                        emotion: 'emotions',
+                        aura: 'aura',
+                        pointer: 'data',
+                        landmarks: 'landmarks'
+                    };
+
+                    const fileType = fileTypeMap[dataType];
+                    console.log('Looking for file type:', fileType);
+                    
+                    const file = response.data.files.find(f => f.type === fileType);
+                    console.log('Found file:', file);
+                    
+                    if (!file) {
+                        throw new Error(`No ${dataType} data found`);
                     }
-                }, 100); // Small delay to ensure loading indicator shows
+
+                    // Normalize file path for Windows
+                    const normalizedPath = file.path.replace(/\\/g, '/');
+                    console.log('Normalized file path:', normalizedPath);
+                    
+                    const csvData = await fetch(`file:///${normalizedPath}`);
+                    const csvText = await csvData.text();
+                    
+                    // Parse CSV and create structured data
+                    const rows = csvText.split('\n')
+                        .filter(row => row.trim())
+                        .map(row => row.split(',').map(cell => cell.trim()));
+
+                    const headers = rows[0];
+                    const structuredData = rows.slice(1).map(row => {
+                        const rowData = {};
+                        headers.forEach((header, index) => {
+                            rowData[header] = row[index];
+                        });
+                        return rowData;
+                    });
+
+                    console.log('Parsed data:', {
+                        type: dataType,
+                        headers: headers,
+                        rowCount: structuredData.length,
+                        sampleRow: structuredData[0]
+                    });
+
+                    this.createVisualization(dataType, structuredData);
+                } catch (error) {
+                    console.error('Error loading video:', error);
+                    videoContainer.innerHTML = `
+                        <div class="error-message">
+                            Error loading video: ${error.message || 'Unknown error'}
+                            <br>
+                            <small>
+                                Suggestions:
+                                <ul>
+                                    <li>Convert the video to a smaller file size (recommended: under 100MB)</li>
+                                    <li>Try a different video format (e.g., WebM or compressed MP4)</li>
+                                    <li>Reduce the video resolution</li>
+                                </ul>
+                            </small>
+                        </div>
+                    `;
+                }
             } else {
                 console.log('No video files found');
+                const videoContainer = document.querySelector('.video-container');
                 videoContainer.innerHTML = `<div class="no-video-message">No video recording available</div>`;
             }
-
-            // Fix the file type mapping to match exactly what's in the file list
-            const fileTypeMap = {
-                gaze: 'gaze',
-                emotion: 'emotions',
-                aura: 'aura',
-                pointer: 'data',
-                face_landmarks: 'landmarks'
-            };
-
-            const fileType = fileTypeMap[dataType];
-            console.log('Looking for file type:', fileType);
-            
-            const file = response.data.files.find(f => f.type === fileType);
-            console.log('Found file:', file);
-            
-            if (!file) {
-                throw new Error(`No ${dataType} data found`);
-            }
-
-            // Normalize file path for Windows
-            const normalizedPath = file.path.replace(/\\/g, '/');
-            console.log('Normalized file path:', normalizedPath);
-            
-            const csvData = await fetch(`file:///${normalizedPath}`);
-            const csvText = await csvData.text();
-            
-            // Parse CSV and create structured data
-            const rows = csvText.split('\n')
-                .filter(row => row.trim())
-                .map(row => row.split(',').map(cell => cell.trim()));
-
-            const headers = rows[0];
-            const structuredData = rows.slice(1).map(row => {
-                const rowData = {};
-                headers.forEach((header, index) => {
-                    rowData[header] = row[index];
-                });
-                return rowData;
-            });
-
-            console.log('Parsed data:', {
-                type: dataType,
-                headers: headers,
-                rowCount: structuredData.length,
-                sampleRow: structuredData[0]
-            });
-
-            this.createVisualization(dataType, structuredData);
         } catch (error) {
             console.error('Error loading data:', error);
             const visualizationArea = document.getElementById('visualization-area');
@@ -330,6 +349,9 @@ class DataViewer {
                     break;
                 case 'pointer':
                     this.createPointerVisualization(structuredData);
+                    break;
+                case 'landmarks':
+                    this.createLandmarkVisualization(structuredData);
                     break;
                 default:
                     throw new Error(`Unknown data type: ${dataType}`);
@@ -749,6 +771,174 @@ class DataViewer {
             ...commonLayout,
             title: 'Mouse Movement Density Heatmap'
         });
+    }
+
+    createLandmarkVisualization(data) {
+        console.log('Creating landmark visualization with data:', data);
+        // Parse the data
+        const parsedData = data.map(d => ({
+            timestamp: parseFloat(d.timestamp),
+            landmarks: {
+                105: { x: parseFloat(d.landmark_105_x), y: parseFloat(d.landmark_105_y) },
+                334: { x: parseFloat(d.landmark_334_x), y: parseFloat(d.landmark_334_y) },
+                14: { x: parseFloat(d.landmark_14_x), y: parseFloat(d.landmark_14_y) },
+                308: { x: parseFloat(d.landmark_308_x), y: parseFloat(d.landmark_308_y) },
+                0: { x: parseFloat(d.landmark_0_x), y: parseFloat(d.landmark_0_y) },
+                6: { x: parseFloat(d.landmark_6_x), y: parseFloat(d.landmark_6_y) },
+                440: { x: parseFloat(d.landmark_440_x), y: parseFloat(d.landmark_440_y) },
+                159: { x: parseFloat(d.landmark_159_x), y: parseFloat(d.landmark_159_y) },
+                145: { x: parseFloat(d.landmark_145_x), y: parseFloat(d.landmark_145_y) },
+                386: { x: parseFloat(d.landmark_386_x), y: parseFloat(d.landmark_386_y) },
+                374: { x: parseFloat(d.landmark_374_x), y: parseFloat(d.landmark_374_y) },
+                33: { x: parseFloat(d.landmark_33_x), y: parseFloat(d.landmark_33_y) },
+                362: { x: parseFloat(d.landmark_362_x), y: parseFloat(d.landmark_362_y) },
+                61: { x: parseFloat(d.landmark_61_x), y: parseFloat(d.landmark_61_y) },
+                291: { x: parseFloat(d.landmark_291_x), y: parseFloat(d.landmark_291_y) }
+            }
+        }));
+
+        // Calculate distances for each gesture
+        const gestureData = {};
+        for (const [gesture, landmarks] of Object.entries(this.GESTURES)) {
+            gestureData[gesture] = parsedData.map(d => {
+                if (landmarks.length === 2) {
+                    return this.calculateDistance(d.landmarks[landmarks[0]], d.landmarks[landmarks[1]]);
+                } else {
+                    const distances = [];
+                    for (let i = 0; i < landmarks.length; i += 2) {
+                        distances.push(this.calculateDistance(d.landmarks[landmarks[i]], d.landmarks[landmarks[i + 1]]));
+                    }
+                    return distances.reduce((a, b) => a + b, 0) / distances.length;
+                }
+            });
+        }
+
+        // Create plots for each gesture
+        const visualizationArea = document.getElementById('visualization-area');
+        visualizationArea.innerHTML = Object.keys(this.GESTURES).map(gesture =>
+            `<div id="landmark-${gesture.replace(/\s+/g, '-').toLowerCase()}" style="width: 100%; height: 300px; margin-bottom: 20px;"></div>`
+        ).join('');
+
+        Object.entries(gestureData).forEach(([gesture, data], index) => {
+            const plotId = `landmark-${gesture.replace(/\s+/g, '-').toLowerCase()}`;
+            console.log('Creating plot for gesture:', gesture, 'with ID:', plotId);
+            
+            // Create the main data trace
+            const trace = {
+                x: parsedData.map(d => d.timestamp),
+                y: data,
+                type: 'scatter',
+                name: gesture,
+                line: { color: '#1f77b4' }
+            };
+
+            // Add the vertical time line trace (initially at 0)
+            const timeLine = {
+                x: [0, 0],
+                y: [Math.min(...data), Math.max(...data)],
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Current Time',
+                line: {
+                    color: 'red',
+                    width: 2
+                },
+                hoverinfo: 'none'
+            };
+
+            const layout = {
+                title: gesture,
+                xaxis: { title: 'Time (s)' },
+                yaxis: { title: 'Distance' },
+                height: 200,
+                margin: { t: 30, r: 20, b: 40, l: 60 },
+                showlegend: false
+            };
+
+            // Plot both traces
+            Plotly.newPlot(plotId, [trace, timeLine], layout);
+            console.log('Plot created for:', gesture);
+        });
+
+        // Add video time update listener
+        const video = document.querySelector('video');
+        if (video) {
+            video.addEventListener('timeupdate', () => {
+                const currentTime = video.currentTime;
+                this.updateLandmarkTimeLine(currentTime);
+            });
+        }
+    }
+
+    calculateDistance(point1, point2) {
+        return Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
+    }
+
+    updateLandmarkTimeLine(currentTime) {
+        // Check if we're currently viewing landmarks
+        const selector = document.getElementById('data-type-selector');
+        if (!selector || selector.value !== 'landmarks') {
+            return; // Exit if we're not viewing landmarks
+        }
+
+        console.log('Updating landmark timeline to:', currentTime);
+        Object.keys(this.GESTURES).forEach(gesture => {
+            const plotId = `landmark-${gesture.replace(/\s+/g, '-').toLowerCase()}`;
+            console.log('Updating plot:', plotId);
+            
+            // Ensure the plot exists
+            const plotElement = document.getElementById(plotId);
+            if (!plotElement) {
+                console.error(`Plot element with ID ${plotId} not found.`);
+                return;
+            }
+
+            const plotData = plotElement.data;
+            if (!plotData || plotData.length < 2) {
+                console.error(`Plot data for ${plotId} is insufficient.`);
+                return;
+            }
+
+            // Update the 'timeLine' trace's x data to move the vertical line
+            Plotly.restyle(plotId, {
+                'x': [[currentTime, currentTime]]
+            }, [1]); // [1] targets the second trace (timeLine)
+            
+            console.log(`Successfully updated plot: ${plotId}`);
+        });
+    }
+
+    setupVideoEventListener() {
+        // Wait for a short delay to ensure DOM is updated
+        setTimeout(() => {
+            const video = document.querySelector('video');
+            if (video) {
+                // Debounce implementation
+                let updateTimeout;
+                const debounceTime = 100; // milliseconds
+
+                const debouncedUpdate = () => {
+                    clearTimeout(updateTimeout);
+                    updateTimeout = setTimeout(() => {
+                        const currentTime = video.currentTime;
+                        console.log('Debounced video time update:', currentTime);
+                        this.updateLandmarkTimeLine(currentTime);
+                    }, debounceTime);
+                };
+
+                video.addEventListener('timeupdate', debouncedUpdate);
+
+                // Add seeking listener for smooth updates while dragging
+                video.addEventListener('seeking', () => {
+                    const currentTime = video.currentTime;
+                    this.updateLandmarkTimeLine(currentTime);
+                });
+
+                console.log('Video event listeners are set up with debouncing.');
+            } else {
+                console.error('Video element not found in setupVideoEventListener');
+            }
+        }, 500); // Give DOM time to update
     }
 }
 
