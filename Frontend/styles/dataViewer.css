@@ -370,7 +370,6 @@ body {
 .video-controls input[type="range"] {
     flex: 1;
     height: 6px;
-    -webkit-appearance: none;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     cursor: pointer;
