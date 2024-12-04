@@ -10,6 +10,8 @@ from contextlib import contextmanager
 import base64
 import json
 import platform
+import weakref
+from typing import Set, Optional
 
 from mne_lsl.stream import StreamLSL as Stream
 from DataProcessing.LLMProcessor import DataAnalyzer
@@ -121,6 +123,7 @@ class BackendServer:
 
         # Flags for the server status.
         self._running = False
+        self._shutdown = False
 
         # OpenCV video capture object
         self._camera = None
@@ -142,7 +145,7 @@ class BackendServer:
         self._pointer_tracker = None
         self._screen_recorder = None
 
-        # Boolean flags for deciding the experiments to run (Still building this out)
+        # Boolean flags for deciding the experiments to run
         self._run_aura = False
         self._run_emotion = False
         self._run_gaze = False
@@ -150,11 +153,9 @@ class BackendServer:
         self._run_screen = False
         self._run_keyboard = False
 
-        # Threads for the data collection
-        self._aura_thread = None
-        self._emotion_thread = None
-        self._regressor_thread = None
-        self._start_time = None
+        # Active threads set using weak references to avoid memory leaks
+        self._active_threads: Set[weakref.ref] = set()
+        self._threads_lock = threading.Lock()
 
         # Path and file names for the data
         self._path = None
@@ -178,8 +179,6 @@ class BackendServer:
         # Status for the data collection loops
         self._data_collection_active = False
         self._training_data_collection_active = False
-        self._threads = []
-        self._threads_lock = threading.Lock()  # Added lock for thread-safe operations
 
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -233,15 +232,19 @@ class BackendServer:
 
     def cleanup(self):
         """Clean up resources before shutting down the server."""
+        if self._shutdown:  # Prevent multiple cleanups
+            return
+            
         print("\n=== Starting BackendServer cleanup ===")
         
-        # Set flags first to stop all operations
-        self._running = False
-        self._data_collection_active = False
-        self._training_data_collection_active = False
-        self._shutdown = True  # Add a shutdown flag
-
         try:
+            # Set flags first
+            self._shutdown = True
+            self._running = False
+            self._data_collection_active = False
+            self._training_data_collection_active = False
+            self._viewing_camera = False
+
             # Stop all active processes first
             print("Stopping all active processes...")
             if self._eye_tracking_process:
@@ -250,25 +253,15 @@ class BackendServer:
                     self._eye_tracking_socket.send_json({"command": "stop"})
                     self._eye_tracking_process.terminate()
                     self._eye_tracking_process.wait(timeout=5)
-                    self._eye_tracking_process.close()
-                    print("Eye tracking process stopped")
+                    self._eye_tracking_process = None
                 except Exception as e:
                     print(f"Error stopping eye tracking process: {e}")
-                finally:
-                    self._eye_tracking_process = None
 
-            # Clean up camera resources
-            print("Cleaning up camera manager...")
-            if hasattr(self, '_camera_manager'):
-                for user in ['eye_gaze', 'emotion', 'viewer']:
-                    print(f"Unregistering camera user: {user}")
-                    self._camera_manager.unregister_user(user)
-                print("Shutting down camera manager...")
-                self._camera_manager.shutdown()
-                print("Camera manager shutdown complete")
+            # Clean up threads first
+            print("Cleaning up threads...")
+            self._cleanup_threads(timeout=2.0)
 
-            # Clean up other resources
-            print("Cleaning up other resources...")
+            # Clean up other resources that might hold semaphores
             resources_to_cleanup = [
                 (self._pointer_tracker, 'stop_tracking'),
                 (self._emotion_handler, 'stop_processing'),
@@ -281,9 +274,10 @@ class BackendServer:
                         getattr(resource, cleanup_method)()
                     except Exception as e:
                         print(f"Error cleaning up resource {resource}: {e}")
+                    finally:
+                        setattr(self, f"_{resource.__class__.__name__.lower()}", None)
 
             # Close all writers
-            print("Closing file writers...")
             writers = [self._aura_writer, self._emotion_writer, 
                       self._gaze_writer, self._pointer_writer]
             for writer in writers:
@@ -293,56 +287,75 @@ class BackendServer:
                     except Exception as e:
                         print(f"Error closing writer: {e}")
 
-            # Wait for threads with timeout
-            print("Waiting for threads to complete...")
-            with self._threads_lock:
-                for thread in self._threads:
-                    if thread and thread.is_alive():
-                        thread.join(timeout=1.0)
-                self._threads.clear()
+            # Clean up camera resources last
+            print("Cleaning up camera manager...")
+            if hasattr(self, '_camera_manager'):
+                # First unregister all users
+                for user in ['eye_gaze', 'emotion', 'viewer']:
+                    self._camera_manager.unregister_user(user)
+                # Then shutdown the manager
+                self._camera_manager.shutdown()
+                self._camera_manager = None
 
             # Clean up ZMQ resources
-            print("Cleaning up ZMQ resources...")
             if hasattr(self, '_socket') and self._socket:
                 self._socket.close(linger=0)
             if hasattr(self, '_context') and self._context:
                 self._context.term()
 
-            # Final multiprocessing cleanup
-            try:
-                print("\n=== Final multiprocessing cleanup ===")
-                import multiprocessing
-                
-                # Access trackers through main module
-                if hasattr(multiprocessing, '_resource_tracker'):
-                    tracker = getattr(multiprocessing._resource_tracker, '_resource_tracker', None)
-                    if tracker:
-                        tracker._cleanup()
-                
-                if hasattr(multiprocessing, '_semaphore_tracker'):
-                    tracker = getattr(multiprocessing._semaphore_tracker, '_semaphore_tracker', None)
-                    if tracker:
-                        tracker._cleanup()
-                
-            except Exception as e:
-                print(f"Error in final multiprocessing cleanup: {str(e)}")
+            # Final cleanup of resources
+            self._last_gaze_frame = None
+            self._last_emotion = None
+            self._camera = None
+            self._emotion_camera = None
+
+            # Force garbage collection
+            import gc
+            gc.collect()
 
             print("\n=== Cleanup completed ===")
         except Exception as e:
             print(f"Error during cleanup: {e}")
         finally:
             # Ensure these are always cleared
-            self._threads = []
             self._aura_writer = None
             self._emotion_writer = None
             self._gaze_writer = None
             self._pointer_writer = None
-            self._last_emotion = None
-            self._last_gaze_frame = None
+            
+            # Final multiprocessing cleanup
+            try:
+                print("\n=== Final multiprocessing cleanup ===")
+                import multiprocessing
+                import multiprocessing.resource_tracker
+                import multiprocessing.semaphore_tracker
+                
+                # Ensure all processes are done before cleaning up resources
+                multiprocessing.active_children()
+                
+                # Clean up resource tracker
+                if hasattr(multiprocessing.resource_tracker, '_resource_tracker'):
+                    tracker = multiprocessing.resource_tracker._resource_tracker
+                    if tracker:
+                        tracker._cleanup()
+                
+                # Clean up semaphore tracker
+                if hasattr(multiprocessing.semaphore_tracker, '_semaphore_tracker'):
+                    tracker = multiprocessing.semaphore_tracker._semaphore_tracker
+                    if tracker:
+                        tracker._cleanup()
+                
+                # Force final garbage collection
+                gc.collect()
+                
+            except Exception as e:
+                print(f"Error in final multiprocessing cleanup: {str(e)}")
 
     def __del__(self):
         """Ensure cleanup is called when the object is deleted."""
-        self.cleanup()
+        if not hasattr(self, '_shutdown') or not self._shutdown:
+            print("BackendServer.__del__ calling cleanup")
+            self.cleanup()
 
     def signal_handler(self, signum, frame):
         """Handle system signals for graceful shutdown."""
@@ -399,7 +412,8 @@ class BackendServer:
                     self._eye_gaze = GazeProcessor()
                     
                     def eye_gaze_task():
-                        with self.thread_tracking(threading.current_thread()):
+                        try:
+                            self._add_thread(threading.current_thread())
                             self.send_signal_update(SIGNAL_GAZE, 'connecting')
                             while True:
                                 frame = self._camera_manager.get_frame()
@@ -414,6 +428,8 @@ class BackendServer:
                             self._eye_gaze_running = True
                             self._fitting_eye_gaze = False
                             self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+                        finally:
+                            self._remove_thread(threading.current_thread())
 
                     local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
                     local_thread.start()
@@ -453,9 +469,8 @@ class BackendServer:
                                 args=(TESTING_MODE,),
                                 daemon=True
                             )
-                            with self.thread_tracking(self._aura_thread):
-                                self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_AURA})
-                                self._aura_thread.start()
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_AURA})
+                            self._aura_thread.start()
                     except Exception as e:
                         print(f"Error starting Aura thread: {str(e)}")
                         raise
@@ -478,9 +493,8 @@ class BackendServer:
                             target=self._emotion_collection_loop,
                             daemon=True
                         )
-                        with self.thread_tracking(self._emotion_thread):
-                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_EMOTION})
-                            self._emotion_thread.start()
+                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_EMOTION})
+                        self._emotion_thread.start()
                 
                 # Coordinate/Gaze
                 if self._run_gaze:
@@ -490,7 +504,8 @@ class BackendServer:
                     if self._eye_tracking_process is not None:
                         # Using Beam eye tracking
                         def beam_gaze_collection_loop():
-                            with self.thread_tracking(threading.current_thread()):
+                            try:
+                                self._add_thread(threading.current_thread())
                                 while self._data_collection_active:
                                     try:
                                         message = self._eye_tracking_socket.recv_json(flags=zmq.NOBLOCK)
@@ -503,7 +518,9 @@ class BackendServer:
                                     except Exception as e:
                                         print(f"Error in beam gaze collection: {e}")
                                         break
-                        
+                            finally:
+                                self._remove_thread(threading.current_thread())
+
                         self._regressor_thread = threading.Thread(
                             target=beam_gaze_collection_loop,
                             daemon=True
@@ -515,9 +532,8 @@ class BackendServer:
                             daemon=True
                         )
                     
-                    with self.thread_tracking(self._regressor_thread):
-                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
-                        self._regressor_thread.start()
+                    self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
+                    self._regressor_thread.start()
                 
                 # Pointer
                 if self._run_pointer:
@@ -580,13 +596,13 @@ class BackendServer:
                     args=(TRAINING_MODE,),
                     daemon=True
                 )
-                with self.thread_tracking(aura_training_thread):
-                    aura_training_thread.start()
+                aura_training_thread.start()
             else:
                 print(f"Failed to start Aura for training: {aura_response['message']}")
 
         def training_data_task():
-            with self.thread_tracking(threading.current_thread()):
+            try:
+                self._add_thread(threading.current_thread())
                 while True:
                     # Make prediction and write to file
                     if self._camera:
@@ -607,12 +623,13 @@ class BackendServer:
                     if not self._training_data_collection_active:
                         gaze_writer.close_file()
                         break
+            finally:
+                self._remove_thread(threading.current_thread())
 
         if self._eye_gaze_running:
             self._training_data_collection_active = True
             local_thread = threading.Thread(target=training_data_task, daemon=True)
-            with self.thread_tracking(local_thread):
-                local_thread.start()
+            local_thread.start()
             return {"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG}
         else:
             return {"status": STATUS_ERROR, "message": "Eye gaze tracking not started"}
@@ -890,6 +907,7 @@ class BackendServer:
             collection_type (str): 'training' or 'testing'
         """
         try:
+            self._add_thread(threading.current_thread())
             aura_writer_training = None
             if collection_type == TRAINING_MODE:
                 channels_names = ['timestamp'] + self._stream.info['ch_names']
@@ -898,100 +916,109 @@ class BackendServer:
                 aura_writer_training.create_new_file()
             self.send_signal_update(SIGNAL_AURA, 'recording')
             
-            while True:
+            while not self._shutdown:
                 if is_stream_ready(self._stream):
                     data, ts = self._stream.get_data()
                     if collection_type == TRAINING_MODE:
                         if aura_writer_training:
                             aura_writer_training.write_data(ts, data)
+                        if not self._training_data_collection_active:
+                            break
                     else:
                         processed_ts = [round(t - self._start_time, 3) for t in ts]
                         self._aura_writer.write_data(processed_ts, data)
-
+                        if not self._data_collection_active:
+                            break
                 time.sleep(0.001)
-
-                if collection_type == TRAINING_MODE and not self._training_data_collection_active:
-                    if aura_writer_training:
-                        aura_writer_training.close_file()
-                    break
-                elif collection_type == TESTING_MODE and not self._data_collection_active:
-                    if self._aura_writer:
-                        self._aura_writer.close_file()
-                    break
-            self.send_signal_update(SIGNAL_AURA, 'ready')
             
+            self.send_signal_update(SIGNAL_AURA, 'ready')
         except Exception as e:
             print(f"Error in aura collection loop: {str(e)}")
             self.send_signal_update(SIGNAL_AURA, 'error')
             raise
+        finally:
+            if aura_writer_training:
+                aura_writer_training.close_file()
+            if self._aura_writer:
+                self._aura_writer.close_file()
+            self._remove_thread(threading.current_thread())
 
     def _emotion_collection_loop(self):
-        """
-        Continuously collect and write emotion data in a loop.
-        """
+        """Continuously collect and write emotion data in a loop."""
         try:
-            with self.thread_tracking(threading.current_thread()):
-                self.send_signal_update(SIGNAL_EMOTION, 'recording')
-                while True:
-                    if self._emotion_handler and self._emotion_camera:
-                        _, frame = self._emotion_camera.read()
-                        if frame is not None:
-                            # Create a copy of the frame to avoid memory sharing
-                            frame_copy = frame.copy()
+            self._add_thread(threading.current_thread())
+            self.send_signal_update(SIGNAL_EMOTION, 'recording')
+            while not self._shutdown and self._data_collection_active:
+                if self._emotion_handler and self._emotion_camera:
+                    _, frame = self._emotion_camera.read()
+                    if frame is not None:
+                        # Create a copy of the frame to avoid memory sharing
+                        frame_copy = frame.copy()
+                        try:
                             emotion = self._emotion_handler.recognize_emotion(frame_copy)
-                            with threading.Lock():
-                                self._last_emotion = emotion
                             if emotion is not None:
+                                with threading.Lock():
+                                    self._last_emotion = emotion
                                 emotion = emotion[0]['dominant_emotion']
                                 timestamp = round(time.time() - self._start_time, 3)
                                 self._emotion_writer.write_data(timestamp, emotion)
-                            # Explicitly delete the frame copy
+                        finally:
+                            # Ensure frame is released
                             del frame_copy
-                    time.sleep(0.033)  # ~30 FPS
-                    if not self._data_collection_active:
-                        self._emotion_camera.release()
-                        self._emotion_camera = None
-                        break
+                time.sleep(0.033)  # ~30 FPS
         finally:
             if self._emotion_writer:
                 self._emotion_writer.close_file()
-            self.send_signal_update(SIGNAL_EMOTION, 'ready')
-            # Explicitly cleanup emotion handler
+            if self._emotion_camera:
+                self._emotion_camera.release()
+                self._emotion_camera = None
             if self._emotion_handler:
                 self._emotion_handler.stop_processing()
                 self._emotion_handler = None
+            self.send_signal_update(SIGNAL_EMOTION, 'ready')
+            self._remove_thread(threading.current_thread())
 
     def _coordinate_regressor_loop(self):
         """Continuously collect eye gaze data and predict screen coordinates."""
-        with self.thread_tracking(threading.current_thread()):
+        try:
+            self._add_thread(threading.current_thread())
             self.send_signal_update(SIGNAL_GAZE, 'recording')
-            while self._data_collection_active:
+            while not self._shutdown and self._data_collection_active:
                 frame = self._camera_manager.get_frame()
                 if frame is not None:
-                    gaze_vector = self._eye_gaze.get_gaze_vector(frame)
-                    if gaze_vector[2] is not None:
-                        with threading.Lock():
-                            self._last_gaze_frame = gaze_vector[2].copy()
-                        left_eye = gaze_vector[0]
-                        right_eye = gaze_vector[1] 
-                        if left_eye is not None and right_eye is not None:
-                            gaze_input = [[
-                                *left_eye,   # x, y, z coordinates for left eye
-                                *right_eye   # x, y, z coordinates for right eye
-                            ]]
-                            predicted_coords = self._regressor.make_prediction(gaze_input)
-                            x, y = predicted_coords[0]  # Extract x,y from nested array
-                            x = int(x)
-                            y = int(y)
-                            timestamp = round(time.time() - self._start_time, 3)
-                            self._gaze_writer.write(timestamp, [x, y])
-                
-                time.sleep(0.033)  # ~30 FPS
-                
+                    frame_copy = frame.copy()
+                    try:
+                        gaze_vector = self._eye_gaze.get_gaze_vector(frame_copy)
+                        if gaze_vector[2] is not None:
+                            with threading.Lock():
+                                if self._last_gaze_frame is not None:
+                                    del self._last_gaze_frame
+                                self._last_gaze_frame = gaze_vector[2].copy()
+                            left_eye = gaze_vector[0]
+                            right_eye = gaze_vector[1] 
+                            if left_eye is not None and right_eye is not None:
+                                gaze_input = [[
+                                    *left_eye,
+                                    *right_eye
+                                ]]
+                                predicted_coords = self._regressor.make_prediction(gaze_input)
+                                x, y = predicted_coords[0]
+                                x = int(x)
+                                y = int(y)
+                                timestamp = round(time.time() - self._start_time, 3)
+                                self._gaze_writer.write(timestamp, [x, y])
+                    finally:
+                        del frame_copy
+                time.sleep(0.033)
+        finally:
             self._eye_gaze_running = False
             self._camera_manager.unregister_user('eye_gaze')
             self.send_signal_update(SIGNAL_GAZE, 'need_calibration')
-        
+            if self._last_gaze_frame is not None:
+                del self._last_gaze_frame
+                self._last_gaze_frame = None
+            self._remove_thread(threading.current_thread())
+
     def update_coordinates(self, x, y):
         """
         Update current coordinates.
@@ -1277,6 +1304,7 @@ class BackendServer:
 
         def stream_frames():
             try:
+                self._add_thread(threading.current_thread())
                 print("Starting camera stream...")
                 while self._viewing_camera and self._camera and self._camera.isOpened():
                     try:
@@ -1312,25 +1340,24 @@ class BackendServer:
                                     'type': 'gaze_frame',
                                     'data': gaze_data
                                 })
-                            del gaze_frame  # Explicitly delete the copy
+                            del gaze_frame
                         
-                        time.sleep(0.033)  # ~30 FPS
+                        time.sleep(0.033)
                         
                     except Exception as e:
                         print(f"Error processing frame: {e}")
                         time.sleep(0.1)
-                        
             except Exception as e:
                 print(f"Fatal error in stream_frames: {e}")
             finally:
                 self._viewing_camera = False
                 print("Camera streaming stopped")
+                self._remove_thread(threading.current_thread())
 
         if not self._viewing_camera:
             self._viewing_camera = True
             thread = threading.Thread(target=stream_frames, daemon=True)
-            with self.thread_tracking(thread):  # Add proper thread tracking
-                thread.start()
+            thread.start()
             return {"status": STATUS_SUCCESS, "message": "Camera streaming started"}
         else:
             return {"status": STATUS_ERROR, "message": "Camera is already streaming"}
@@ -1481,19 +1508,36 @@ class BackendServer:
         except Exception as e:
             print(f"Error processing heatmap: {e}")
 
-    # @contextmanager
-    # def thread_tracking(self, thread):
-    #     """
-    #     Context manager to track active threads.
+    def _add_thread(self, thread: threading.Thread) -> None:
+        """Add a thread to the active threads set using a weak reference."""
+        if not isinstance(thread, threading.Thread):
+            return
         
-    #     Args:
-    #         thread: Thread object to track
-    #     """
-    #     with self._threads_lock:
-    #         self._threads.append(thread)
-    #     try:
-    #         yield thread
-    #     finally:
-    #         with self._threads_lock:
-    #             if thread in self._threads:
-    #                 self._threads.remove(thread)
+        def cleanup(ref):
+            with self._threads_lock:
+                self._active_threads.discard(ref)
+        
+        with self._threads_lock:
+            thread_ref = weakref.ref(thread, cleanup)
+            self._active_threads.add(thread_ref)
+
+    def _remove_thread(self, thread: threading.Thread) -> None:
+        """Remove a thread from the active threads set."""
+        with self._threads_lock:
+            for thread_ref in list(self._active_threads):
+                if thread_ref() is thread:
+                    self._active_threads.discard(thread_ref)
+                    break
+
+    def _cleanup_threads(self, timeout: float = 1.0) -> None:
+        """Clean up all active threads with a timeout."""
+        with self._threads_lock:
+            active_threads = [ref() for ref in list(self._active_threads) if ref() is not None]
+            
+        for thread in active_threads:
+            if thread.is_alive():
+                thread.join(timeout=timeout)
+        
+        with self._threads_lock:
+            self._active_threads.clear()
+
