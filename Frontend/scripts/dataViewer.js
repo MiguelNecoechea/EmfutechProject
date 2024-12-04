@@ -177,14 +177,19 @@ class DataViewer {
             
             // Load video if available
             const videoContainer = document.querySelector('.video-container');
-            const videoFiles = response.data.files.filter(f => f.name.toLowerCase().includes('_screen.mp4'));
+            const videoFiles = response.data.files.filter(f => 
+                f.name.toLowerCase().includes('_heatmap.mp4') || 
+                f.name.toLowerCase().includes('_screen.mp4')
+            );
             console.log('Found video files:', videoFiles);
             
             if (videoFiles.length > 0) {
-                console.log('Loading video from path:', videoFiles[0].path);
+                console.log('Loading video...');
                 
-                // Show loading indicator with file size information
-                const fileSizeMB = Math.round(videoFiles[0].size / (1024 * 1024));
+                // Prefer heatmap video if available
+                const videoFile = videoFiles.find(f => f.name.toLowerCase().includes('_heatmap.mp4')) || videoFiles[0];
+                const fileSizeMB = Math.round(videoFile.size / (1024 * 1024));
+                
                 videoContainer.innerHTML = `
                     <div class="loading-message">
                         Loading video (${fileSizeMB}MB)... This may take a moment for larger files.
@@ -195,7 +200,7 @@ class DataViewer {
 
                 const videoHtml = `
                     <video controls width="100%" preload="metadata">
-                        <source src="local-video://${videoFiles[0].path}" type="video/mp4">
+                        <source src="file://${encodeURI(videoFile.path)}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 `;
