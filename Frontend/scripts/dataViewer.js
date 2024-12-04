@@ -461,66 +461,32 @@ class DataViewer {
     }
 
     createEmotionVisualization(data) {
-        // Set up visualization area with slider
+        // Get unique emotions and sort them
+        const uniqueEmotions = [...new Set(data.map(d => d['Emotion Predicted']))].sort();
+        
+        // Set up visualization area
         const visualizationArea = document.getElementById('visualization-area');
-        visualizationArea.innerHTML = `
-            <div class="emotion-controls">
-                <label for="emotion-selector">Select Emotion:</label>
-                <input type="range" id="emotion-selector" min="0" value="0" style="width: 200px;">
-                <span id="current-emotion"></span>
-            </div>
-            <div id="emotion-timeline" style="height: 400px;"></div>
-        `;
+        visualizationArea.innerHTML = uniqueEmotions.map(emotion => 
+            `<div id="emotion-${emotion.toLowerCase()}" style="height: 300px; margin-bottom: 20px;"></div>`
+        ).join('');
 
-        // Get unique emotions and sort them, add "All Emotions" as first option
-        const uniqueEmotions = ['All Emotions', ...[...new Set(data.map(d => d['Emotion Predicted']))].sort()];
-        
-        // Update slider max value and initialize emotion display
-        const slider = document.getElementById('emotion-selector');
-        const emotionLabel = document.getElementById('current-emotion');
-        slider.max = uniqueEmotions.length - 1;
-        
-        // Function to update the plot for a specific emotion
-        const updateEmotionPlot = (selectedEmotion) => {
-            emotionLabel.textContent = selectedEmotion;
-            
-            let traces;
-            if (selectedEmotion === 'All Emotions') {
-                // Create a trace for each emotion
-                traces = [...new Set(data.map(d => d['Emotion Predicted']))]
-                    .sort()
-                    .map(emotion => ({
-                        x: data.map(d => parseFloat(d.Time)),
-                        y: data.map(d => d['Emotion Predicted'] === emotion ? 1 : 0),
-                        mode: 'lines',
-                        type: 'scatter',
-                        name: emotion,
-                        line: {
-                            shape: 'hv',
-                            width: 2
-                        }
-                    }));
-            } else {
-                // Single emotion trace with fill
-                traces = [{
-                    x: data.map(d => parseFloat(d.Time)),
-                    y: data.map(d => d['Emotion Predicted'] === selectedEmotion ? 1 : 0),
-                    mode: 'lines',
-                    type: 'scatter',
-                    name: selectedEmotion,
-                    line: {
-                        shape: 'hv',
-                        width: 2
-                    },
-                    fill: 'tozeroy'
-                }];
-            }
+        // Create individual plots for each emotion
+        uniqueEmotions.forEach(emotion => {
+            const trace = {
+                x: data.map(d => parseFloat(d.Time)),
+                y: data.map(d => d['Emotion Predicted'] === emotion ? 1 : 0),
+                mode: 'lines',
+                type: 'scatter',
+                name: emotion,
+                line: {
+                    shape: 'hv',
+                    width: 2
+                },
+                fill: 'tozeroy'
+            };
 
-            // Create plot with appropriate layout
-            Plotly.newPlot('emotion-timeline', traces, {
-                title: selectedEmotion === 'All Emotions' ? 
-                    'All Emotions Timeline' : 
-                    `Emotion Timeline: ${selectedEmotion}`,
+            const layout = {
+                title: `${emotion} Timeline`,
                 xaxis: {
                     title: 'Time (seconds)',
                     tickformat: '.1f'
@@ -531,18 +497,10 @@ class DataViewer {
                     tickvals: [0, 1],
                     ticktext: ['No', 'Yes']
                 },
-                showlegend: selectedEmotion === 'All Emotions',
                 margin: { l: 50, r: 50, t: 50, b: 50 }
-            });
-        };
+            };
 
-        // Initialize with first option (All Emotions)
-        updateEmotionPlot(uniqueEmotions[0]);
-
-        // Add slider event listener
-        slider.addEventListener('input', (e) => {
-            const selectedEmotion = uniqueEmotions[e.target.value];
-            updateEmotionPlot(selectedEmotion);
+            Plotly.newPlot(`emotion-${emotion.toLowerCase()}`, [trace], layout);
         });
     }
 
