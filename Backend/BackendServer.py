@@ -226,6 +226,13 @@ class BackendServer:
         self._active_threads = set()
         self._shutdown = False
 
+        # Initialize thread references
+        self._aura_thread = None
+        self._emotion_thread = None
+        self._regressor_thread = None
+        self._screen_recording_thread = None
+        self._face_landmarks_thread = None
+
     def _setup_signal_handlers(self):
         """Set up signal handlers for graceful shutdown."""
         def handle_signal(signum, frame):
@@ -592,14 +599,14 @@ class BackendServer:
                 if self._run_face_landmarks:
                     self._face_landmarks_writer = FaceLandmarksWriter(self._path, f'{self._filename}_face_landmarks.csv')
                     self._face_landmarks_writer.create_new_file()
-                    
-                    if self._face_landmarks_thread is None or not self._face_landmarks_thread.is_alive():
-                        self._face_landmarks_thread = threading.Thread(
-                            target=self._face_landmarks_collection_loop,
-                            daemon=True
-                        )
-                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": "face_landmarks"})
-                        self._face_landmarks_thread.start()
+                    if self._camera_manager.register_user('face_landmarks'):
+                        if self._face_landmarks_thread is None or not self._face_landmarks_thread.is_alive():
+                            self._face_landmarks_thread = threading.Thread(
+                                target=self._face_landmarks_collection_loop,
+                                daemon=True
+                            )
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": "face_landmarks"})
+                            self._face_landmarks_thread.start()
 
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
@@ -729,7 +736,7 @@ class BackendServer:
                 cv2.destroyAllWindows()
 
             # Unregister all camera users and cleanup camera
-            for user in ['eye_gaze', 'emotion', 'viewer']:
+            for user in ['eye_gaze', 'emotion', 'face_landmarks']:
                 self._camera_manager.unregister_user(user)
             self._camera_manager.cleanup_camera()
 
@@ -1510,12 +1517,21 @@ class BackendServer:
 
     def _face_landmarks_collection_loop(self):
         """Continuously collect and write face landmark data in a loop."""
+        video_path = None
+        video_writer = None
+        
         try:
             self._add_thread(threading.current_thread())
             self.send_signal_update("face_landmarks", 'recording')
             
-            # Initialize video writer
-            height, width = self._camera_manager.get_frame_dimensions()
+            # Get first frame to initialize video writer
+            frame = self._camera_manager.get_frame()
+            while frame is None:
+                time.sleep(0.1)
+                frame = self._camera_manager.get_frame()
+            
+            # Initialize video writer using frame dimensions
+            height, width = frame.shape[:2]
             video_path = os.path.join(self._path, f"{self._filename}_landmarks.mp4")
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (width, height))
@@ -1540,9 +1556,9 @@ class BackendServer:
             if video_writer:
                 video_writer.release()
             
-            # Post-process the video file
-            if os.path.exists(video_path):
-                self.send_signal_update("face_landmarks", 'processing')
+            # Post-process the video file only if it was created
+            if video_path and os.path.exists(video_path):
+                self.send_signal_update("face_landmarks", 'recording')
                 success = post_process_video(video_path, video_path)
                 if not success:
                     self.send_signal_update("face_landmarks", 'error')
