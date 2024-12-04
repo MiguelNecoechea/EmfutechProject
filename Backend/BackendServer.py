@@ -188,6 +188,9 @@ class BackendServer:
         self._aura_file = None
         self._aura_training_file = None
 
+        # Screen recording file
+        self._screen_recording_file = None
+
     @contextmanager
     def thread_tracking(self, thread):
         """
@@ -636,7 +639,7 @@ class BackendServer:
         try:
             self._data_collection_active = False
             self._training_data_collection_active = False
-            
+
             # Stop pointer tracking
             if self._pointer_tracker is not None:
                 self._pointer_tracker.stop_tracking()
@@ -659,8 +662,8 @@ class BackendServer:
                 if self._keyboard_writer:
                     self._keyboard_writer.close_file()
                 self._keyboard_writer = None
-            
-            # Stop screen recording - moved earlier in the cleanup process
+
+            # Stop screen recording
             if self._screen_recorder is not None:
                 try:
                     self._screen_recorder.stop_recording()
@@ -729,6 +732,9 @@ class BackendServer:
             for is_active, signal, status in signals:
                 if is_active:
                     self.send_signal_update(signal, status)
+            
+            # Post-process data at the very end
+            self._post_process_eye_gaze()
 
             return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
         except Exception as e:
@@ -1417,6 +1423,9 @@ class BackendServer:
             if not os.path.exists(self._path):
                 os.makedirs(self._path)
                 
+            # Store the output file path
+            self._screen_recording_file = os.path.join(self._path, f"{self._filename}{SCREEN_FILE_SUFFIX}")
+            
             # Initialize recorder with default settings
             self._screen_recorder = ScreenRecorder(
                 output_path=os.path.join(self._path, ''),  # Ensure path ends with separator
@@ -1461,7 +1470,6 @@ class BackendServer:
         finally:
             # Ensure screen recorder is cleaned up even if an error occurs
             self._screen_recorder = None
-
     def stop_eye_tracking(self):
         """Stop the eye tracking process."""
         try:
@@ -1473,3 +1481,25 @@ class BackendServer:
                 return {"status": STATUS_SUCCESS, "message": "Eye tracking stopped"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": f"Failed to stop eye tracking: {str(e)}"}
+
+    def _post_process_eye_gaze(self):
+        """Post-process eye gaze data to generate heatmap visualization."""
+        if not (self._run_gaze and hasattr(self, '_screen_recorder')):
+            return
+
+        try:
+            video_file = self._screen_recording_file
+            gaze_file = os.path.join(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
+            heatmap_output = os.path.join(self._path, f'{self._filename}_heatmap.mp4')
+
+            if os.path.exists(video_file) and os.path.exists(gaze_file):
+                print("Processing gaze heatmap...")
+                from DataProcessing.VideoProcessing import GazeHeatmapProcessor
+                GazeHeatmapProcessor.process_video(
+                    video_file=video_file,
+                    csv_file=gaze_file,
+                    output_file=heatmap_output
+                )
+                print("Heatmap processing complete")
+        except Exception as e:
+            print(f"Error processing heatmap: {e}")

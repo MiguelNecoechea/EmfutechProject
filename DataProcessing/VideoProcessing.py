@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter
 from multiprocessing import Pool, cpu_count
-from ffmpegPostProcessing import post_process_video
+from DataProcessing.ffmpegPostProcessing import post_process_video
 
 class GazeHeatmapProcessor:
     @staticmethod
@@ -188,25 +188,3 @@ class GazeHeatmapProcessor:
         heatmap_colored = cv2.applyColorMap(heatmap_normalized.astype(np.uint8), cv2.COLORMAP_JET)
         return cv2.addWeighted(frame, 0.6, heatmap_colored, 0.4, 0)
     
-
-
-def test_heatmap_generation():
-    # Test file paths
-    video_file = "/Users/mnecoea/PycharmProjects/AuraSignalProcessing/Miguel_screen.mp4"  # Your input video file
-    csv_file = "/Users/mnecoea/PycharmProjects/AuraSignalProcessing/Miguel_gaze.csv"     # Your gaze data CSV file
-    output_file = "output_heatmap.mp4"  
-
-    try:
-        # Process the video
-        GazeHeatmapProcessor.process_video(
-            video_file=video_file,
-            csv_file=csv_file,
-            output_file=output_file
-        )
-        print("Test completed successfully!")
-        
-    except Exception as e:
-        print(f"Test failed with error: {str(e)}")
-
-if __name__ == "__main__":
-    test_heatmap_generation()
