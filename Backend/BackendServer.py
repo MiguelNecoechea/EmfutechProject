@@ -356,123 +356,33 @@ class BackendServer:
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
-        try:
-            # First, let's verify the conda environment exists and get its path
-            print("Attempting to locate eyetracking_env conda environment...")
-            conda_env_path = None
-            possible_paths = []
-
-            if platform.system() == 'Windows':
-                # Windows paths
-                possible_paths = [
-                    os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'python.exe'),
-                    os.path.join(os.path.expanduser('~'), 'anaconda3', 'envs', 'eyetracking_env', 'python.exe'),
-                    os.path.join(os.path.expanduser('~'), 'miniconda3', 'envs', 'eyetracking_env', 'python.exe')
-                ]
-            else:
-                # Unix paths
-                possible_paths = [
-                    os.path.join(os.environ.get('CONDA_PREFIX', ''), 'envs', 'eyetracking_env', 'bin', 'python'),
-                    os.path.join(os.path.expanduser('~'), 'anaconda3', 'envs', 'eyetracking_env', 'bin', 'python'),
-                    os.path.join(os.path.expanduser('~'), 'miniconda3', 'envs', 'eyetracking_env', 'bin', 'python')
-                ]
-
-            # Try each path and use the first one that exists
-            for path in possible_paths:
-                print(f"Checking path: {path}")
-                if os.path.exists(path):
-                    conda_env_path = path
-                    print(f"Found conda environment at: {conda_env_path}")
-                    break
-
-            if not conda_env_path:
-                raise Exception("Could not find eyetracking_env conda environment. Please ensure it's properly installed.")
-
-            # Get the absolute path to the eye tracking script
-            script_path = Path(__file__).parent.parent / "API" / "Windows_Beam_Eye_Tracking.py"
-            if not script_path.exists():
-                raise Exception(f"Eye tracking script not found at: {script_path}")
-            
-            print(f"Using script path: {script_path}")
-
-            # Start the Beam eye tracking process with detailed logging
-            print("Starting eye tracking subprocess...")
-            
-            # Create a log file for the subprocess
-            log_dir = Path(__file__).parent.parent / "logs"
-            log_dir.mkdir(exist_ok=True)
-            log_file = log_dir / "eye_tracking.log"
-            
-            with open(log_file, 'w') as f:
-                self._eye_tracking_process = subprocess.Popen(
-                    [conda_env_path, str(script_path)],
-                    stdout=f,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
-
-            print(f"Subprocess started with PID: {self._eye_tracking_process.pid}")
-
-            # Wait for initial connection with timeout
-            print("Waiting for eye tracking connection...")
-            try:
-                connection_msg = self._eye_tracking_socket.recv_json(timeout=5000)
-                print(f"Received initial connection message: {connection_msg}")
+        self.manage_camera(OPEN_CAMERA)
+        self._create_directories()
+        self._eye_gaze = GazeProcessor()
+        def eye_gaze_task():
+            with self.thread_tracking(threading.current_thread()):
                 self.send_signal_update(SIGNAL_GAZE, 'connecting')
-                
-                # Send explicit calibration complete message
-                self._socket.send_json({
-                    "type": "calibration_status",
-                    "message": CALIBRATION_COMPLETE_MSG
-                })
-                return {"status": STATUS_SUCCESS, "message": "Eye tracking started"}
-                
-            except zmq.error.Again:
-                print("Timeout waiting for eye tracking connection")
-                # Check if process is still running
-                if self._eye_tracking_process.poll() is not None:
-                    print(f"Process exited with code: {self._eye_tracking_process.poll()}")
-                    # Read the log file for error details
-                    with open(log_file, 'r') as f:
-                        log_content = f.read()
-                    print(f"Process log:\n{log_content}")
-                
-                self.stop_eye_tracking()
-                raise Exception("Failed to establish connection with eye tracker")
+                while True:
+                    if self._camera:
+                        frame = self.get_frame()
+                        if frame is not None:   
+                            gaze_data = self._eye_gaze.get_gaze_vector(frame)
+                            if gaze_data[2] is not None:
+                                with threading.Lock():
+                                    self._last_gaze_frame = gaze_data[2].copy()
+                        
+                        if gaze_data[0] is not None and gaze_data[1] is not None:
+                            break
+                self._eye_gaze_running = True
+                self._fitting_eye_gaze = False
+                self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
 
-        except Exception as e:
-            print(f"Error starting eye tracking: {str(e)}")
-            print("Falling back to webcam eye tracking...")
-            # Fallback to webcam-based eye tracking
-            self.manage_camera(OPEN_CAMERA)
-            self._create_directories()
-            self._eye_gaze = GazeProcessor()
-            
-            def eye_gaze_task():
-                with self.thread_tracking(threading.current_thread()):
-                    self.send_signal_update(SIGNAL_GAZE, 'connecting')
-                    while True:
-                        if self._camera:
-                            frame = self.get_frame()
-                            if frame is not None:   
-                                gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                                if gaze_data[2] is not None:
-                                    with threading.Lock():
-                                        self._last_gaze_frame = gaze_data[2].copy()
-                            
-                            if gaze_data[0] is not None and gaze_data[1] is not None:
-                                break
-                    self._eye_gaze_running = True
-                    self._fitting_eye_gaze = False
-                    self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
-
-            if not self._fitting_eye_gaze and not self._eye_gaze_running:
-                local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
-                local_thread.start()
-                return {"status": STATUS_SUCCESS, "message": "Webcam eye tracking started"}
-            else:
-                return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
+        if not self._fitting_eye_gaze and not self._eye_gaze_running:
+            local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
+            local_thread.start()
+            return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
+        else:
+            return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
 
     def start_data_collection(self):
         """Start all active data collection threads."""
