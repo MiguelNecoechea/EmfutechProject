@@ -53,7 +53,7 @@ class ScreenRecorder:
         screen = screeninfo.get_monitors()[0]
         return screen.width, screen.height
 
-    def start_recording(self, fps: int = 30) -> bool:
+    def start_recording(self, fps: int = 24) -> bool:
         """
         Starts the recording of the screen. The recording will be saved in the output path with the filename.
         :param fps: The target fps of the recording.
