@@ -5,6 +5,7 @@ import numpy as np
 import mss
 import screeninfo
 import threading
+from collections import deque
 from DataProcessing.ffmpegPostProcessing import post_process_video
 
 class ScreenRecorder:
@@ -26,24 +27,56 @@ class ScreenRecorder:
         self.video_data_writer = None
         self.screen_width, self.screen_height = self.__get_main_screen_resolution()
         self.mss_area = {'top': 0, 'left': 0, 'width': self.screen_width, 'height': self.screen_height}
+        
+        # Frame buffer and FPS monitoring
+        self.frame_buffer = deque(maxlen=120)  # 2 seconds buffer at 60fps
+        self.fps_buffer = deque(maxlen=60)  # Store last 60 frame timestamps
+        self.current_fps = 0.0  # Current observed FPS
+        self.frame_count = 0
+        self.start_time = None
+
+    def __calculate_current_fps(self):
+        """Calculate the current FPS based on total frames and elapsed time"""
+        if self.start_time is None or self.frame_count == 0:
+            return 0.0
+        
+        elapsed_time = time.time() - self.start_time
+        if elapsed_time > 0:
+            return self.frame_count / elapsed_time
+        return 0.0
 
     def __internal_recording_loop(self):
-        """
-        Internal loop that captures the screen and writes it to the video file.
-        """
         with mss.mss() as sct:
+            self.start_time = time.time()
+            self.frame_count = 0
+            
             while True:
                 if self.video_data_writer is not None:
+                    # Capture frame
                     frame = np.array(sct.grab(self.mss_area))
                     formated_frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
                     if formated_frame.shape[1::-1] != (self.screen_width, self.screen_height):
                         formated_frame = cv2.resize(formated_frame, (self.screen_width, self.screen_height))
+                    
+                    current_time = time.time()
+                    self.frame_buffer.append((formated_frame, current_time))
+                    self.frame_count += 1
+                    self.current_fps = self.__calculate_current_fps()
+                    
+                    # Write frames from buffer if enabled
                     if self.can_write_frame:
-                        self.video_data_writer.write(formated_frame)
+                        while self.frame_buffer:
+                            frame_data = self.frame_buffer.popleft()
+                            self.video_data_writer.write(frame_data[0])
+                            
                 if not self.is_recording_active:
+                    # Write remaining frames in buffer
+                    if self.can_write_frame:
+                        while self.frame_buffer:
+                            frame_data = self.frame_buffer.popleft()
+                            self.video_data_writer.write(frame_data[0])
                     break
-
 
     def __get_main_screen_resolution(self):
         """
@@ -53,14 +86,17 @@ class ScreenRecorder:
         screen = screeninfo.get_monitors()[0]
         return screen.width, screen.height
 
-    def start_recording(self, fps: int = 24) -> bool:
+    def start_recording(self, fps: int = 30) -> bool:
         """
         Starts the recording of the screen. The recording will be saved in the output path with the filename.
-        :param fps: The target fps of the recording.
+        :param fps: The target fps of the recording. This should be set slightly higher than expected to ensure smooth capture.
         :return: A boolean indicating if the recording was successfully started.
         """
         if not self.is_recording_active:
             self.is_recording_active = True
+            self.frame_count = 0
+            self.current_fps = 0.0
+            self.start_time = None
             
             # Use H.264 codec with fallbacks
             codecs_to_try = [
@@ -75,7 +111,7 @@ class ScreenRecorder:
                     self.video_data_writer = cv2.VideoWriter(
                         self.output_path + self.filename,
                         cv2.VideoWriter_fourcc(*codec),
-                        fps,
+                        fps,  # Use fixed FPS for the writer
                         (self.screen_width, self.screen_height),
                         isColor=True
                     )
@@ -95,6 +131,12 @@ class ScreenRecorder:
             return True
         return False
 
+    def get_current_fps(self) -> float:
+        """
+        Get the current observed FPS of the recording.
+        :return: The current FPS as a float
+        """
+        return self.current_fps
 
     def stop_recording(self) -> bool:
         """
