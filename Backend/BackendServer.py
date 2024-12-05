@@ -1551,8 +1551,6 @@ class BackendServer:
         """Continuously collect and write face landmark data in a loop."""
         video_path = None
         video_writer = None
-        frame_count = 0
-        start_time = time.time()
         
         try:
             self._add_thread(threading.current_thread())
@@ -1583,14 +1581,7 @@ class BackendServer:
                     # Write the processed frame to video
                     if processed_frame is not None and self._can_write_data:
                         video_writer.write(processed_frame)
-                        frame_count += 1
-                        
-                        # Calculate and print FPS every 30 frames
-                        if frame_count % 30 == 0:
-                            elapsed_time = time.time() - start_time
-                            fps = frame_count / elapsed_time
-                            print(f"Face landmarks actual FPS: {fps:.2f}")
-                
+
                 time.sleep(0.033)  # 1/30 = 0.033 seconds for 30 fps
                 
         finally:
