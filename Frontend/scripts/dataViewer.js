@@ -197,16 +197,22 @@ class DataViewer {
             const landmarksVideo = response.data.files.find(f => 
                 f.name.toLowerCase().includes('_landmarks.mp4')
             );
-            console.log('Found videos:', { screenVideo, landmarksVideo });
+            const heatmapVideo = response.data.files.find(f => 
+                f.name.toLowerCase().includes('_heatmap.mp4')
+            );
+            console.log('Found videos:', { screenVideo, landmarksVideo, heatmapVideo });
             
-            if (screenVideo || landmarksVideo) {
+            if (screenVideo || landmarksVideo || heatmapVideo) {
                 console.log('Loading videos...');
                 
                 // Create a promise to wait for video loading
                 const videoLoadPromise = new Promise((resolve, reject) => {
-                    const totalVideos = (screenVideo ? 1 : 0) + (landmarksVideo ? 1 : 0);
+                    // Use heatmap video instead of screen video if available
+                    const mainVideo = heatmapVideo || screenVideo;
+                    const totalVideos = (mainVideo ? 1 : 0) + (landmarksVideo ? 1 : 0);
                     const fileSizeMB = Math.round(
-                        (screenVideo?.size || 0 + landmarksVideo?.size || 0) / (1024 * 1024)
+                        (mainVideo?.size || 0 + 
+                         landmarksVideo?.size || 0) / (1024 * 1024)
                     );
                     
                     videoContainer.innerHTML = `
@@ -219,11 +225,11 @@ class DataViewer {
 
                     const videoHtml = `
                         <div class="video-grid">
-                            ${screenVideo ? `
+                            ${mainVideo ? `
                                 <div class="video-wrapper screen-video">
-                                    <div class="video-label">Screen Recording</div>
+                                    <div class="video-label">${heatmapVideo ? 'Gaze Heatmap' : 'Screen Recording'}</div>
                                     <video preload="metadata" id="screen-video">
-                                        <source src="file:///${screenVideo.path.replace(/\\/g, '/')}" type="video/mp4">
+                                        <source src="file:///${mainVideo.path.replace(/\\/g, '/')}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
                                 </div>
@@ -990,7 +996,7 @@ class DataViewer {
         // Create plots for each gesture
         const visualizationArea = document.getElementById('visualization-area');
         visualizationArea.innerHTML = Object.keys(this.GESTURES).map(gesture =>
-            `<div id="landmark-${gesture.replace(/\s+/g, '-').toLowerCase()}" style="width: 100%; height: 300px; margin-bottom: 20px;"></div>`
+            `<div id="landmark-${gesture.replace(/\s+/g, '-').toLowerCase()}" style="width: 100%; height: 150px; margin-bottom: 5px;"></div>`
         ).join('');
 
         Object.entries(gestureData).forEach(([gesture, data], index) => {
@@ -1021,11 +1027,22 @@ class DataViewer {
             };
 
             const layout = {
-                title: gesture,
-                xaxis: { title: 'Time (s)' },
-                yaxis: { title: 'Distance' },
-                height: 200,
-                margin: { t: 30, r: 20, b: 40, l: 60 },
+                title: {
+                    text: gesture,
+                    font: { size: 12 }  // Even smaller title font
+                },
+                xaxis: { 
+                    title: 'Time (s)',
+                    titlefont: { size: 10 },  // Even smaller axis title font
+                    tickfont: { size: 9 }     // Smaller tick labels
+                },
+                yaxis: { 
+                    title: 'Distance',
+                    titlefont: { size: 10 },  // Even smaller axis title font
+                    tickfont: { size: 9 }     // Smaller tick labels
+                },
+                height: 150,  // Further reduced height
+                margin: { t: 20, r: 20, b: 30, l: 45 },  // Further reduced margins
                 showlegend: false
             };
 
