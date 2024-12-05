@@ -8,16 +8,17 @@ class PointerWriter(Writer):
         :param file_path: The path where the file will be saved.
         :param file_name: The name of the file to store the data.
         """
-        super().__init__(file_path, file_name, ['timestamp', 'x', 'y', 'clicked'])
+        super().__init__(file_path, file_name, ['timestamp', 'x', 'y', 'clicked', 'scroll'])
 
-    def write(self, timestamp, x, y, clicked=False):
+    def write(self, timestamp, x, y, clicked=False, scroll=0):
         """
-        Writes the pointer coordinates and click state to the file.
+        Writes the pointer coordinates, click state, and scroll direction to the file.
         
         :param timestamp: The timestamp of the pointer position
         :param x: The x-coordinate of the pointer
         :param y: The y-coordinate of the pointer
         :param clicked: Boolean indicating if mouse is clicked
+        :param scroll: Integer indicating scroll direction (-1: down, 0: none, 1: up)
         """
         if not self._is_writer_opened:
             self.create_new_file()
@@ -25,5 +26,5 @@ class PointerWriter(Writer):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError("Both x and y coordinates must be numeric values.")
 
-        self._csv_writer.writerow([round(timestamp, 3), x, y, int(clicked)])
+        self._csv_writer.writerow([round(timestamp, 3), x, y, int(clicked), scroll])
         self._csv_file.flush()

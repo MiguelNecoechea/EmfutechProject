@@ -9,7 +9,8 @@ class CursorTracker:
         """
         self._listener = mouse.Listener(
             on_click=self.on_click,
-            on_move=self.on_move
+            on_move=self.on_move,
+            on_scroll=self.on_scroll
         )
         self._listener.start()
         self._mouse_controller = Controller()
@@ -18,6 +19,7 @@ class CursorTracker:
         self._start_time = None
         self._is_tracking = False
         self._is_clicked = False
+        self._scroll_direction = 0
         self._tracking_interval = 1 / 30  # 30 samples per second
         self._last_track_time = 0
 
@@ -55,15 +57,23 @@ class CursorTracker:
                 self.handle_position(x, y)
                 self._last_track_time = current_time
 
+    def on_scroll(self, x, y, dx, dy):
+        """Callback for scroll events"""
+        if self._is_tracking:
+            self._scroll_direction = 1 if dy > 0 else -1 if dy < 0 else 0
+            self.handle_position(x, y)
+            self._scroll_direction = 0
+
     def handle_position(self, x, y):
         """
-        Handles tracking of pointer position and click state
+        Handles tracking of pointer position, click state, and scroll direction
         """
         coordinates = (int(x), int(y))
         
         if self._writer and self._start_time is not None:
             timestamp = time.time() - self._start_time
-            self._writer.write(timestamp, coordinates[0], coordinates[1], self._is_clicked)
+            self._writer.write(timestamp, coordinates[0], coordinates[1], 
+                             self._is_clicked, self._scroll_direction)
             
         return coordinates
 
