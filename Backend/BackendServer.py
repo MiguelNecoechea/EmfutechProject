@@ -233,12 +233,24 @@ class BackendServer:
         self._screen_recording_thread = None
         self._face_landmarks_thread = None
 
+        # Boolean flag for writing data
+        self._can_write_data = False
+
+        # Signal first data received
+        self._aura_first_data_received = False
+        self._emotion_first_data_received = False
+        self._gaze_first_data_received = False
+        self._pointer_first_data_received = False
+        self._screen_first_data_received = False
+        self._face_landmarks_first_data_received = False
+
+        # self._streams_synchronized = False
+
     def _setup_signal_handlers(self):
         """Set up signal handlers for graceful shutdown."""
         def handle_signal(signum, frame):
             print(f"\nReceived signal {signum}, initiating graceful shutdown...")
             self.cleanup()
-            # Use os._exit instead of sys.exit to avoid threading issues
             import os
             os._exit(0)
 
@@ -561,7 +573,26 @@ class BackendServer:
                     
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
                     self._regressor_thread.start()
+
+                # Face Landmarks
+                if self._run_face_landmarks:
+                    self._face_landmarks_writer = FaceLandmarksWriter(self._path, f'{self._filename}_face_landmarks.csv')
+                    self._face_landmarks_writer.create_new_file()
+                    if self._camera_manager.register_user('face_landmarks'):
+                        if self._face_landmarks_thread is None or not self._face_landmarks_thread.is_alive():
+                            self._face_landmarks_thread = threading.Thread(
+                                target=self._face_landmarks_collection_loop,
+                                daemon=True
+                            )
+                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": "face_landmarks"})
+                            self._face_landmarks_thread.start()
                 
+                while not self._check_streams_synchronized():
+                    print("Waiting for streams to synchronize...")
+                    time.sleep(0.01)
+
+                self._start_time = time.time()
+
                 # Pointer
                 if self._run_pointer:
                     self._pointer_writer = PointerWriter(self._path, f'{self._filename}{POINTER_FILE_SUFFIX}')
@@ -587,31 +618,23 @@ class BackendServer:
                     self._keyboard_tracker.is_tracking = True
                     self.send_signal_update(SIGNAL_KEYBOARD, 'recording')
                     self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_KEYBOARD})
-
+                
+                # Screen
                 if self._run_screen:
                     screen_response = self.start_screen_recording()
                     if screen_response["status"] != STATUS_SUCCESS:
                         self.send_signal_update(SIGNAL_SCREEN, 'error')
                     else:
                         self.send_signal_update(SIGNAL_SCREEN, 'recording')
-
-                # Face Landmarks
-                if self._run_face_landmarks:
-                    self._face_landmarks_writer = FaceLandmarksWriter(self._path, f'{self._filename}_face_landmarks.csv')
-                    self._face_landmarks_writer.create_new_file()
-                    if self._camera_manager.register_user('face_landmarks'):
-                        if self._face_landmarks_thread is None or not self._face_landmarks_thread.is_alive():
-                            self._face_landmarks_thread = threading.Thread(
-                                target=self._face_landmarks_collection_loop,
-                                daemon=True
-                            )
-                            self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": "face_landmarks"})
-                            self._face_landmarks_thread.start()
+                        
+                self._screen_recorder.set_frame_writing(True)
+                self._can_write_data = True
 
                 return {"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG}
             else:
                 return {"status": STATUS_ERROR, "message": "Data collection already started"}
             
+                        
         except Exception as e:
             self._data_collection_active = False
             print(f"Error in start_data_collection: {str(e)}")
@@ -684,6 +707,8 @@ class BackendServer:
         try:
             self._data_collection_active = False
             self._training_data_collection_active = False
+            self._can_write_data = False
+            self._screen_recorder.set_frame_writing(False)
 
             # Stop pointer tracking
             if self._pointer_tracker is not None:
@@ -970,7 +995,10 @@ class BackendServer:
                             break
                     else:
                         processed_ts = [round(t - self._start_time, 3) for t in ts]
-                        self._aura_writer.write_data(processed_ts, data)
+                        self._aura_first_data_received = True
+                        if self._can_write_data:
+                            self._aura_writer.write_data(processed_ts, data)
+
                         if not self._data_collection_active:
                             break
                 time.sleep(0.001)
@@ -1003,8 +1031,10 @@ class BackendServer:
                                 with threading.Lock():
                                     self._last_emotion = emotion
                                 emotion = emotion[0]['dominant_emotion']
-                                timestamp = round(time.time() - self._start_time, 3)
-                                self._emotion_writer.write_data(timestamp, emotion)
+                                self._emotion_first_data_received = True
+                                if self._can_write_data:
+                                    timestamp = round(time.time() - self._start_time, 3)
+                                    self._emotion_writer.write_data(timestamp, emotion)
                         finally:
                             # Ensure frame is released
                             del frame_copy
@@ -1035,7 +1065,8 @@ class BackendServer:
                                     del self._last_gaze_frame
                                 self._last_gaze_frame = gaze_vector[2].copy()
                             left_eye = gaze_vector[0]
-                            right_eye = gaze_vector[1] 
+                            right_eye = gaze_vector[1]
+                            self._gaze_first_data_received = True
                             if left_eye is not None and right_eye is not None:
                                 gaze_input = [[
                                     *left_eye,
@@ -1046,7 +1077,8 @@ class BackendServer:
                                 x = int(x)
                                 y = int(y)
                                 timestamp = round(time.time() - self._start_time, 3)
-                                self._gaze_writer.write(timestamp, [x, y])
+                                if self._can_write_data:
+                                    self._gaze_writer.write(timestamp, [x, y])
                     finally:
                         del frame_copy
                 time.sleep(0.033)
@@ -1519,6 +1551,8 @@ class BackendServer:
         """Continuously collect and write face landmark data in a loop."""
         video_path = None
         video_writer = None
+        frame_count = 0
+        start_time = time.time()
         
         try:
             self._add_thread(threading.current_thread())
@@ -1534,22 +1568,31 @@ class BackendServer:
             height, width = frame.shape[:2]
             video_path = os.path.join(self._path, f"{self._filename}_landmarks.mp4")
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (width, height))
+            video_writer = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
             
             while not self._shutdown and self._data_collection_active:
                 frame = self._camera_manager.get_frame()
                 if frame is not None:
                     processed_frame, landmarks = self._face_landmarks_detector.process_frame(frame)
                     if landmarks:
+                        self._face_landmarks_first_data_received = True
                         timestamp = round(time.time() - self._start_time, 3)
-                        self._face_landmarks_writer.write(timestamp, landmarks)
+                        if self._can_write_data:
+                            self._face_landmarks_writer.write(timestamp, landmarks)
                         
                     # Write the processed frame to video
-                    if processed_frame is not None:
+                    if processed_frame is not None and self._can_write_data:
                         video_writer.write(processed_frame)
+                        frame_count += 1
                         
-                time.sleep(0.033)  # ~30 FPS
-            
+                        # Calculate and print FPS every 30 frames
+                        if frame_count % 30 == 0:
+                            elapsed_time = time.time() - start_time
+                            fps = frame_count / elapsed_time
+                            print(f"Face landmarks actual FPS: {fps:.2f}")
+                
+                time.sleep(0.033)  # 1/30 = 0.033 seconds for 30 fps
+                
         finally:
             if self._face_landmarks_writer:
                 self._face_landmarks_writer.close_file()
@@ -1614,3 +1657,20 @@ class BackendServer:
         with self._threads_lock:
             # Remove the weak reference to the thread
             self._active_threads = {t for t in self._active_threads if t() is not thread}
+    
+    def _check_streams_synchronized(self):
+        """Wait for first valid data from each active stream before starting collection."""
+        streams_status = []
+        if self._run_aura:
+            streams_status.append(self._aura_first_data_received)
+
+        if self._run_gaze:
+            streams_status.append(self._gaze_first_data_received)
+
+        if self._run_emotion:
+            streams_status.append(self._emotion_first_data_received)
+        
+        if self._run_face_landmarks:
+            streams_status.append(self._face_landmarks_first_data_received)
+        
+        return all(streams_status)

@@ -22,6 +22,7 @@ class ScreenRecorder:
         self.output_path = output_path
         self.filename = filename
         self.is_recording_active = False
+        self.can_write_frame = False
         self.video_data_writer = None
         self.screen_width, self.screen_height = self.__get_main_screen_resolution()
         self.mss_area = {'top': 0, 'left': 0, 'width': self.screen_width, 'height': self.screen_height}
@@ -38,7 +39,8 @@ class ScreenRecorder:
 
                     if formated_frame.shape[1::-1] != (self.screen_width, self.screen_height):
                         formated_frame = cv2.resize(formated_frame, (self.screen_width, self.screen_height))
-                    self.video_data_writer.write(formated_frame)
+                    if self.can_write_frame:
+                        self.video_data_writer.write(formated_frame)
                 if not self.is_recording_active:
                     break
 
@@ -112,3 +114,17 @@ class ScreenRecorder:
         
         # Post-process the video using the shared function
         return post_process_video(original_file, original_file)
+
+    def set_frame_writing(self, enabled: bool) -> None:
+        """
+        Enable or disable frame writing during recording.
+        :param enabled: Boolean indicating if frames should be written
+        """
+        self.can_write_frame = enabled
+
+    def get_frame_writing_state(self) -> bool:
+        """
+        Get the current frame writing state.
+        :return: Boolean indicating if frames are being written
+        """
+        return self.can_write_frame
