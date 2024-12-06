@@ -1573,8 +1573,28 @@ class BackendServer:
             # Initialize video writer using frame dimensions
             height, width = frame.shape[:2]
             video_path = os.path.join(self._path, f"{self._filename}_landmarks.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
+            
+            # Try different codecs in order of preference
+            codecs = ['avc1', 'h264', 'mp4v']
+            video_writer = None
+            
+            for codec in codecs:
+                try:
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    temp_writer = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
+                    if temp_writer.isOpened():
+                        video_writer = temp_writer
+                        print(f"Successfully initialized video writer with codec: {codec}")
+                        break
+                    temp_writer.release()
+                except Exception as e:
+                    print(f"Failed to initialize video writer with codec {codec}: {str(e)}")
+                    continue
+            
+            if video_writer is None:
+                print("Failed to initialize video writer with any codec")
+                self.send_signal_update("face_landmarks", 'error')
+                return
             
             while not self._shutdown and self._data_collection_active:
                 frame = self._camera_manager.get_frame()
