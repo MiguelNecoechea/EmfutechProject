@@ -1708,7 +1708,6 @@ class BackendServer:
                     if message.get("type") == "gaze_coordinates":
                         gaze_data = message["data"]
                         x, y = gaze_data["x"], gaze_data["y"]
-                        print(f"Gaze data received: x={x}, y={y}")
                         self._gaze_first_data_received = True
                         if self._can_write_data:
                             timestamp = round(time.time() - self._start_time, 3)

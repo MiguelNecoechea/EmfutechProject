@@ -4,12 +4,15 @@ import pandas as pd
 from scipy.ndimage import gaussian_filter
 from multiprocessing import Pool, cpu_count
 from DataProcessing.ffmpegPostProcessing import post_process_video
+import os
 
 class GazeHeatmapProcessor:
     @staticmethod
     def process_video(video_file: str, csv_file: str, output_file: str, batch_size: int = 16):
-        # Create a temporary output file for OpenCV
-        temp_output = output_file + '.temp.mp4'
+        # Create a temporary output file with a proper name and path
+        output_dir = os.path.dirname(output_file)
+        temp_name = f"temp_{os.path.basename(output_file)}"
+        temp_output = os.path.join(output_dir, temp_name)
         
         print("---> Heatmap process started <----")
         
