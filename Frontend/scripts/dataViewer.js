@@ -153,29 +153,6 @@ class DataViewer {
         const dataType = selector.value;
         console.log('Loading data for type:', dataType);
         
-        // Store the current options HTML before rebuilding
-        const currentOptions = selector.innerHTML;
-        
-        // Update the data-container structure with top-bottom layout
-        const dataContainer = document.querySelector('.data-container');
-        dataContainer.innerHTML = `
-            <div class="video-section">
-                <div class="video-container"></div>
-            </div>
-            <div class="visualization-section">
-                <div class="visualization-controls">
-                    <select id="data-type-selector">${currentOptions}</select>
-                    <button id="refresh-data">Refresh</button>
-                </div>
-                <div id="visualization-area"></div>
-            </div>
-        `;
-        
-        // Restore the selected value and event listeners
-        const newSelector = document.getElementById('data-type-selector');
-        newSelector.value = dataType;
-        this.setupEventListeners();
-        
         try {
             const response = await window.electronAPI.getParticipantData({
                 folderPath: this.participantData.folderPath,
@@ -211,8 +188,7 @@ class DataViewer {
                     const mainVideo = heatmapVideo || screenVideo;
                     const totalVideos = (mainVideo ? 1 : 0) + (landmarksVideo ? 1 : 0);
                     const fileSizeMB = Math.round(
-                        (mainVideo?.size || 0 + 
-                         landmarksVideo?.size || 0) / (1024 * 1024)
+                        ((mainVideo?.size || 0) + (landmarksVideo?.size || 0)) / (1024 * 1024)
                     );
                     
                     videoContainer.innerHTML = `
@@ -225,40 +201,79 @@ class DataViewer {
 
                     // Helper function to normalize file paths for both Windows and Mac
                     const normalizeFilePath = (path) => {
-                        // Convert backslashes to forward slashes
-                        path = path.replace(/\\/g, '/');
-                        // Ensure the path starts with file:///
-                        if (!path.startsWith('file:///')) {
-                            path = 'file:///' + path;
+                        try {
+                            // Convert backslashes to forward slashes
+                            path = path.replace(/\\/g, '/');
+                            
+                            // Remove any existing file:/// prefix
+                            path = path.replace(/^file:\/\/\/?/g, '');
+                            
+                            // Handle Windows drive letters (e.g., C:)
+                            const isWindowsPath = /^[A-Za-z]:/i.test(path);
+                            
+                            // For absolute paths on Mac/Linux, ensure they start with a single slash
+                            if (!isWindowsPath && path.startsWith('/')) {
+                                path = path.replace(/^\/+/, '/');
+                            }
+                            
+                            // Add file:/// prefix
+                            const prefix = 'file://';
+                            path = prefix + (isWindowsPath ? '/' : '') + path;
+                            
+                            // Encode each path segment individually, preserving slashes
+                            return path.split('/')
+                                .map((segment, index) => {
+                                    // Don't encode the protocol or empty segments
+                                    if (segment === 'file:' || !segment) return segment;
+                                    return encodeURIComponent(segment);
+                                })
+                                .join('/');
+                        } catch (error) {
+                            console.error('Error normalizing file path:', error, 'Original path:', path);
+                            throw error;
                         }
-                        // Handle Windows drive letters (e.g., C:)
-                        if (/^file:\/\/\/[A-Za-z]:/.test(path)) {
-                            path = path.replace(/^file:\/\/\/([A-Za-z]):/, 'file:///$1:');
+                    };
+
+                    const createVideoElement = (video, label) => {
+                        try {
+                            const normalizedPath = normalizeFilePath(video.path);
+                            console.log(`Original path for ${label}:`, video.path);
+                            console.log(`Normalized path for ${label}:`, normalizedPath);
+                            
+                            return `
+                                <div class="video-wrapper ${label.toLowerCase().replace(/\s+/g, '-')}-video">
+                                    <div class="video-label">${label}</div>
+                                    <video 
+                                        preload="metadata" 
+                                        id="${label.toLowerCase().replace(/\s+/g, '-')}-video"
+                                    >
+                                        <source 
+                                            src="${normalizedPath}" 
+                                            type="video/mp4"
+                                            onerror="console.error('Error loading video source:', this.src)"
+                                        >
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+                            `;
+                        } catch (error) {
+                            console.error(`Error creating video element for ${label}:`, error);
+                            return `
+                                <div class="video-wrapper ${label.toLowerCase().replace(/\s+/g, '-')}-video">
+                                    <div class="error-message">
+                                        Error loading ${label} video: ${error.message}
+                                        <br>
+                                        <small>Path: ${video.path}</small>
+                                    </div>
+                                </div>
+                            `;
                         }
-                        // Encode special characters in the path
-                        return encodeURI(path);
                     };
 
                     const videoHtml = `
                         <div class="video-grid">
-                            ${mainVideo ? `
-                                <div class="video-wrapper screen-video">
-                                    <div class="video-label">${heatmapVideo ? 'Gaze Heatmap' : 'Screen Recording'}</div>
-                                    <video preload="metadata" id="screen-video">
-                                        <source src="${normalizeFilePath(mainVideo.path)}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                </div>
-                            ` : ''}
-                            ${landmarksVideo ? `
-                                <div class="video-wrapper landmarks-video">
-                                    <div class="video-label">Facial Landmarks</div>
-                                    <video preload="metadata" id="landmarks-video">
-                                        <source src="${normalizeFilePath(landmarksVideo.path)}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                </div>
-                            ` : ''}
+                            ${mainVideo ? createVideoElement(mainVideo, heatmapVideo ? 'Gaze Heatmap' : 'Screen Recording') : ''}
+                            ${landmarksVideo ? createVideoElement(landmarksVideo, 'Facial Landmarks') : ''}
                         </div>
                         <div class="video-controls">
                             <button id="play-pause-btn" class="control-btn">
@@ -283,20 +298,63 @@ class DataViewer {
                         
                         let loadedVideos = 0;
                         const videoElements = videoContainer.querySelectorAll('video');
+                        const totalVideos = videoElements.length;
                         
+                        if (totalVideos === 0) {
+                            reject(new Error('No video elements created'));
+                            return;
+                        }
+
                         const checkAllLoaded = () => {
                             loadedVideos++;
-                            if (loadedVideos === videoElements.length) {
+                            console.log(`Video loaded (${loadedVideos}/${totalVideos})`);
+                            if (loadedVideos === totalVideos) {
                                 resolve(videoElements);
                             }
                         };
 
+                        const handleVideoError = (video, error) => {
+                            console.error('Video loading error:', error);
+                            const wrapper = video.closest('.video-wrapper');
+                            if (wrapper) {
+                                wrapper.innerHTML = `
+                                    <div class="error-message">
+                                        Error loading video: ${error.message || 'Unknown error'}
+                                        <br>
+                                        <small>
+                                            Try:
+                                            <ul>
+                                                <li>Converting to a different format (e.g., MP4 with H.264 codec)</li>
+                                                <li>Reducing the file size</li>
+                                                <li>Checking if the file exists</li>
+                                            </ul>
+                                        </small>
+                                    </div>
+                                `;
+                            }
+                            checkAllLoaded(); // Still count as loaded to not block other videos
+                        };
+
                         videoElements.forEach(video => {
-                            video.addEventListener('loadeddata', checkAllLoaded);
+                            video.addEventListener('loadeddata', () => {
+                                console.log('Video loaded:', video.id);
+                                checkAllLoaded();
+                            });
+                            
                             video.addEventListener('error', (e) => {
-                                console.error('Video error:', e);
-                                const error = video.error;
-                                reject(error);
+                                handleVideoError(video, video.error || new Error('Unknown video error'));
+                            });
+
+                            // Add timeout for video loading
+                            const loadTimeout = setTimeout(() => {
+                                if (video.readyState < 2) { // Not loaded
+                                    handleVideoError(video, new Error('Video loading timeout'));
+                                    video.removeEventListener('loadeddata', checkAllLoaded);
+                                }
+                            }, 30000); // 30 second timeout
+
+                            video.addEventListener('loadeddata', () => {
+                                clearTimeout(loadTimeout);
                             });
                         });
                     }, 100);
