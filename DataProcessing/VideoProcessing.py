@@ -7,6 +7,7 @@ from DataProcessing.ffmpegPostProcessing import post_process_video
 
 class GazeHeatmapProcessor:
     @staticmethod
+    # Safe implementation of the process_video method
     def process_video(video_file: str, csv_file: str, output_file: str, batch_size: int = 16):
         # Create a temporary output file for OpenCV
         temp_output = output_file + '.temp.mp4'
