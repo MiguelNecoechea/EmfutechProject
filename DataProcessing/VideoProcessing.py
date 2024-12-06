@@ -45,10 +45,14 @@ class GazeHeatmapProcessor:
         # Initialize heatmap
         heatmap = np.zeros((frame_height, frame_width), dtype=np.float32)
         if use_gpu:
-            gpu_heatmap = cv2.cuda_GpuMat()
+            gpu_heatmap = cv2.cuda_GpuMat(frame_height, frame_width, cv2.CV_32F)
             gpu_frame = cv2.cuda_GpuMat()
             gpu_heatmap_colored = cv2.cuda_GpuMat()
+            gpu_overlay = cv2.cuda_GpuMat()
             gpu_stream = cv2.cuda_Stream()
+            
+            # Initialize GPU heatmap with zeros
+            gpu_heatmap.upload(heatmap)
 
         decay_rate = 0.9
 
@@ -63,31 +67,38 @@ class GazeHeatmapProcessor:
             if not ret:
                 break
 
-            # Decay previous points on the heatmap
-            heatmap *= decay_rate
-
-            # Find all gaze points that correspond to this frame's timestamp
+            # Calculate frame timestamps
             current_time = frame_idx * ms_per_frame
             next_frame_time = (frame_idx + 1) * ms_per_frame
 
-            # Update heatmap with all gaze points that fall within this frame's time window
-            for i in range(last_gaze_idx, len(gaze_data)):
-                timestamp, x, y = gaze_data[i]
-                
-                # Skip if this gaze point is for a future frame
-                if timestamp > next_frame_time:
-                    break
-                    
-                # Use this gaze point if it falls within current frame's time window
-                if timestamp >= current_time and timestamp < next_frame_time:
-                    x, y = int(x), int(y)
-                    if 0 <= x < frame_width and 0 <= y < frame_height:  # Ensure coordinates are within frame
-                        cv2.circle(heatmap, (x, y), radius=90, color=1, thickness=-1)
-                
-                last_gaze_idx = i
-
             if use_gpu:
-                overlay = GazeHeatmapProcessor._process_frame_gpu(frame, heatmap, gpu_frame, gpu_heatmap, gpu_heatmap_colored, gpu_stream)
+                # Upload frame to GPU
+                gpu_frame.upload(frame)
+                
+                # Decay previous points on GPU
+                gpu_heatmap.convertTo(gpu_heatmap, cv2.CV_32F, decay_rate, 0, gpu_stream)
+                
+                # Update heatmap with new gaze points
+                for i in range(last_gaze_idx, len(gaze_data)):
+                    timestamp, x, y = gaze_data[i]
+                    if timestamp > next_frame_time:
+                        break
+                    if timestamp >= current_time and timestamp < next_frame_time:
+                        x, y = int(x), int(y)
+                        if 0 <= x < frame_width and 0 <= y < frame_height:
+                            # Create temporary CPU heatmap for the new point
+                            point_heatmap = np.zeros_like(heatmap)
+                            cv2.circle(point_heatmap, (x, y), radius=90, color=1, thickness=-1)
+                            # Upload and add to GPU heatmap
+                            point_gpu = cv2.cuda_GpuMat()
+                            point_gpu.upload(point_heatmap)
+                            cv2.cuda.add(gpu_heatmap, point_gpu, gpu_heatmap, stream=gpu_stream)
+                            point_gpu.release()
+                    last_gaze_idx = i
+                
+                # Process the frame on GPU
+                overlay = GazeHeatmapProcessor._process_frame_gpu(
+                    gpu_frame, gpu_heatmap, gpu_heatmap_colored, gpu_overlay, gpu_stream)
                 out.write(overlay)
             else:
                 # Collect frames and heatmaps for batch processing
@@ -118,6 +129,7 @@ class GazeHeatmapProcessor:
             gpu_heatmap.release()
             gpu_frame.release()
             gpu_heatmap_colored.release()
+            gpu_overlay.release()
 
         # Post-process with FFmpeg
         success = post_process_video(temp_output, output_file)
@@ -152,29 +164,25 @@ class GazeHeatmapProcessor:
         return gaze_data
 
     @staticmethod
-    def _process_frame_gpu(frame: np.ndarray, heatmap: np.ndarray, 
-                          gpu_frame: cv2.cuda_GpuMat, gpu_heatmap: cv2.cuda_GpuMat,
+    def _process_frame_gpu(gpu_frame: cv2.cuda_GpuMat, gpu_heatmap: cv2.cuda_GpuMat,
                           gpu_heatmap_colored: cv2.cuda_GpuMat, 
+                          gpu_overlay: cv2.cuda_GpuMat,
                           stream: cv2.cuda_Stream) -> np.ndarray:
-        # Upload data to GPU
-        gpu_frame.upload(frame)
+        # Apply Gaussian blur on GPU
+        cv2.cuda.GaussianBlur(gpu_heatmap, (0, 0), 40, gpu_heatmap, stream=stream)
         
-        # Apply Gaussian blur (CPU for now as CUDA doesn't have direct gaussian_filter equivalent)
-        smoothed_heatmap = gaussian_filter(heatmap, sigma=40)
-        
-        # Normalize the heatmap
-        heatmap_normalized = cv2.normalize(smoothed_heatmap, None, 0, 255, cv2.NORM_MINMAX)
-        gpu_heatmap.upload(heatmap_normalized.astype(np.uint8))
+        # Normalize the heatmap on GPU
+        cv2.cuda.normalize(gpu_heatmap, gpu_heatmap, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U, stream=stream)
         
         # Apply colormap on GPU
-        cv2.cuda.cvtColor(gpu_heatmap, cv2.COLOR_GRAY2BGR, gpu_heatmap_colored, stream)
-        cv2.cuda.applyColorMap(gpu_heatmap_colored, cv2.COLORMAP_JET, gpu_heatmap_colored, stream)
+        cv2.cuda.cvtColor(gpu_heatmap, cv2.COLOR_GRAY2BGR, gpu_heatmap_colored, stream=stream)
+        cv2.cuda.applyColorMap(gpu_heatmap_colored, cv2.COLORMAP_JET, gpu_heatmap_colored, stream=stream)
         
         # Blend images on GPU
-        result = cv2.cuda.addWeighted(gpu_frame, 0.6, gpu_heatmap_colored, 0.4, 0, stream)
+        cv2.cuda.addWeighted(gpu_frame, 0.6, gpu_heatmap_colored, 0.4, 0, gpu_overlay, stream=stream)
         
         # Download result back to CPU
-        return result.download()
+        return gpu_overlay.download()
 
     @staticmethod
     def _process_frame_cpu(frame: np.ndarray, heatmap: np.ndarray) -> np.ndarray:
