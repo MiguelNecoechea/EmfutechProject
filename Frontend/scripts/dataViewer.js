@@ -223,13 +223,29 @@ class DataViewer {
                         </div>
                     `;
 
+                    // Helper function to normalize file paths for both Windows and Mac
+                    const normalizeFilePath = (path) => {
+                        // Convert backslashes to forward slashes
+                        path = path.replace(/\\/g, '/');
+                        // Ensure the path starts with file:///
+                        if (!path.startsWith('file:///')) {
+                            path = 'file:///' + path;
+                        }
+                        // Handle Windows drive letters (e.g., C:)
+                        if (/^file:\/\/\/[A-Za-z]:/.test(path)) {
+                            path = path.replace(/^file:\/\/\/([A-Za-z]):/, 'file:///$1:');
+                        }
+                        // Encode special characters in the path
+                        return encodeURI(path);
+                    };
+
                     const videoHtml = `
                         <div class="video-grid">
                             ${mainVideo ? `
                                 <div class="video-wrapper screen-video">
                                     <div class="video-label">${heatmapVideo ? 'Gaze Heatmap' : 'Screen Recording'}</div>
                                     <video preload="metadata" id="screen-video">
-                                        <source src="file:///${mainVideo.path.replace(/\\/g, '/')}" type="video/mp4">
+                                        <source src="${normalizeFilePath(mainVideo.path)}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
                                 </div>
@@ -238,7 +254,7 @@ class DataViewer {
                                 <div class="video-wrapper landmarks-video">
                                     <div class="video-label">Facial Landmarks</div>
                                     <video preload="metadata" id="landmarks-video">
-                                        <source src="file:///${landmarksVideo.path.replace(/\\/g, '/')}" type="video/mp4">
+                                        <source src="${normalizeFilePath(landmarksVideo.path)}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
                                 </div>
@@ -447,11 +463,27 @@ class DataViewer {
                         throw new Error(`No ${dataType} data found`);
                     }
 
-                    // Normalize file path for Windows
-                    const normalizedPath = file.path.replace(/\\/g, '/');
+                    // Helper function to normalize file paths for both Windows and Mac
+                    const normalizeFilePath = (path) => {
+                        // Convert backslashes to forward slashes
+                        path = path.replace(/\\/g, '/');
+                        // Ensure the path starts with file:///
+                        if (!path.startsWith('file:///')) {
+                            path = 'file:///' + path;
+                        }
+                        // Handle Windows drive letters (e.g., C:)
+                        if (/^file:\/\/\/[A-Za-z]:/.test(path)) {
+                            path = path.replace(/^file:\/\/\/([A-Za-z]):/, 'file:///$1:');
+                        }
+                        // Encode special characters in the path
+                        return encodeURI(path);
+                    };
+
+                    // Normalize file path for Windows and Mac
+                    const normalizedPath = normalizeFilePath(file.path);
                     console.log('Normalized file path:', normalizedPath);
                     
-                    const csvData = await fetch(`file:///${normalizedPath}`);
+                    const csvData = await fetch(normalizedPath);
                     const csvText = await csvData.text();
                     
                     // Parse CSV and create structured data
