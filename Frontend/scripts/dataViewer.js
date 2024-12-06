@@ -169,15 +169,21 @@ class DataViewer {
             // Load videos if available
             const videoContainer = document.querySelector('.video-container');
             const screenVideo = response.data.files.find(f => 
-                f.name.toLowerCase().includes('_screen.mp4')
+                f.name.toLowerCase().endsWith('_screen.mp4') && !f.name.toLowerCase().endsWith('.temp')
             );
             const landmarksVideo = response.data.files.find(f => 
-                f.name.toLowerCase().includes('_landmarks.mp4')
+                f.name.toLowerCase().endsWith('_landmarks.mp4') && !f.name.toLowerCase().endsWith('.temp')
             );
             const heatmapVideo = response.data.files.find(f => 
-                f.name.toLowerCase().includes('_heatmap.mp4')
+                f.name.toLowerCase().endsWith('_heatmap.mp4') && !f.name.toLowerCase().endsWith('.temp')
             );
-            console.log('Found videos:', { screenVideo, landmarksVideo, heatmapVideo });
+            
+            // Log found videos and their paths for debugging
+            console.log('Found videos:', {
+                screen: screenVideo?.path,
+                landmarks: landmarksVideo?.path,
+                heatmap: heatmapVideo?.path
+            });
             
             if (screenVideo || landmarksVideo || heatmapVideo) {
                 console.log('Loading videos...');
