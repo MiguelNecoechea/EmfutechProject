@@ -1,5 +1,6 @@
 import subprocess
 import os
+import shutil
 from typing import Optional
 
 def post_process_video(input_file: str, output_file: str, remove_input: bool = True) -> bool:
@@ -16,8 +17,15 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
     """
     try:
         print("Post-processing video with FFmpeg...")
-        # Create a temporary output file if input and output are the same
-        temp_file = output_file + '.temp.mp4' if input_file == output_file else output_file
+        # Always use a temporary file with a unique name
+        temp_file = output_file + '.processing.mp4'
+        
+        # Remove any existing temporary file
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception as e:
+                print(f"Warning: Could not remove existing temp file: {str(e)}")
         
         command = [
             'ffmpeg',
@@ -41,39 +49,40 @@ def post_process_video(input_file: str, output_file: str, remove_input: bool = T
         )
         
         if process.returncode == 0:
-            if input_file == output_file:
+            # If the temp file was created successfully
+            if os.path.exists(temp_file):
                 try:
-                    # First try to remove the original file
-                    if os.path.exists(input_file):
+                    # Remove the target file if it exists
+                    if os.path.exists(output_file):
+                        os.remove(output_file)
+                    
+                    # Try to move the temp file to the target location
+                    shutil.move(temp_file, output_file)
+                    
+                    # If we need to remove the input file and it's different from the output
+                    if remove_input and input_file != output_file and os.path.exists(input_file):
                         os.remove(input_file)
-                    # Then rename the temp file
-                    os.rename(temp_file, output_file)
+                        
+                    print(f"Video successfully converted to web-compatible format: {output_file}")
+                    return True
                 except Exception as e:
-                    print(f"Error during file replacement: {str(e)}")
-                    # If rename fails, try an alternative approach
-                    try:
-                        import shutil
-                        shutil.move(temp_file, output_file)
-                    except Exception as e2:
-                        print(f"Error during file move: {str(e2)}")
-                        return False
-            elif remove_input and input_file != output_file:
-                # If we're not overwriting and remove_input is True, delete the input
-                os.remove(input_file)
-                
-            print(f"Video successfully converted to web-compatible format: {output_file}")
-            return True
+                    print(f"Error during file operations: {str(e)}")
+                    return False
+            else:
+                print("Error: FFmpeg completed but output file was not created")
+                return False
         else:
             error_message = process.stderr.decode()
             print(f"Error converting video: {error_message}")
-            # Clean up temp file if it exists
-            if os.path.exists(temp_file) and temp_file != output_file:
-                os.remove(temp_file)
             return False
             
     except Exception as e:
         print(f"Error during video conversion: {str(e)}")
-        # Clean up temp file if it exists
-        if 'temp_file' in locals() and os.path.exists(temp_file) and temp_file != output_file:
-            os.remove(temp_file)
         return False
+    finally:
+        # Clean up temp file if it exists
+        try:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        except Exception as e:
+            print(f"Warning: Could not remove temporary file: {str(e)}")
