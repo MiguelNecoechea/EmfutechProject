@@ -42,7 +42,7 @@ class GazeHeatmapProcessor:
         ms_per_frame = 1000 / fps
 
         # Use temp file for OpenCV output
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         out = cv2.VideoWriter(temp_output, fourcc, fps, (frame_width, frame_height))
 
         # Initialize heatmap
