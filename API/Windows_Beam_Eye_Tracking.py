@@ -20,7 +20,7 @@ api_path = Path(__file__).parent.parent.parent
 sys.path.append(str(api_path))
 
 try:
-    from eyeware.client import TrackerClient
+    from python.eyeware.client import TrackerClient
 except ImportError as e:
     print(f"Error importing TrackerClient: {e}")
     print(f"Current sys.path: {sys.path}")
