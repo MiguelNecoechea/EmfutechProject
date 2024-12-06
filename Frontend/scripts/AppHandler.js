@@ -576,12 +576,14 @@ class AppHandler {
             const eyeTrackingBtn = item.querySelector('.eye-tracking-button');
             const startBtn = item.querySelector('.start-button');
             const stopBtn = item.querySelector('.stop-button');
+            const viewDataBtn = item.querySelector('.view-data-button');
             
             // Always disable buttons for non-selected participants
             if (!isSelected) {
                 if (eyeTrackingBtn) eyeTrackingBtn.disabled = true;
                 if (startBtn) startBtn.disabled = true;
                 if (stopBtn) stopBtn.disabled = true;
+                if (viewDataBtn) viewDataBtn.disabled = true;
                 return;
             }
             
@@ -594,6 +596,9 @@ class AppHandler {
             }
             if (buttonType === 'all' || buttonType === 'stop') {
                 if (stopBtn) stopBtn.disabled = state;
+            }
+            if (buttonType === 'all' || buttonType === 'view-data') {
+                if (viewDataBtn) viewDataBtn.disabled = state;
             }
         });
     }
@@ -1019,11 +1024,12 @@ class AppHandler {
                 const response = await window.electronAPI.getExperiment(this.selectedExperimentId);
                 if (response.status === 'success' && response.data && response.data.signals) {
                     const signals = response.data.signals;
-                    if (signals.eye && this.calibrationCount === 0) {
-                        this.updateButtonStates(STATES.CALIBRATE);
-                    } else {
-                        this.updateButtonStates(STATES.READY);
-                    }
+                    this.updateButtonStates(STATES.READY);
+                    // if (signals.eye && this.calibrationCount === 0) {
+                    //     this.updateButtonStates(STATES.CALIBRATE);
+                    // } else {
+                    //     this.updateButtonStates(STATES.READY);
+                    // }
                 }
             }
             
@@ -1255,7 +1261,8 @@ class AppHandler {
                     signalEmotion: document.getElementById('signal-emotion'),
                     signalPointer: document.getElementById('signal-pointer'),
                     signalKeyboard: document.getElementById('signal-keyboard'),
-                    signalScreen: document.getElementById('signal-screen')
+                    signalScreen: document.getElementById('signal-screen'),
+                    signalLandmarks: document.getElementById('signal-landmarks')
                 };
 
                 // Reset all study panel elements
@@ -1272,7 +1279,8 @@ class AppHandler {
                     emotion: elements.signalEmotion,
                     pointer: elements.signalPointer,
                     keyboard: elements.signalKeyboard,
-                    screen: elements.signalScreen
+                    screen: elements.signalScreen,
+                    landmarks: elements.signalLandmarks
                 }).forEach(([_, element]) => {
                     if (element) {
                         element.textContent = '-';
