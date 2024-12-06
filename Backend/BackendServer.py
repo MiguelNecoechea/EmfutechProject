@@ -535,44 +535,52 @@ class BackendServer:
                         self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_EMOTION})
                         self._emotion_thread.start()
                 
+                debug = True
                 # Coordinate/Gaze
                 if self._run_gaze:
                     self._gaze_writer = CoordinateWriter(self._path, f'{self._filename}{GAZE_FILE_SUFFIX}')
                     self._gaze_writer.create_new_file()
-                    
-                    if self._eye_tracking_process is not None:
-                        # Using Beam eye tracking
-                        def beam_gaze_collection_loop():
-                            try:
-                                self._add_thread(threading.current_thread())
-                                while self._data_collection_active:
-                                    try:
-                                        message = self._eye_tracking_socket.recv_json(flags=zmq.NOBLOCK)
-                                        if message.get("type") == "gaze_coordinates":
-                                            gaze_data = message["data"]
-                                            timestamp = round(time.time() - self._start_time, 3)
-                                            self._gaze_writer.write(timestamp, [gaze_data["x"], gaze_data["y"]])
-                                    except zmq.error.Again:
-                                        time.sleep(0.001)  # Brief sleep when no message
-                                    except Exception as e:
-                                        print(f"Error in beam gaze collection: {e}")
-                                        break
-                            finally:
-                                self._remove_thread(threading.current_thread())
+                    if debug:
+                        self._eye_gaze_running = True
+                        gaze_thread = threading.Thread(
+                            target=self._gaze_socket_collection_loop,
+                            daemon=True
+                        )
+                        gaze_thread.start()
+                    else:   
+                        if self._eye_tracking_process is not None:
+                            # Using Beam eye tracking
+                            def beam_gaze_collection_loop():
+                                try:
+                                    self._add_thread(threading.current_thread())
+                                    while self._data_collection_active:
+                                        try:
+                                            message = self._eye_tracking_socket.recv_json(flags=zmq.NOBLOCK)
+                                            if message.get("type") == "gaze_coordinates":
+                                                gaze_data = message["data"]
+                                                timestamp = round(time.time() - self._start_time, 3)
+                                                self._gaze_writer.write(timestamp, [gaze_data["x"], gaze_data["y"]])
+                                        except zmq.error.Again:
+                                            time.sleep(0.001)  # Brief sleep when no message
+                                        except Exception as e:
+                                            print(f"Error in beam gaze collection: {e}")
+                                            break
+                                finally:
+                                    self._remove_thread(threading.current_thread())
 
-                        self._regressor_thread = threading.Thread(
-                            target=beam_gaze_collection_loop,
-                            daemon=True
-                        )
-                    else:
-                        # Using webcam-based tracking
-                        self._regressor_thread = threading.Thread(
-                            target=self._coordinate_regressor_loop,
-                            daemon=True
-                        )
-                    
-                    self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
-                    self._regressor_thread.start()
+                            self._regressor_thread = threading.Thread(
+                                target=beam_gaze_collection_loop,
+                                daemon=True
+                            )
+                        else:
+                            # Using webcam-based tracking
+                            self._regressor_thread = threading.Thread(
+                                target=self._coordinate_regressor_loop,
+                                daemon=True
+                            )
+                        
+                        self._socket.send_json({"status": STATUS_SUCCESS, "message": COLLECTION_STARTED_MSG, "signal": SIGNAL_GAZE})
+                        self._regressor_thread.start()
 
                 # Face Landmarks
                 if self._run_face_landmarks:
@@ -1665,3 +1673,35 @@ class BackendServer:
             streams_status.append(self._face_landmarks_first_data_received)
         
         return all(streams_status)
+
+    def _gaze_socket_collection_loop(self):
+        """Dedicated loop to collect gaze data from ZMQ socket on port 5557."""
+        try:
+            self._add_thread(threading.current_thread())
+            self.send_signal_update(SIGNAL_GAZE, 'recording')
+            
+            while not self._shutdown and self._data_collection_active:
+                try:
+                    # Try to receive message from the socket without blocking
+                    message = self._eye_tracking_socket.recv_json(flags=zmq.NOBLOCK)
+                    
+                    if message.get("type") == "gaze_coordinates":
+                        gaze_data = message["data"]
+                        x, y = gaze_data["x"], gaze_data["y"]
+                        print(f"Gaze data received: x={x}, y={y}")
+                        self._gaze_first_data_received = True
+                        if self._can_write_data:
+                            timestamp = round(time.time() - self._start_time, 3)
+                            self._gaze_writer.write(timestamp, [x, y])
+                    
+                except zmq.error.Again:
+                    # No message available, sleep briefly
+                    time.sleep(0.001)
+                except Exception as e:
+                    print(f"Error processing gaze data: {e}")
+                    time.sleep(0.001)
+                    
+        finally:
+            self._eye_gaze_running = False
+            self.send_signal_update(SIGNAL_GAZE, 'ready')
+            self._remove_thread(threading.current_thread())
