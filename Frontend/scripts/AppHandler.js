@@ -207,16 +207,17 @@ class AppHandler {
                 alert('Please select a participant first');
                 return;
             }
+            window.electronAPI.sendPythonCommand(COMMANDS.VIEW_CAMERA);
 
-            if (!this.isViewingCamera) {
-                await this.handleViewCamera();
-                this.isViewingCamera = true;
-                this.viewCamera.textContent = 'Close Camera View';
-            } else {
-                await window.electronAPI.closeFrameStream();
-                this.isViewingCamera = false;
-                this.viewCamera.textContent = 'View Camera';
-            }
+            // if (!this.isViewingCamera) {
+            //     await this.handleViewCamera();
+            //     this.isViewingCamera = true;
+            //     this.viewCamera.textContent = 'Close Camera View';
+            // } else {
+            //     await window.electronAPI.closeFrameStream();
+            //     this.isViewingCamera = false;
+            //     this.viewCamera.textContent = 'View Camera';
+            // }
         });
 
         document.getElementById('new-study').addEventListener('click', () => {
@@ -528,7 +529,7 @@ class AppHandler {
                 this.lockUIForCalibration(true);
                 break;
             case STATES.INITIAL:
-                this.viewCamera.disabled = this.DISABLED;
+                this.viewCamera.disabled = this.ENABLED;
                 addParticipantBtn.disabled = !this.selectedExperimentId;
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
@@ -551,7 +552,7 @@ class AppHandler {
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
                 participantsList.style.pointerEvents = 'auto';
-                this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
+                this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 this.updateParticipantButtonStates('stop', this.DISABLED);
                 this.updateParticipantButtonStates('start', this.ENABLED);
                 this.updateParticipantButtonStates('eye-tracking', this.DISABLED);

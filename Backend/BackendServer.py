@@ -816,7 +816,7 @@ class BackendServer:
                     self.send_signal_update(signal, status)
             
             # Post-process data at the very end
-            self._post_process_eye_gaze()
+            # self._post_process_eye_gaze()
 
             return {"status": STATUS_SUCCESS, "message": COLLECTION_STOPPED_MSG}
         except Exception as e:
@@ -1118,7 +1118,8 @@ class BackendServer:
             self._participant_folder = path
             self._path = os.path.join(path, COLLECTED_FOLDER)
             self._training_path = os.path.join(path, TRAINING_FOLDER)
-            
+            self._screen_recording_file = os.path.join(self._path, f"{self._filename}{SCREEN_FILE_SUFFIX}")
+
             return {"status": STATUS_SUCCESS, "message": "Output path updated"}
         except Exception as e:
             return {"status": STATUS_ERROR, "message": str(e)}
@@ -1377,70 +1378,71 @@ class BackendServer:
 
     def view_camera(self):
         """Capture frames from the camera and stream them to the frontend via ZMQ."""
-        if self._camera is None or not self._camera.isOpened():
-            result = self.manage_camera(OPEN_CAMERA)
-            if result["status"] == STATUS_ERROR:
-                return result
+        self._post_process_eye_gaze()
+        # if self._camera is None or not self._camera.isOpened():
+        #     result = self.manage_camera(OPEN_CAMERA)
+        #     if result["status"] == STATUS_ERROR:
+        #         return result
 
-        def stream_frames():
-            try:
-                self._add_thread(threading.current_thread())
-                print("Starting camera stream...")
-                while self._viewing_camera and self._camera and self._camera.isOpened():
-                    try:
-                        # Get and process camera frame
-                        ret, frame = self._camera.read()
-                        if not ret or frame is None:
-                            print("Failed to capture frame")
-                            continue
+        # def stream_frames():
+        #     try:
+        #         self._add_thread(threading.current_thread())
+        #         print("Starting camera stream...")
+        #         while self._viewing_camera and self._camera and self._camera.isOpened():
+        #             try:
+        #                 # Get and process camera frame
+        #                 ret, frame = self._camera.read()
+        #                 if not ret or frame is None:
+        #                     print("Failed to capture frame")
+        #                     continue
 
-                        # Process camera frame
-                        frame = cv2.resize(frame, (640, 480))
-                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        if ret:
-                            frame_data = base64.b64encode(buffer).decode('utf-8')
-                            self._socket.send_json({
-                                'type': 'frame',
-                                'data': frame_data
-                            })
+        #                 # Process camera frame
+        #                 frame = cv2.resize(frame, (640, 480))
+        #                 ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        #                 if ret:
+        #                     frame_data = base64.b64encode(buffer).decode('utf-8')
+        #                     self._socket.send_json({
+        #                         'type': 'frame',
+        #                         'data': frame_data
+        #                     })
 
-                        # Process gaze frame if available
-                        gaze_frame = None
-                        if hasattr(self, '_last_gaze_frame') and self._last_gaze_frame is not None:
-                            with threading.Lock():
-                                if self._last_gaze_frame is not None:
-                                    gaze_frame = self._last_gaze_frame.copy()
+        #                 # Process gaze frame if available
+        #                 gaze_frame = None
+        #                 if hasattr(self, '_last_gaze_frame') and self._last_gaze_frame is not None:
+        #                     with threading.Lock():
+        #                         if self._last_gaze_frame is not None:
+        #                             gaze_frame = self._last_gaze_frame.copy()
                         
-                        if gaze_frame is not None:
-                            gaze_frame = cv2.resize(gaze_frame, (640, 480))
-                            ret_gaze, buffer_gaze = cv2.imencode('.jpg', gaze_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                            if ret_gaze:
-                                gaze_data = base64.b64encode(buffer_gaze).decode('utf-8')
-                                self._socket.send_json({
-                                    'type': 'gaze_frame',
-                                    'data': gaze_data
-                                })
-                            del gaze_frame
+        #                 if gaze_frame is not None:
+        #                     gaze_frame = cv2.resize(gaze_frame, (640, 480))
+        #                     ret_gaze, buffer_gaze = cv2.imencode('.jpg', gaze_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        #                     if ret_gaze:
+        #                         gaze_data = base64.b64encode(buffer_gaze).decode('utf-8')
+        #                         self._socket.send_json({
+        #                             'type': 'gaze_frame',
+        #                             'data': gaze_data
+        #                         })
+        #                     del gaze_frame
                         
-                        time.sleep(0.033)
+        #                 time.sleep(0.033)
                         
-                    except Exception as e:
-                        print(f"Error processing frame: {e}")
-                        time.sleep(0.1)
-            except Exception as e:
-                print(f"Fatal error in stream_frames: {e}")
-            finally:
-                self._viewing_camera = False
-                print("Camera streaming stopped")
-                self._remove_thread(threading.current_thread())
+        #             except Exception as e:
+        #                 print(f"Error processing frame: {e}")
+        #                 time.sleep(0.1)
+        #     except Exception as e:
+        #         print(f"Fatal error in stream_frames: {e}")
+        #     finally:
+        #         self._viewing_camera = False
+        #         print("Camera streaming stopped")
+        #         self._remove_thread(threading.current_thread())
 
-        if not self._viewing_camera:
-            self._viewing_camera = True
-            thread = threading.Thread(target=stream_frames, daemon=True)
-            thread.start()
-            return {"status": STATUS_SUCCESS, "message": "Camera streaming started"}
-        else:
-            return {"status": STATUS_ERROR, "message": "Camera is already streaming"}
+        # if not self._viewing_camera:
+        #     self._viewing_camera = True
+        #     thread = threading.Thread(target=stream_frames, daemon=True)
+        #     thread.start()
+        #     return {"status": STATUS_SUCCESS, "message": "Camera streaming started"}
+        # else:
+        #     return {"status": STATUS_ERROR, "message": "Camera is already streaming"}
 
     def stop_camera_view(self):
         """Stop the camera stream."""
