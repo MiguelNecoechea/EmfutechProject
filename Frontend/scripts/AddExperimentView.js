@@ -10,7 +10,8 @@ class AddExperimentView {
         this.experimentName = document.getElementById('experimentName');
         this.experimentDescription = document.getElementById('experimentDescription');
         this.experimentFolder = document.getElementById('experimentFolder');
-        this.experimentLength = document.getElementById('experimentLength');
+        this.experimentMinutes = document.getElementById('experimentMinutes');
+        this.experimentSeconds = document.getElementById('experimentSeconds');
         this.selectFolderBtn = document.getElementById('selectFolder');
         this.cancelBtn = document.getElementById('cancelBtn');
         this.confirmBtn = document.getElementById('confirmBtn');
@@ -61,7 +62,10 @@ class AddExperimentView {
             name: this.experimentName.value,
             description: this.experimentDescription.value,
             folder: this.experimentFolder.value,
-            length: parseInt(this.experimentLength.value),
+            length: {
+                minutes: parseInt(this.experimentMinutes.value),
+                seconds: parseInt(this.experimentSeconds.value)
+            },
             // Update signals configuration
             signals: {
                 aura: this.signalAura.checked,
@@ -110,9 +114,21 @@ class AddExperimentView {
         }
 
         // Length validation
-        const length = parseInt(this.experimentLength.value);
-        if (isNaN(length) || length <= 0) {
-            alert('Please enter a valid experiment length (must be greater than 0)');
+        const minutes = parseInt(this.experimentMinutes.value);
+        const seconds = parseInt(this.experimentSeconds.value);
+        
+        if (isNaN(minutes) || minutes < 0) {
+            alert('Please enter a valid number of minutes (must be 0 or greater)');
+            return false;
+        }
+
+        if (isNaN(seconds) || seconds < 0 || seconds > 59) {
+            alert('Please enter a valid number of seconds (must be between 0 and 59)');
+            return false;
+        }
+
+        if (minutes === 0 && seconds === 0) {
+            alert('Total experiment duration must be greater than 0');
             return false;
         }
 

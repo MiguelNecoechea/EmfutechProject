@@ -376,7 +376,7 @@ class AppHandler {
                             // Update study panel information
                             document.getElementById('study-name').textContent = experimentData.name;
                             document.getElementById('study-description').textContent = experimentData.description;
-                            document.getElementById('study-length').textContent = `${experimentData.length} minutes`;
+                            document.getElementById('study-length').textContent = `${experimentData.length.minutes}:${experimentData.length.seconds.toString().padStart(2, '0')}`;
                             document.getElementById('study-created').textContent = new Date(experimentData.createdAt).toLocaleString();
                             document.getElementById('study-folder').textContent = experimentData.folder;
                             
@@ -653,7 +653,7 @@ class AppHandler {
                         <h3>${experiment.name}</h3>
                         <p>${experiment.description}</p>
                         <div class="experiment-details">
-                            <span>Length: ${experiment.length} minutes</span>
+                            <span>Length: ${experiment.length.minutes}:${experiment.length.seconds.toString().padStart(2, '0')}</span>
                             <span>Created: ${new Date(experiment.createdAt).toLocaleDateString()}</span>
                         </div>
                     `;
@@ -665,7 +665,7 @@ class AppHandler {
                         // Update all study panel information
                         document.getElementById('study-name').textContent = experiment.name;
                         document.getElementById('study-description').textContent = experiment.description;
-                        document.getElementById('study-length').textContent = `${experiment.length} minutes`;
+                        document.getElementById('study-length').textContent = `${experiment.length.minutes}:${experiment.length.seconds.toString().padStart(2, '0')}`;
                         document.getElementById('study-created').textContent = new Date(experiment.createdAt).toLocaleString();
                         document.getElementById('study-folder').textContent = experiment.folder;
                         
@@ -1063,10 +1063,12 @@ class AppHandler {
 
     // Update the timer methods to work with individual displays
     startExperimentTimer(duration) {
-        this.experimentDuration = duration * 60;
+        // Convert duration object to total seconds
+        this.experimentDuration = (duration.minutes * 60) + duration.seconds;
         this.timeRemaining = this.experimentDuration;
         const timerDisplay = document.getElementById('time-remaining');
         this.updateTimerDisplay(timerDisplay);
+        
         // Clear any existing timer
         this.stopExperimentTimer();
 
@@ -1509,7 +1511,8 @@ class AppHandler {
         this.updateButtonStates(STATES.RECORDING);
         
         const lengthText = document.getElementById('study-length').textContent;
-        const duration = parseInt(lengthText.split(' ')[0]);
+        const [minutes, seconds] = lengthText.split(':').map(num => parseInt(num));
+        const duration = { minutes, seconds };
         
         this.startExperimentTimer(duration);
         window.electronAPI.minimize();
