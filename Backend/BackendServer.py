@@ -445,44 +445,45 @@ class BackendServer:
 
     def start_eye_gaze(self):
         """Initialize and start eye gaze tracking."""
-        try:
-            if not self._fitting_eye_gaze and not self._eye_gaze_running:
-                if self._camera_manager.register_user('eye_gaze'):
-                    self._create_directories()
-                    self._eye_gaze = GazeProcessor()
+        self._post_process_eye_gaze()
+        # try:
+        #     if not self._fitting_eye_gaze and not self._eye_gaze_running:
+        #         if self._camera_manager.register_user('eye_gaze'):
+        #             self._create_directories()
+        #             self._eye_gaze = GazeProcessor()
                     
-                    def eye_gaze_task():
-                        try:
-                            self._add_thread(threading.current_thread())
-                            self.send_signal_update(SIGNAL_GAZE, 'connecting')
-                            while True:
-                                if self._camera_manager:
-                                    frame = self._camera_manager.get_frame()
-                                    if frame is not None:   
-                                        gaze_data = self._eye_gaze.get_gaze_vector(frame)
-                                        if gaze_data[2] is not None:
-                                            with threading.Lock():
-                                                self._last_gaze_frame = gaze_data[2].copy()
+        #             def eye_gaze_task():
+        #                 try:
+        #                     self._add_thread(threading.current_thread())
+        #                     self.send_signal_update(SIGNAL_GAZE, 'connecting')
+        #                     while True:
+        #                         if self._camera_manager:
+        #                             frame = self._camera_manager.get_frame()
+        #                             if frame is not None:   
+        #                                 gaze_data = self._eye_gaze.get_gaze_vector(frame)
+        #                                 if gaze_data[2] is not None:
+        #                                     with threading.Lock():
+        #                                         self._last_gaze_frame = gaze_data[2].copy()
                                 
-                                        if gaze_data[0] is not None and gaze_data[1] is not None:
-                                            break
-                            self._eye_gaze_running = True
-                            self._fitting_eye_gaze = False
-                            self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
-                        finally:
-                            self._remove_thread(threading.current_thread())
+        #                                 if gaze_data[0] is not None and gaze_data[1] is not None:
+        #                                     break
+        #                     self._eye_gaze_running = True
+        #                     self._fitting_eye_gaze = False
+        #                     self._socket.send_json({"status": STATUS_SUCCESS, "message": START_CALIBRATION_MSG})
+        #                 finally:
+        #                     self._remove_thread(threading.current_thread())
 
-                    local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
-                    local_thread.start()
-                    return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
-                else:
-                    raise Exception("Failed to initialize camera for eye tracking")
-            else:
-                return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
-        except Exception as e:
-            self._camera_manager.unregister_user('eye_gaze')
-            print(f"Error starting eye gaze: {e}")
-            return {"status": STATUS_ERROR, "message": str(e)}
+        #             local_thread = threading.Thread(target=eye_gaze_task, daemon=True)
+        #             local_thread.start()
+        #             return {"status": STATUS_SUCCESS, "message": "Eye gaze tracking started"}
+        #         else:
+        #             raise Exception("Failed to initialize camera for eye tracking")
+        #     else:
+        #         return {"status": STATUS_ERROR, "message": "Eye gaze is already started or cannot be started"}
+        # except Exception as e:
+        #     self._camera_manager.unregister_user('eye_gaze')
+        #     print(f"Error starting eye gaze: {e}")
+        #     return {"status": STATUS_ERROR, "message": str(e)}
 
     def start_data_collection(self):
         """Start all active data collection threads."""

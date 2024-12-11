@@ -194,6 +194,7 @@ class AppHandler {
 
     setupButtons() {
         this.viewCamera = document.getElementById('view-camera');
+        this.viewCamera.disabled = this.DISABLED;
     }
 
     setupEventListeners() {
@@ -514,7 +515,7 @@ class AppHandler {
                 this.updateCameraButtonState(this.selectedExperimentId, this.DISABLED);
                 this.updateParticipantButtonStates('stop', this.DISABLED);
                 this.updateParticipantButtonStates('start', this.DISABLED);
-                this.updateParticipantButtonStates('eye-tracking', this.ENABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
                 this.lockUIForCalibration(false);
                 break;
             case STATES.RECORDING:
@@ -526,10 +527,11 @@ class AppHandler {
                 this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 this.updateParticipantButtonStates('stop', this.ENABLED);
                 this.updateParticipantButtonStates('start', this.DISABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
                 this.lockUIForCalibration(true);
                 break;
             case STATES.INITIAL:
-                this.viewCamera.disabled = this.ENABLED;
+                this.viewCamera.disabled = this.DISABLED;
                 addParticipantBtn.disabled = !this.selectedExperimentId;
                 newStudyBtn.disabled = this.ENABLED;
                 experimentsList.style.pointerEvents = 'auto';
@@ -555,7 +557,7 @@ class AppHandler {
                 this.updateCameraButtonState(this.selectedExperimentId, this.ENABLED);
                 this.updateParticipantButtonStates('stop', this.DISABLED);
                 this.updateParticipantButtonStates('start', this.ENABLED);
-                this.updateParticipantButtonStates('eye-tracking', this.DISABLED);
+                this.updateParticipantButtonStates('eye-tracking', this.ENABLED);
                 this.lockUIForCalibration(false);
                 break;
             case STATES.DISABLED:
@@ -781,7 +783,7 @@ class AppHandler {
                             </div>
                             <div class="participant-controls">
                                 ${hasEyeTracking ? 
-                                    `<button class="control-button eye-tracking-button" disabled title="Start eye tracking calibration">Eye Track</button>` : 
+                                    `<button class="control-button eye-tracking-button" disabled title="Start eye tracking calibration">Post process</button>` : 
                                     ''
                                 }
                                 <button class="control-button start-button" disabled title="Start recording">Start</button>
@@ -823,12 +825,12 @@ class AppHandler {
                                 return;
                             }
 
-                            const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
-                            if (confirmed) {
-                                this.hasConfirmed = true;
-                                this.updateButtonStates(STATES.CALIBRATING);
+                            // const confirmed = confirm("By clicking OK, you agree to start recording data. This will collect interaction data. Do you wish to proceed?");
+                            // if (confirmed) {
+                            //     this.hasConfirmed = true;
+                                // this.updateButtonStates(STATES.CALIBRATING);
                                 await this.sendCommandToBackend(COMMANDS.START_GAZE);
-                            }
+                            // }
                         });
                     }
 
